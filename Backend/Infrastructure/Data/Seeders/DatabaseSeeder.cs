@@ -8,629 +8,825 @@ namespace Infrastructure.Data.Seeders;
 /// Seeds the database with sample data for testing
 /// Run this once after initial migration
 /// </summary>
-public static class DatabaseSeeder
+public class DatabaseSeeder(AppDbContext context)
 {
-    public static async Task SeedAsync(AppDbContext context)
+    public async Task SeedAsync()
     {
-        // Check if database already has data
-        if (await context.Users.AnyAsync())
+        await context.Database.EnsureCreatedAsync();
+
+        if (!await context.Users.AnyAsync())
         {
-            Console.WriteLine("Database already seeded. Skipping...");
-            return;
+            await SeedUsers();
+            await SeedAddresses();
+            await SeedCustomers();
+            await SeedLeads();
+            await SeedInstallations();
+            await SeedInstallationStatusHistory();
+            await SeedInstallationTechnicians();
+            await SeedEquipment();
+            await SeedWeatherData();
+            await SeedEnergyProduction();
+            await SeedSupportTickets();
+            await SeedDocuments();
         }
+    }
 
-        Console.WriteLine("Seeding database...");
+    private async Task SeedUsers()
+    {
+        var users = new List<User>
+        {
+            new User
+            {
+                Email = "admin@solarcompany.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
+                FirstName = "System",
+                LastName = "Administrator",
+                Role = UserRole.Admin,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddMonths(-12),
+                LastLoginAt = DateTime.UtcNow.AddDays(-1)
+            },
+            new User
+            {
+                Email = "tech.john@solarcompany.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Tech123!"),
+                FirstName = "John",
+                LastName = "Smith",
+                Role = UserRole.Technician,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddMonths(-8),
+                LastLoginAt = DateTime.UtcNow.AddDays(-3),
+                Specialization = "Solar Panel Installation",
+                LicenseNumber = "TECH-001"
+            },
+            new User
+            {
+                Email = "tech.maria@solarcompany.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Tech123!"),
+                FirstName = "Maria",
+                LastName = "Garcia",
+                Role = UserRole.Technician,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddMonths(-6),
+                LastLoginAt = DateTime.UtcNow.AddDays(-5),
+                Specialization = "Electrical Systems",
+                LicenseNumber = "TECH-002"
+            },
+            new User
+            {
+                Email = "tech.david@solarcompany.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Tech123!"),
+                FirstName = "David",
+                LastName = "Chen",
+                Role = UserRole.Technician,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddMonths(-4),
+                LastLoginAt = DateTime.UtcNow.AddDays(-2),
+                Specialization = "Battery Systems",
+                LicenseNumber = "TECH-003"
+            },
+            new User
+            {
+                Email = "customer.service@solarcompany.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Support123!"),
+                FirstName = "Sarah",
+                LastName = "Johnson",
+                Role = UserRole.Admin,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow.AddMonths(-10),
+                LastLoginAt = DateTime.UtcNow.AddDays(-1)
+            }
+        };
 
-        // 1. Create Addresses
+        await context.Users.AddRangeAsync(users);
+        await context.SaveChangesAsync();
+    }
+    private async Task SeedAddresses()
+    {
         var addresses = new List<Address>
         {
             new Address
             {
                 Street = "123 Main Street",
-                City = "Los Angeles",
-                State = "California",
-                ZipCode = "90001",
-                Country = "USA",
-                Latitude = 34.0522m,
-                Longitude = -118.2437m,
-                UniqueAddressHash = "4C0A74C8B8D8B6D16E29AB2DADFC403744A2F5471B129C380014803EEC16517B"
-            },
-            new Address
-            {
-                Street = "456 Oak Avenue",
                 City = "San Diego",
-                State = "California",
+                State = "CA",
                 ZipCode = "92101",
                 Country = "USA",
                 Latitude = 32.7157m,
                 Longitude = -117.1611m,
-                UniqueAddressHash = "F0B04CDB3ACD51AC510A4E8AA3C9E36BA4E25F8D52F9CF0A03D62E9B6C18CFBE"
+                UniqueAddressHash = Address.BuildHash("123 Main Street", "San Diego", "CA", "92101", "USA")
             },
             new Address
             {
-                Street = "789 Beach Road",
-                City = "Santa Monica",
-                State = "California",
-                ZipCode = "90401",
+                Street = "456 Oak Avenue",
+                City = "Los Angeles",
+                State = "CA",
+                ZipCode = "90001",
                 Country = "USA",
-                Latitude = 34.0195m,
-                Longitude = -118.4912m,
-                UniqueAddressHash = "E69C64D95EB76A040B81F9F0D9ADDD4D2532BEB2A0093F536BA7C58C6E4D4F14"
+                Latitude = 34.0522m,
+                Longitude = -118.2437m,
+                UniqueAddressHash = Address.BuildHash("456 Oak Avenue", "Los Angeles", "CA", "90001", "USA")
             },
             new Address
             {
-                Street = "321 Mountain View Dr",
+                Street = "789 Pine Road",
                 City = "San Francisco",
-                State = "California",
+                State = "CA",
                 ZipCode = "94102",
                 Country = "USA",
                 Latitude = 37.7749m,
                 Longitude = -122.4194m,
-                UniqueAddressHash = "11C9E99F878FEBA0545302994B52DE9587D51353B4AB6E80DC3380296B19A646"
+                UniqueAddressHash = Address.BuildHash("789 Pine Road", "San Francisco", "CA", "94102", "USA")
+            },
+            new Address
+            {
+                Street = "321 Elm Street",
+                City = "San Diego",
+                State = "CA",
+                ZipCode = "92103",
+                Country = "USA",
+                Latitude = 32.7490m,
+                Longitude = -117.1670m,
+                UniqueAddressHash = Address.BuildHash("321 Elm Street", "San Diego", "CA", "92103", "USA")
+            },
+            new Address
+            {
+                Street = "654 Maple Drive",
+                City = "San Jose",
+                State = "CA",
+                ZipCode = "95123",
+                Country = "USA",
+                Latitude = 37.3382m,
+                Longitude = -121.8863m,
+                UniqueAddressHash = Address.BuildHash("654 Maple Drive", "San Jose", "CA", "95123", "USA")
             }
         };
+
         await context.Addresses.AddRangeAsync(addresses);
         await context.SaveChangesAsync();
-
-        // 2. Create Users (Admin and Technicians)
-        var users = new List<User>
-        {
-            new User
-            {
-                Email = "admin@solarcr m.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
-                FirstName = "John",
-                LastName = "Administrator",
-                Role = UserRole.Admin,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
-            },
-            new User
-            {
-                Email = "mike.tech@solarcrm.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Tech123!"),
-                FirstName = "Mike",
-                LastName = "Technician",
-                Role = UserRole.Technician,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-                Specialization = "Solar Panel Installation",
-                LicenseNumber = "CA-SOLAR-12345"
-            },
-            new User
-            {
-                Email = "sarah.tech@solarcrm.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Tech123!"),
-                FirstName = "Sarah",
-                LastName = "Engineer",
-                Role = UserRole.Technician,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-                Specialization = "Electrical Systems",
-                LicenseNumber = "CA-ELEC-67890"
-            }
-        };
-        await context.Users.AddRangeAsync(users);
-        await context.SaveChangesAsync();
-
-        // 3. Create Customers
+    }
+    private async Task SeedCustomers()
+    {
         var customers = new List<Customer>
         {
             new Customer
             {
                 FirstName = "Robert",
-                LastName = "Johnson",
-                Email = "robert.j@email.com",
-                PhoneNumber = "+1-555-0101",
+                LastName = "Wilson",
+                Email = "robert.wilson@email.com",
+                PhoneNumber = "(619) 555-0101",
                 Status = CustomerStatus.Active,
                 RegistrationDate = DateTime.UtcNow.AddMonths(-6),
-                LastActivityDate = DateTime.UtcNow.AddDays(-5),
-                ContactAddressId = addresses[0].Id
+                LastActivityDate = DateTime.UtcNow.AddDays(-10),
+                ContactAddressId = 1
             },
             new Customer
             {
-                FirstName = "Emily",
-                LastName = "Davis",
-                Email = "emily.d@email.com",
-                PhoneNumber = "+1-555-0102",
-                Status = CustomerStatus.Prospect,
-                RegistrationDate = DateTime.UtcNow.AddMonths(-2),
-                LastActivityDate = DateTime.UtcNow.AddDays(-10),
-                ContactAddressId = addresses[1].Id
+                FirstName = "Jennifer",
+                LastName = "Martinez",
+                Email = "jennifer.martinez@email.com",
+                PhoneNumber = "(213) 555-0102",
+                Status = CustomerStatus.Active,
+                RegistrationDate = DateTime.UtcNow.AddMonths(-4),
+                LastActivityDate = DateTime.UtcNow.AddDays(-5),
+                ContactAddressId = 2
             },
             new Customer
             {
                 FirstName = "Michael",
                 LastName = "Brown",
-                Email = "michael.b@email.com",
-                PhoneNumber = "+1-555-0103",
-                Status = CustomerStatus.Lead,
-                RegistrationDate = DateTime.UtcNow.AddDays(-15),
+                Email = "michael.brown@email.com",
+                PhoneNumber = "(415) 555-0103",
+                Status = CustomerStatus.Active,
+                RegistrationDate = DateTime.UtcNow.AddMonths(-2),
                 LastActivityDate = DateTime.UtcNow.AddDays(-2),
-                ContactAddressId = addresses[2].Id
+                ContactAddressId = 3
+            },
+            new Customer
+            {
+                FirstName = "Lisa",
+                LastName = "Taylor",
+                Email = "lisa.taylor@email.com",
+                PhoneNumber = "(619) 555-0104",
+                Status = CustomerStatus.Prospect,
+                RegistrationDate = DateTime.UtcNow.AddMonths(-1),
+                LastActivityDate = DateTime.UtcNow.AddDays(-15),
+                ContactAddressId = 4
             }
         };
+
         await context.Customers.AddRangeAsync(customers);
         await context.SaveChangesAsync();
+    }
+    private async Task SeedLeads()
+    {
+        var leads = new List<Lead>
+        {
+            new Lead
+            {
+                FirstName = "Lisa",
+                LastName = "Taylor",
+                Email = "lisa.taylor@email.com",
+                PhoneNumber = "(619) 555-0104",
+                AddressId = 4,
+                PropertyType = PropertyType.House,
+                IsPropertyOwner = true,
+                Status = LeadStatus.Converted,
+                CreatedAt = DateTime.UtcNow.AddMonths(-2),
+                ContactedAt = DateTime.UtcNow.AddMonths(-2).AddDays(1),
+                ConvertedAt = DateTime.UtcNow.AddMonths(-1),
+                MonthlyBillRange = "$200-$300",
+                BestTimeToContact = "Evening",
+                Notes = "Very interested in battery backup system",
+                CustomerId = 4
+            },
+            new Lead
+            {
+                FirstName = "James",
+                LastName = "Anderson",
+                Email = "james.anderson@email.com",
+                PhoneNumber = "(408) 555-0105",
+                AddressId = 5,
+                PropertyType = PropertyType.House,
+                IsPropertyOwner = true,
+                Status = LeadStatus.Contacted,
+                CreatedAt = DateTime.UtcNow.AddDays(-10),
+                ContactedAt = DateTime.UtcNow.AddDays(-8),
+                MonthlyBillRange = "$150-$250",
+                BestTimeToContact = "Morning",
+                Notes = "Considering solar for new construction"
+            },
+            new Lead
+            {
+                FirstName = "Amanda",
+                LastName = "White",
+                Email = "amanda.white@email.com",
+                PhoneNumber = "(619) 555-0106",
+                AddressId = 1,
+                PropertyType = PropertyType.Apartment,
+                IsPropertyOwner = false,
+                Status = LeadStatus.Disqualified,
+                CreatedAt = DateTime.UtcNow.AddDays(-20),
+                ContactedAt = DateTime.UtcNow.AddDays(-18),
+                MonthlyBillRange = "$100-$150",
+                BestTimeToContact = "Afternoon",
+                Notes = "Renter - not eligible for installation"
+            },
+            new Lead
+            {
+                FirstName = "Kevin",
+                LastName = "Lee",
+                Email = "kevin.lee@email.com",
+                PhoneNumber = "(213) 555-0107",
+                AddressId = 2,
+                PropertyType = PropertyType.Commercial,
+                IsPropertyOwner = true,
+                Status = LeadStatus.New,
+                CreatedAt = DateTime.UtcNow.AddDays(-3),
+                MonthlyBillRange = "$500-$700",
+                BestTimeToContact = "Business Hours",
+                Notes = "Commercial property owner interested in large system"
+            }
+        };
 
-        // 4. Create Installations
+        await context.Leads.AddRangeAsync(leads);
+        await context.SaveChangesAsync();
+    }
+    private async Task SeedInstallations()
+    {
         var installations = new List<Installation>
         {
             new Installation
             {
-                ProjectName = "Johnson Residence Solar Installation",
+                ProjectName = "Wilson Residence Solar Project",
                 Status = InstallationStatus.Active,
                 StartDate = DateTime.UtcNow.AddMonths(-5),
                 CompletionDate = DateTime.UtcNow.AddMonths(-1),
                 SystemSizeKw = 8.5m,
-                PanelCount = 20,
-                InverterType = "SolarEdge SE7600H-US",
-                Notes = "Residential installation with battery backup",
-                CustomerId = customers[0].Id,
-                InstallationAddressId = addresses[0].Id,
-                Customer = customers[0],
-                InstallationAddress = addresses[0]
+                PanelCount = 22,
+                InverterType = "String Inverter",
+                Notes = "South-facing roof, excellent sun exposure",
+                CustomerId = 1,
+                InstallationAddressId = 1,
+                Customer = null!,
+                InstallationAddress = null!
             },
             new Installation
             {
-                ProjectName = "Davis Beach House Solar Project",
+                ProjectName = "Martinez Home Solar System",
+                Status = InstallationStatus.Inspection,
+                StartDate = DateTime.UtcNow.AddMonths(-3),
+                CompletionDate = null,
+                SystemSizeKw = 12.2m,
+                PanelCount = 32,
+                InverterType = "Microinverters",
+                Notes = "Includes battery backup system",
+                CustomerId = 2,
+                InstallationAddressId = 2,
+                Customer = null!,
+                InstallationAddress = null!
+            },
+            new Installation
+            {
+                ProjectName = "Brown Family Solar Installation",
                 Status = InstallationStatus.Installation,
                 StartDate = DateTime.UtcNow.AddMonths(-1),
-                SystemSizeKw = 6.0m,
-                PanelCount = 15,
-                InverterType = "Enphase IQ7+",
-                Notes = "Installation in progress",
-                CustomerId = customers[1].Id,
-                InstallationAddressId = addresses[3].Id,
-                Customer = customers[1],
-                InstallationAddress = addresses[3]
+                CompletionDate = null,
+                SystemSizeKw = 6.8m,
+                PanelCount = 18,
+                InverterType = "String Inverter",
+                Notes = "East-west roof configuration",
+                CustomerId = 3,
+                InstallationAddressId = 3,
+                Customer = null!,
+                InstallationAddress = null!
             },
             new Installation
             {
-                ProjectName = "Brown Residence - Initial Survey",
-                Status = InstallationStatus.Survey,
+                ProjectName = "Taylor Residence Solar Project",
+                Status = InstallationStatus.Design,
                 StartDate = DateTime.UtcNow.AddDays(-10),
-                SystemSizeKw = 5.5m,
-                PanelCount = 12,
-                Notes = "Awaiting site survey completion",
-                CustomerId = customers[2].Id,
-                InstallationAddressId = addresses[2].Id,
-                Customer = customers[2],
-                InstallationAddress = addresses[2]
+                CompletionDate = null,
+                SystemSizeKw = 10.0m,
+                PanelCount = 26,
+                InverterType = "Microinverters",
+                Notes = "Planning phase - awaiting customer approval",
+                CustomerId = 4,
+                InstallationAddressId = 4,
+                Customer = null!,
+                InstallationAddress = null!
             }
         };
+
         await context.Installations.AddRangeAsync(installations);
         await context.SaveChangesAsync();
+    }
+    private async Task SeedInstallationStatusHistory()
+    {
+        var adminUser = await context.Users.FirstAsync(u => u.Role == UserRole.Admin);
+        var history = new List<InstallationStatusHistory>();
 
-        // 5. Create Installation Status History
-        var statusHistories = new List<InstallationStatusHistory>
+        // Installation 1 - Complete workflow
+        var installation1History = new[]
         {
-            // For Installation 1 (Johnson - Active)
-            new InstallationStatusHistory
-            {
-                InstallationId = installations[0].Id,
-                FromStatus = InstallationStatus.Survey,
-                ToStatus = InstallationStatus.Design,
-                ChangedAt = DateTime.UtcNow.AddMonths(-5),
-                ChangedByUserId = users[0].Id,
-                Notes = "Site survey completed successfully",
-                Installation = installations[0],
-                ChangedBy = users[0]
-            },
-            new InstallationStatusHistory
-            {
-                InstallationId = installations[0].Id,
-                FromStatus = InstallationStatus.Design,
-                ToStatus = InstallationStatus.Permits,
-                ChangedAt = DateTime.UtcNow.AddMonths(-4).AddDays(-20),
-                ChangedByUserId = users[0].Id,
-                Notes = "System design approved by customer",
-                Installation = installations[0],
-                ChangedBy = users[0]
-            },
-            new InstallationStatusHistory
-            {
-                InstallationId = installations[0].Id,
-                FromStatus = InstallationStatus.Permits,
-                ToStatus = InstallationStatus.Installation,
-                ChangedAt = DateTime.UtcNow.AddMonths(-3),
-                ChangedByUserId = users[0].Id,
-                Notes = "All permits obtained from city",
-                Installation = installations[0],
-                ChangedBy = users[0]
-            },
-            new InstallationStatusHistory
-            {
-                InstallationId = installations[0].Id,
-                FromStatus = InstallationStatus.Installation,
-                ToStatus = InstallationStatus.Inspection,
-                ChangedAt = DateTime.UtcNow.AddMonths(-2),
-                ChangedByUserId = users[1].Id,
-                Notes = "Installation completed",
-                Installation = installations[0],
-                ChangedBy = users[0]
-            },
-            new InstallationStatusHistory
-            {
-                InstallationId = installations[0].Id,
-                FromStatus = InstallationStatus.Inspection,
-                ToStatus = InstallationStatus.Active,
-                ChangedAt = DateTime.UtcNow.AddMonths(-1),
-                ChangedByUserId = users[0].Id,
-                Notes = "Passed final inspection, system activated",
-                Installation = installations[0],
-                ChangedBy = users[0]
-            },
-            // For Installation 2 (Davis - In Progress)
-            new InstallationStatusHistory
-            {
-                InstallationId = installations[1].Id,
-                FromStatus = InstallationStatus.Survey,
-                ToStatus = InstallationStatus.Design,
-                ChangedAt = DateTime.UtcNow.AddDays(-25),
-                ChangedByUserId = users[0].Id,
-                Installation = installations[0],
-                ChangedBy = users[0]
-            },
-            new InstallationStatusHistory
-            {
-                InstallationId = installations[1].Id,
-                FromStatus = InstallationStatus.Design,
-                ToStatus = InstallationStatus.Permits,
-                ChangedAt = DateTime.UtcNow.AddDays(-20),
-                ChangedByUserId = users[0].Id,
-                Installation = installations[1],
-                ChangedBy = users[0]
-            },
-            new InstallationStatusHistory
-            {
-                InstallationId = installations[1].Id,
-                FromStatus = InstallationStatus.Permits,
-                ToStatus = InstallationStatus.Installation,
-                ChangedAt = DateTime.UtcNow.AddDays(-5),
-                ChangedByUserId = users[1].Id,
-                Notes = "Installation crew assigned",
-                Installation = installations[1],
-                ChangedBy = users[1]
-            }
+            new { From = InstallationStatus.Survey, To = InstallationStatus.Design, DaysAgo = 150 },
+            new { From = InstallationStatus.Design, To = InstallationStatus.Permits, DaysAgo = 140 },
+            new { From = InstallationStatus.Permits, To = InstallationStatus.Installation, DaysAgo = 120 },
+            new { From = InstallationStatus.Installation, To = InstallationStatus.Inspection, DaysAgo = 60 },
+            new { From = InstallationStatus.Inspection, To = InstallationStatus.Active, DaysAgo = 30 }
         };
-        await context.InstallationStatusHistories.AddRangeAsync(statusHistories);
-        await context.SaveChangesAsync();
 
-        // 6. Create Technician Assignments
-        var technicianAssignments = new List<InstallationTechnician>
+        foreach (var change in installation1History)
         {
-            new InstallationTechnician
+            history.Add(new InstallationStatusHistory
             {
-                InstallationId = installations[0].Id,
-                TechnicianId = users[1].Id,
-                AssignedDate = DateTime.UtcNow.AddMonths(-5),
-                CompletedDate = DateTime.UtcNow.AddMonths(-1),
-                Role = "Lead Installer",
-                Notes = "Successfully completed installation",
-                Installation = installations[0],
-                Technician = users[1]
-            },
-            new InstallationTechnician
-            {
-                InstallationId = installations[0].Id,
-                TechnicianId = users[2].Id,
-                AssignedDate = DateTime.UtcNow.AddMonths(-3),
-                CompletedDate = DateTime.UtcNow.AddMonths(-1),
-                Role = "Electrical Engineer",
-                Notes = "Handled electrical connections and grid integration",
-                Installation = installations[0],
-                Technician = users[2]
-            },
-            new InstallationTechnician
-            {
-                InstallationId = installations[1].Id,
-                TechnicianId = users[1].Id,
-                AssignedDate = DateTime.UtcNow.AddDays(-5),
-                Role = "Lead Installer",
-                Notes = "Currently installing",
-                Installation = installations[1],
-                Technician = users[1]
-            }
-        };
-        await context.InstallationTechnicians.AddRangeAsync(technicianAssignments);
-        await context.SaveChangesAsync();
-
-        // 7. Create Weather Data
-        var weatherData = new List<WeatherData>();
-        var random = new Random();
-        var baseDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30));
-            
-        for (int i = 0; i < 30; i++)
-        {
-            weatherData.Add(new WeatherData
-            {
-                Date = baseDate.AddDays(i),
-                Location = "Los Angeles, CA",
-                Condition = random.Next(0, 3) switch
-                {
-                    0 => "Sunny",
-                    1 => "Partly Cloudy",
-                    _ => "Cloudy"
-                },
-                TemperatureCelsius = 20m + random.Next(-5, 10),
-                CloudCoverPercentage = random.Next(0, 100)
+                FromStatus = change.From,
+                ToStatus = change.To,
+                ChangedAt = DateTime.UtcNow.AddDays(-change.DaysAgo),
+                Notes = $"Status changed from {change.From} to {change.To}",
+                InstallationId = 1,
+                ChangedByUserId = adminUser.Id,
+                Installation = null!,
+                ChangedBy = null!
             });
         }
-        await context.WeatherData.AddRangeAsync(weatherData);
-        await context.SaveChangesAsync();
 
-        // 8. Create Energy Production Data (for active installation)
-        var energyProductions = new List<EnergyProduction>();
-        for (int i = 0; i < 30; i++)
+        // Installation 2 - In progress
+        var installation2History = new[]
         {
-            var date = baseDate.AddDays(i);
-            var weather = weatherData.First(w => w.Date == date);
-            var baseProd = weather.Condition == "Sunny" ? 45m : weather.Condition == "Partly Cloudy" ? 35m : 25m;
-                
-            energyProductions.Add(new EnergyProduction
+            new { From = InstallationStatus.Survey, To = InstallationStatus.Design, DaysAgo = 90 },
+            new { From = InstallationStatus.Design, To = InstallationStatus.Permits, DaysAgo = 75 },
+            new { From = InstallationStatus.Permits, To = InstallationStatus.Installation, DaysAgo = 45 },
+            new { From = InstallationStatus.Installation, To = InstallationStatus.Inspection, DaysAgo = 10 }
+        };
+
+        foreach (var change in installation2History)
+        {
+            history.Add(new InstallationStatusHistory
             {
-                InstallationId = installations[0].Id,
-                ProductionDate = date,
-                ExpectedProductionKwh = 40m,
-                ActualProductionKwh = baseProd +
-                                      random.Next(-5,
-                                          5),
-                HealthStatus = SystemHealthStatus.Excellent,
-                WeatherDataId = weather.Id,
-                Installation = installations[0]
+                FromStatus = change.From,
+                ToStatus = change.To,
+                ChangedAt = DateTime.UtcNow.AddDays(-change.DaysAgo),
+                Notes = $"Status changed from {change.From} to {change.To}",
+                InstallationId = 2,
+                ChangedByUserId = adminUser.Id,
+                Installation = null!,
+                ChangedBy = null!
             });
         }
-        await context.EnergyProductions.AddRangeAsync(energyProductions);
-        await context.SaveChangesAsync();
 
-        // 9. Create Equipment
+        await context.InstallationStatusHistories.AddRangeAsync(history);
+        await context.SaveChangesAsync();
+    }
+    private async Task SeedInstallationTechnicians()
+    {
+        var technicians = await context.Users.Where(u => u.Role == UserRole.Technician).ToListAsync();
+        var assignments = new List<InstallationTechnician>();
+
+        // Installation 1 - Completed project
+        assignments.Add(new InstallationTechnician
+        {
+            AssignedDate = DateTime.UtcNow.AddMonths(-5),
+            CompletedDate = DateTime.UtcNow.AddMonths(-1),
+            Role = "Lead Installer",
+            Notes = "Completed installation ahead of schedule",
+            InstallationId = 1,
+            TechnicianId = technicians[0].Id,
+            Installation = null!,
+            Technician = null!
+        });
+
+        // Installation 2 - Current project with multiple technicians
+        assignments.Add(new InstallationTechnician
+        {
+            AssignedDate = DateTime.UtcNow.AddMonths(-3),
+            CompletedDate = null,
+            Role = "Lead Installer",
+            Notes = "Managing battery system installation",
+            InstallationId = 2,
+            TechnicianId = technicians[1].Id,
+            Installation = null!,
+            Technician = null!
+        });
+
+        assignments.Add(new InstallationTechnician
+        {
+            AssignedDate = DateTime.UtcNow.AddMonths(-2),
+            CompletedDate = null,
+            Role = "Electrical Specialist",
+            Notes = "Handling electrical connections",
+            InstallationId = 2,
+            TechnicianId = technicians[2].Id,
+            Installation = null!,
+            Technician = null!
+        });
+
+        // Installation 3 - New project
+        assignments.Add(new InstallationTechnician
+        {
+            AssignedDate = DateTime.UtcNow.AddMonths(-1),
+            CompletedDate = null,
+            Role = "Installer",
+            Notes = "Standard panel installation",
+            InstallationId = 3,
+            TechnicianId = technicians[0].Id,
+            Installation = null!,
+            Technician = null!
+        });
+
+        await context.InstallationTechnicians.AddRangeAsync(assignments);
+        await context.SaveChangesAsync();
+    }
+    private async Task SeedEquipment()
+    {
         var equipment = new List<Equipment>
         {
-            // Equipment for Installation 1
+            // Solar Panels
             new Equipment
             {
                 Type = EquipmentType.SolarPanel,
-                Model = "LG NeON 2 LG350Q1C-A5",
-                SerialNumber = "SN-PANEL-001",
-                Manufacturer = "LG Electronics",
+                Model = "SunPower X22-370",
+                SerialNumber = "SPX22-370-001",
+                Manufacturer = "SunPower",
                 Status = EquipmentStatus.Installed,
                 PurchaseDate = DateTime.UtcNow.AddMonths(-6),
-                WarrantyExpiryDate = DateTime.UtcNow.AddYears(25),
-                Cost = 350m,
-                Specifications = "{\"wattage\": 350, \"efficiency\": 21.1, \"dimensions\": \"1686x1016x40mm\"}",
-                InstallationId = installations[0].Id
+                WarrantyExpiryDate = DateTime.UtcNow.AddYears(24).AddMonths(6),
+                Cost = 285.00m,
+                Specifications = "{\"wattage\": 370, \"efficiency\": 22.1, \"cellType\": \"Monocrystalline\"}",
+                InstallationId = 1
+            },
+            new Equipment
+            {
+                Type = EquipmentType.SolarPanel,
+                Model = "LG NeON R",
+                SerialNumber = "LGN360-002",
+                Manufacturer = "LG",
+                Status = EquipmentStatus.Installed,
+                PurchaseDate = DateTime.UtcNow.AddMonths(-4),
+                WarrantyExpiryDate = DateTime.UtcNow.AddYears(24).AddMonths(8),
+                Cost = 265.00m,
+                Specifications = "{\"wattage\": 360, \"efficiency\": 21.7, \"cellType\": \"N-type\"}",
+                InstallationId = 2
+            },
+
+            // Inverters
+            new Equipment
+            {
+                Type = EquipmentType.Inverter,
+                Model = "SE7600H",
+                SerialNumber = "SE7600-001",
+                Manufacturer = "SolarEdge",
+                Status = EquipmentStatus.Installed,
+                PurchaseDate = DateTime.UtcNow.AddMonths(-6),
+                WarrantyExpiryDate = DateTime.UtcNow.AddYears(11).AddMonths(6),
+                Cost = 1200.00m,
+                Specifications = "{\"power\": 7600, \"efficiency\": 99.0, \"type\": \"String\"}",
+                InstallationId = 1
             },
             new Equipment
             {
                 Type = EquipmentType.Inverter,
-                Model = "SolarEdge SE7600H-US",
-                SerialNumber = "SN-INV-001",
-                Manufacturer = "SolarEdge",
-                Status = EquipmentStatus.Installed,
-                PurchaseDate = DateTime.UtcNow.AddMonths(-6),
-                WarrantyExpiryDate = DateTime.UtcNow.AddYears(12),
-                Cost = 1500m,
-                Specifications = "{\"capacity\": \"7.6kW\", \"efficiency\": 97.6, \"type\": \"String Inverter\"}",
-                InstallationId = installations[0].Id
-            },
-            // Equipment for Installation 2
-            new Equipment
-            {
-                Type = EquipmentType.SolarPanel,
-                Model = "Canadian Solar CS3W-400P",
-                SerialNumber = "SN-PANEL-002",
-                Manufacturer = "Canadian Solar",
+                Model = "IQ8+",
+                SerialNumber = "ENPH-IQ8-001",
+                Manufacturer = "Enphase",
                 Status = EquipmentStatus.Assigned,
-                PurchaseDate = DateTime.UtcNow.AddMonths(-2),
-                WarrantyExpiryDate = DateTime.UtcNow.AddYears(25),
-                Cost = 320m,
-                Specifications = "{\"wattage\": 400, \"efficiency\": 19.8}",
-                InstallationId = installations[1].Id
+                PurchaseDate = DateTime.UtcNow.AddMonths(-3),
+                WarrantyExpiryDate = DateTime.UtcNow.AddYears(24).AddMonths(9),
+                Cost = 185.00m,
+                Specifications = "{\"power\": 300, \"efficiency\": 97.5, \"type\": \"Microinverter\"}",
+                InstallationId = 2
             },
-            // Equipment in stock
+
+            // Batteries
             new Equipment
             {
                 Type = EquipmentType.Battery,
-                Model = "Tesla Powerwall 2",
-                SerialNumber = "SN-BAT-001",
+                Model = "Powerwall 2",
+                SerialNumber = "PW2-001",
                 Manufacturer = "Tesla",
-                Status = EquipmentStatus.InStock,
-                PurchaseDate = DateTime.UtcNow.AddMonths(-1),
-                WarrantyExpiryDate = DateTime.UtcNow.AddYears(10),
-                Cost = 7500m,
-                Specifications = "{\"capacity\": \"13.5kWh\", \"power\": \"5kW continuous\"}"
+                Status = EquipmentStatus.Assigned,
+                PurchaseDate = DateTime.UtcNow.AddMonths(-3),
+                WarrantyExpiryDate = DateTime.UtcNow.AddYears(9).AddMonths(9),
+                Cost = 7500.00m,
+                Specifications = "{\"capacity\": 13.5, \"power\": 7, \"chemistry\": \"Lithium-ion\"}",
+                InstallationId = 2
             },
+
+            // In-stock equipment
             new Equipment
             {
-                Type = EquipmentType.MonitoringSystem,
-                Model = "SolarEdge Monitoring Portal",
-                SerialNumber = "SN-MON-001",
-                Manufacturer = "SolarEdge",
-                Status = EquipmentStatus.Installed,
-                PurchaseDate = DateTime.UtcNow.AddMonths(-6),
-                Cost = 300m,
-                Specifications = "{\"connectivity\": \"WiFi/Ethernet\", \"features\": \"Real-time monitoring\"}",
-                InstallationId = installations[0].Id
+                Type = EquipmentType.SolarPanel,
+                Model = "Q.PEAK DUO BLK-G10",
+                SerialNumber = "QCELLS-001",
+                Manufacturer = "Qcells",
+                Status = EquipmentStatus.InStock,
+                PurchaseDate = DateTime.UtcNow.AddMonths(-1),
+                WarrantyExpiryDate = DateTime.UtcNow.AddYears(24).AddMonths(11),
+                Cost = 240.00m,
+                Specifications = "{\"wattage\": 355, \"efficiency\": 20.6, \"cellType\": \"PERC\"}",
+                InstallationId = null
             }
         };
+
         await context.Equipment.AddRangeAsync(equipment);
         await context.SaveChangesAsync();
+    }
+    private async Task SeedWeatherData()
+    {
+        var weatherData = new List<WeatherData>
+        {
+            new WeatherData
+            {
+                Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-5)),
+                Location = "San Diego, CA",
+                Condition = "Sunny",
+                TemperatureCelsius = 24.5m,
+                CloudCoverPercentage = 10
+            },
+            new WeatherData
+            {
+                Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-4)),
+                Location = "San Diego, CA",
+                Condition = "Partly Cloudy",
+                TemperatureCelsius = 22.8m,
+                CloudCoverPercentage = 40
+            },
+            new WeatherData
+            {
+                Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-3)),
+                Location = "San Diego, CA",
+                Condition = "Cloudy",
+                TemperatureCelsius = 20.1m,
+                CloudCoverPercentage = 75
+            },
+            new WeatherData
+            {
+                Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-2)),
+                Location = "San Diego, CA",
+                Condition = "Sunny",
+                TemperatureCelsius = 25.2m,
+                CloudCoverPercentage = 5
+            },
+            new WeatherData
+            {
+                Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)),
+                Location = "San Diego, CA",
+                Condition = "Rainy",
+                TemperatureCelsius = 18.3m,
+                CloudCoverPercentage = 90
+            }
+        };
 
-        // 10. Create Support Tickets
-        var supportTickets = new List<SupportTicket>
+        await context.WeatherData.AddRangeAsync(weatherData);
+        await context.SaveChangesAsync();
+    }
+    private async Task SeedEnergyProduction()
+    {
+        var production = new List<EnergyProduction>();
+        var installation1 = await context.Installations.FindAsync(1);
+        var weatherData = await context.WeatherData.ToListAsync();
+
+        // Generate 30 days of production data for installation 1
+        for (int i = 0; i < 30; i++)
+        {
+            var date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-29 + i));
+            var weather = weatherData.FirstOrDefault(w => w.Date == date);
+            
+            // Simulate seasonal variation + weather impact
+            var baseProduction = installation1!.SystemSizeKw * 4.2m; // 4.2 sun hours average
+            var weatherMultiplier = weather?.Condition switch
+            {
+                "Sunny" => 1.1m,
+                "Partly Cloudy" => 0.9m,
+                "Cloudy" => 0.6m,
+                "Rainy" => 0.3m,
+                _ => 0.8m
+            };
+            
+            var randomVariation = (decimal)(Random.Shared.NextDouble() * 0.4 + 0.8); // 0.8-1.2 variation
+            var actualProduction = baseProduction * weatherMultiplier * randomVariation;
+
+            production.Add(new EnergyProduction
+            {
+                ProductionDate = date,
+                ActualProductionKwh = Math.Round(actualProduction,
+                    2),
+                ExpectedProductionKwh = Math.Round(baseProduction,
+                    2),
+                HealthStatus = actualProduction >= baseProduction * 0.9m
+                    ? SystemHealthStatus.Excellent
+                    : actualProduction >= baseProduction * 0.7m
+                        ? SystemHealthStatus.Good
+                        : SystemHealthStatus.Warning,
+                Notes = weather?.Condition ?? "Normal operation",
+                InstallationId = 1,
+                WeatherDataId = weather?.Id,
+                Installation = null!
+            });
+        }
+
+        await context.EnergyProductions.AddRangeAsync(production);
+        await context.SaveChangesAsync();
+    }
+    private async Task SeedSupportTickets()
+    {
+        var supportUser = await context.Users.FirstAsync(u => u.Email == "customer.service@solarcompany.com");
+        var tickets = new List<SupportTicket>
         {
             new SupportTicket
             {
-                Title = "Inverter displaying error code",
+                Title = "System performance lower than expected",
                 Description =
-                    "The inverter has been showing error code E012 for the past 2 days. System production has dropped significantly.",
+                    "Noticed that energy production seems about 15% lower than what was projected during the design phase.",
+                Status = TicketStatus.Resolved,
+                Priority = TicketPriority.Medium,
+                CreatedAt = DateTime.UtcNow.AddDays(-20),
+                AssignedAt = DateTime.UtcNow.AddDays(-19),
+                ResolvedAt = DateTime.UtcNow.AddDays(-15),
+                ResolutionNotes = "Adjusted panel tilt and cleaned debris. Performance returned to expected levels.",
+                CustomerId = 1,
+                AssignedToUserId = supportUser.Id,
+                InstallationId = 1,
+                Customer = null!
+            },
+            new SupportTicket
+            {
+                Title = "Monitoring app not showing real-time data",
+                Description = "The solar monitoring application shows data from 2 days ago but not current production.",
                 Status = TicketStatus.InProgress,
                 Priority = TicketPriority.High,
-                CreatedAt = DateTime.UtcNow.AddDays(-3),
-                AssignedAt = DateTime.UtcNow.AddDays(-2),
-                CustomerId = customers[0].Id,
-                InstallationId = installations[0].Id,
-                AssignedToUserId = users[1].Id,
-                Customer = customers[0]
+                CreatedAt = DateTime.UtcNow.AddDays(-5),
+                AssignedAt = DateTime.UtcNow.AddDays(-4),
+                ResolutionNotes = null,
+                CustomerId = 2,
+                AssignedToUserId = supportUser.Id,
+                InstallationId = 2,
+                Customer = null!
             },
             new SupportTicket
             {
-                Title = "Request for production report",
-                Description = "Could you please send me the detailed production report for last month? I need it for my utility company.",
-                Status = TicketStatus.Resolved,
-                Priority = TicketPriority.Low,
-                CreatedAt = DateTime.UtcNow.AddDays(-10),
-                AssignedAt = DateTime.UtcNow.AddDays(-9),
-                ResolvedAt = DateTime.UtcNow.AddDays(-8),
-                ClosedAt = DateTime.UtcNow.AddDays(-7),
-                CustomerId = customers[0].Id,
-                InstallationId = installations[0].Id,
-                AssignedToUserId = users[0].Id,
-                ResolutionNotes = "Production report sent via email",
-                Customer = customers[0]
-            },
-            new SupportTicket
-            {
-                Title = "Question about installation timeline",
-                Description = "When can we expect the installation to begin? We've been waiting for permits approval.",
+                Title = "Inverter error code 023",
+                Description = "Inverter display shows error code 023 and system has stopped producing power.",
                 Status = TicketStatus.Open,
-                Priority = TicketPriority.Medium,
+                Priority = TicketPriority.Critical,
+                CreatedAt = DateTime.UtcNow.AddDays(-2),
+                AssignedAt = null,
+                ResolutionNotes = null,
+                CustomerId = 3,
+                AssignedToUserId = null,
+                InstallationId = 3,
+                Customer = null!
+            },
+            new SupportTicket
+            {
+                Title = "General inquiry about expansion",
+                Description = "Interested in adding more panels to existing system. Need information about compatibility and costs.",
+                Status = TicketStatus.Open,
+                Priority = TicketPriority.Low,
                 CreatedAt = DateTime.UtcNow.AddDays(-1),
-                CustomerId = customers[1].Id,
-                InstallationId = installations[1].Id,
-                Customer = customers[1]
+                AssignedAt = null,
+                ResolutionNotes = null,
+                CustomerId = 1,
+                AssignedToUserId = null,
+                InstallationId = 1,
+                Customer = null!
             }
         };
-        await context.SupportTickets.AddRangeAsync(supportTickets);
-        await context.SaveChangesAsync();
 
-        // 11. Create Documents
+        await context.SupportTickets.AddRangeAsync(tickets);
+        await context.SaveChangesAsync();
+    }
+    private async Task SeedDocuments()
+    {
+        var adminUser = await context.Users.FirstAsync(u => u.Role == UserRole.Admin);
         var documents = new List<Document>
         {
             // Customer documents
             new Document
             {
-                FileName = "robert_johnson_id.pdf",
-                FilePath = "/uploads/customers/1/id_verification.pdf",
-                FileType = "pdf",
+                FileName = "robert_wilson_id.pdf",
+                FilePath = "/documents/customers/1/id_verification.pdf",
+                FileType = "application/pdf",
                 FileSize = 2048576,
                 Type = DocumentType.IdVerification,
                 UploadedAt = DateTime.UtcNow.AddMonths(-6),
-                Description = "Driver's license for identity verification",
-                CustomerId = customers[0].Id,
-                UploadedByUserId = users[0].Id,
-                UploadedBy = users[0]
+                Description = "Driver's License - Robert Wilson",
+                CustomerId = 1,
+                UploadedByUserId = adminUser.Id,
+                UploadedBy = null!
             },
             new Document
             {
-                FileName = "robert_johnson_property_deed.pdf",
-                FilePath = "/uploads/customers/1/property_deed.pdf",
-                FileType = "pdf",
-                FileSize = 3145728,
-                Type = DocumentType.PropertyOwnership,
+                FileName = "wilson_utility_bill.pdf",
+                FilePath = "/documents/customers/1/utility_bill.pdf",
+                FileType = "application/pdf",
+                FileSize = 1548576,
+                Type = DocumentType.UtilityBill,
                 UploadedAt = DateTime.UtcNow.AddMonths(-6),
-                Description = "Property ownership documentation",
-                CustomerId = customers[0].Id,
-                UploadedByUserId = users[0].Id,
-                UploadedBy = users[0]
+                Description = "SDG&E Utility Bill",
+                CustomerId = 1,
+                UploadedByUserId = adminUser.Id,
+                UploadedBy = null!
             },
+
             // Installation documents
             new Document
             {
-                FileName = "johnson_contract_signed.pdf",
-                FilePath = "/uploads/installations/1/contract.pdf",
-                FileType = "pdf",
-                FileSize = 1048576,
-                Type = DocumentType.InstallationContract,
-                UploadedAt = DateTime.UtcNow.AddMonths(-5),
-                Description = "Signed installation contract",
-                InstallationId = installations[0].Id,
-                UploadedByUserId = users[0].Id,
-                UploadedBy = users[0]
-            },
-            new Document
-            {
-                FileName = "johnson_building_permit.pdf",
-                FilePath = "/uploads/installations/1/building_permit.pdf",
-                FileType = "pdf",
-                FileSize = 524288,
+                FileName = "wilson_building_permit.pdf",
+                FilePath = "/documents/installations/1/building_permit.pdf",
+                FileType = "application/pdf",
+                FileSize = 3048576,
                 Type = DocumentType.BuildingPermit,
-                UploadedAt = DateTime.UtcNow.AddMonths(-4),
-                Description = "City building permit approval",
-                InstallationId = installations[0].Id,
-                UploadedByUserId = users[0].Id,
-                UploadedBy = users[0]
+                UploadedAt = DateTime.UtcNow.AddMonths(-5),
+                Description = "City of San Diego Building Permit",
+                InstallationId = 1,
+                UploadedByUserId = adminUser.Id,
+                UploadedBy = null!
             },
             new Document
             {
-                FileName = "johnson_installation_photo1.jpg",
-                FilePath = "/uploads/installations/1/photo1.jpg",
-                FileType = "jpg",
-                FileSize = 4194304,
+                FileName = "wilson_installation_photo1.jpg",
+                FilePath = "/documents/installations/1/installation_photo1.jpg",
+                FileType = "image/jpeg",
+                FileSize = 4458576,
                 Type = DocumentType.InstallationPhoto,
                 UploadedAt = DateTime.UtcNow.AddMonths(-2),
-                Description = "Panels installed on roof - front view",
-                InstallationId = installations[0].Id,
-                UploadedByUserId = users[1].Id,
-                UploadedBy = users[1]
+                Description = "Roof installation completed",
+                InstallationId = 1,
+                UploadedByUserId = adminUser.Id,
+                UploadedBy = null!
             },
             new Document
             {
-                FileName = "johnson_installation_photo2.jpg",
-                FilePath = "/uploads/installations/1/photo2.jpg",
-                FileType = "jpg",
-                FileSize = 3932160,
-                Type = DocumentType.InstallationPhoto,
-                UploadedAt = DateTime.UtcNow.AddMonths(-2),
-                Description = "Inverter and electrical connections",
-                InstallationId = installations[0].Id,
-                UploadedByUserId = users[1].Id,
-                UploadedBy = users[1]
-            },
-            new Document
-            {
-                FileName = "johnson_inspection_cert.pdf",
-                FilePath = "/uploads/installations/1/inspection.pdf",
-                FileType = "pdf",
-                FileSize = 819200,
-                Type = DocumentType.InspectionCertificate,
+                FileName = "wilson_warranty.pdf",
+                FilePath = "/documents/installations/1/warranty.pdf",
+                FileType = "application/pdf",
+                FileSize = 1048576,
+                Type = DocumentType.WarrantyDocument,
                 UploadedAt = DateTime.UtcNow.AddMonths(-1),
-                Description = "Final inspection certificate from city",
-                InstallationId = installations[0].Id,
-                UploadedByUserId = users[0].Id,
-                UploadedBy = users[0]
+                Description = "25-Year System Warranty",
+                InstallationId = 1,
+                UploadedByUserId = adminUser.Id,
+                UploadedBy = null!
             },
+
             // Ticket documents
             new Document
             {
-                FileName = "inverter_error_screenshot.jpg",
-                FilePath = "/uploads/tickets/1/error_screen.jpg",
-                FileType = "jpg",
-                FileSize = 1572864,
-                Type = DocumentType.ProblemPhoto,
-                UploadedAt = DateTime.UtcNow.AddDays(-3),
-                Description = "Photo of inverter error display",
-                TicketId = supportTickets[0].Id,
-                UploadedByUserId = users[0].Id,
-                UploadedBy = users[0]
+                FileName = "performance_report.pdf",
+                FilePath = "/documents/tickets/1/performance_report.pdf",
+                FileType = "application/pdf",
+                FileSize = 1848576,
+                Type = DocumentType.DiagnosticReport,
+                UploadedAt = DateTime.UtcNow.AddDays(-18),
+                Description = "System Performance Analysis",
+                TicketId = 1,
+                UploadedByUserId = adminUser.Id,
+                UploadedBy = null!
             }
         };
+
         await context.Documents.AddRangeAsync(documents);
         await context.SaveChangesAsync();
-
-        Console.WriteLine("Database seeding completed successfully!");
-        Console.WriteLine($"Created:");
-        Console.WriteLine($"  - {addresses.Count} addresses");
-        Console.WriteLine($"  - {users.Count} users");
-        Console.WriteLine($"  - {customers.Count} customers");
-        Console.WriteLine($"  - {installations.Count} installations");
-        Console.WriteLine($"  - {statusHistories.Count} status history records");
-        Console.WriteLine($"  - {technicianAssignments.Count} technician assignments");
-        Console.WriteLine($"  - {weatherData.Count} weather records");
-        Console.WriteLine($"  - {energyProductions.Count} energy production records");
-        Console.WriteLine($"  - {equipment.Count} equipment items");
-        Console.WriteLine($"  - {supportTickets.Count} support tickets");
-        Console.WriteLine($"  - {documents.Count} documents");
     }
 }

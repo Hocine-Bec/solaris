@@ -537,6 +537,110 @@ namespace Infrastructure.Migrations
                     b.ToTable("installation_technicians", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.Lead", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AddressId")
+                        .HasColumnType("integer")
+                        .HasColumnName("address_id");
+
+                    b.Property<string>("BestTimeToContact")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("best_time_to_contact");
+
+                    b.Property<DateTime?>("ContactedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("contacted_at");
+
+                    b.Property<DateTime?>("ConvertedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("converted_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("CustomerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("first_name");
+
+                    b.Property<bool>("IsPropertyOwner")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_property_owner");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_name");
+
+                    b.Property<string>("MonthlyBillRange")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("monthly_bill_range");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone_number");
+
+                    b.Property<string>("PropertyType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("property_type");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AddressId");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_leads_created_at");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_leads_customer_id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_leads_status");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("ix_leads_status_created_at");
+
+                    b.ToTable("leads", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.SupportTicket", b =>
                 {
                     b.Property<int>("Id")
@@ -864,6 +968,24 @@ namespace Infrastructure.Migrations
                     b.Navigation("Installation");
 
                     b.Navigation("Technician");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Lead", b =>
+                {
+                    b.HasOne("Domain.Entities.Address", "Address")
+                        .WithMany()
+                        .HasForeignKey("AddressId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Address");
+
+                    b.Navigation("Customer");
                 });
 
             modelBuilder.Entity("Domain.Entities.SupportTicket", b =>
