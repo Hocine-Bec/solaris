@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SupportTicket> SupportTickets { get; set; }
     public DbSet<Document> Documents { get; set; }
     public DbSet<User> Users { get; set; }
+    public DbSet<Lead> Leads { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

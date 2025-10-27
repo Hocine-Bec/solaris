@@ -24,7 +24,8 @@ namespace Infrastructure.Migrations
                     zip_code = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     country = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     latitude = table.Column<decimal>(type: "numeric(10,7)", precision: 10, scale: 7, nullable: false),
-                    longitude = table.Column<decimal>(type: "numeric(10,7)", precision: 10, scale: 7, nullable: false)
+                    longitude = table.Column<decimal>(type: "numeric(10,7)", precision: 10, scale: 7, nullable: false),
+                    unique_address_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -128,6 +129,45 @@ namespace Infrastructure.Migrations
                         principalTable: "customers",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "leads",
+                columns: table => new
+                {
+                    id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    first_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    last_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    email = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    phone_number = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    address_id = table.Column<int>(type: "integer", nullable: false),
+                    property_type = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    is_property_owner = table.Column<bool>(type: "boolean", nullable: false),
+                    status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    contacted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    converted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    monthly_bill_range = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    best_time_to_contact = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    notes = table.Column<string>(type: "text", nullable: true),
+                    customer_id = table.Column<int>(type: "integer", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_leads", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_leads_addresses_address_id",
+                        column: x => x.address_id,
+                        principalTable: "addresses",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_leads_customers_customer_id",
+                        column: x => x.customer_id,
+                        principalTable: "customers",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -350,6 +390,12 @@ namespace Infrastructure.Migrations
                 column: "zip_code");
 
             migrationBuilder.CreateIndex(
+                name: "ux_addresses_unique_address_hash",
+                table: "addresses",
+                column: "unique_address_hash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_customers_contact_address_id",
                 table: "customers",
                 column: "contact_address_id");
@@ -493,6 +539,31 @@ namespace Infrastructure.Migrations
                 columns: new[] { "status", "start_date" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_leads_address_id",
+                table: "leads",
+                column: "address_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_leads_created_at",
+                table: "leads",
+                column: "created_at");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_leads_customer_id",
+                table: "leads",
+                column: "customer_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_leads_status",
+                table: "leads",
+                column: "status");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_leads_status_created_at",
+                table: "leads",
+                columns: new[] { "status", "created_at" });
+
+            migrationBuilder.CreateIndex(
                 name: "ix_support_tickets_assigned_to_user_id",
                 table: "support_tickets",
                 column: "AssignedToUserId");
@@ -562,6 +633,9 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "installation_technicians");
+
+            migrationBuilder.DropTable(
+                name: "leads");
 
             migrationBuilder.DropTable(
                 name: "support_tickets");

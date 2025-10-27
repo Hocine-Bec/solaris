@@ -16,7 +16,7 @@ export default function CTASection() {
         <p className="text-lg sm:text-xl text-gray-700 dark:text-gray-300 mb-10 max-w-2xl mx-auto">
           Talk to our team today and see how Solaris can simplify your solar journey.
         </p>
-        <Button variant="primary" size="lg" href="#consultation">
+        <Button variant="primary" size="lg" to='/quote'>
           Book a Consultation
         </Button>
       </div>

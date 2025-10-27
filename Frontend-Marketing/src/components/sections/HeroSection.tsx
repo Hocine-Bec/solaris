@@ -25,7 +25,7 @@ export default function HeroSection() {
                 From installation to real-time tracking, Solaris simplifies your journey to clean energy.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Button variant="primary" size="lg" href="#quote" className="w-full sm:w-auto">
+                <Button variant="primary" size="lg" to='/quote' className="w-full sm:w-auto">
                   Get a Free Quote
                 </Button>
                 <Button variant="secondary" size="lg" href="#learn-more" className="w-full sm:w-auto">

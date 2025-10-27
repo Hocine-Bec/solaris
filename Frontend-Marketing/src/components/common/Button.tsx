@@ -1,8 +1,11 @@
+import { Link } from "react-router-dom";
+
 interface ButtonProps {
   children: React.ReactNode;
   variant?: 'primary' | 'secondary' | 'outlined';
   size?: 'sm' | 'md' | 'lg';
   href?: string;
+  to?: string;
   onClick?: () => void;
   className?: string;
 }
@@ -12,6 +15,7 @@ export default function Button({
   variant = 'primary',
   size = 'md',
   href,
+  to,
   onClick,
   className = ''
 }: ButtonProps) {
@@ -32,6 +36,16 @@ export default function Button({
 
   const classes = `${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`;
 
+  // If 'to' prop is provided, use React Router Link
+  if (to) {
+    return (
+      <Link to={to} className={classes}>
+        {children}
+      </Link>
+    );
+  }
+
+  // If href is provided, render as external link
   if (href) {
     return (
       <a href={href} className={classes}>
@@ -40,6 +54,7 @@ export default function Button({
     );
   }
 
+  // Otherwise render as button
   return (
     <button onClick={onClick} className={classes}>
       {children}

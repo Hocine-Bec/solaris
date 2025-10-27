@@ -38,7 +38,7 @@ public class CustomerMapping : IRegister
         // CreateCustomerRequest to Entity
         config.NewConfig<CreateCustomerRequest, Customer>()
             .Map(dest => dest.RegistrationDate, src => DateTime.UtcNow)
-            .Map(dest => dest.Status, src => CustomerStatus.Lead)
+            .Map(dest => dest.Status, src => CustomerStatus.Prospect)
             .Ignore(dest => dest.Id)
             .Ignore(dest => dest.LastActivityDate)
             .Ignore(dest => dest.Installations)
@@ -49,7 +49,7 @@ public class CustomerMapping : IRegister
         // UpdateCustomerRequest to Entity
         config.NewConfig<UpdateCustomerRequest, Customer>()
             .IgnoreNullValues(true)
-            .Map(dest => dest.Status, src => src.Status != null ? Enum.Parse<CustomerStatus>(src.Status) : CustomerStatus.Lead)
+            .Map(dest => dest.Status, src => src.Status != null ? Enum.Parse<CustomerStatus>(src.Status) : CustomerStatus.Prospect)
             .Map(dest => dest.LastActivityDate, src => DateTime.UtcNow)
             .Ignore(dest => dest.Id)
             .Ignore(dest => dest.RegistrationDate)
