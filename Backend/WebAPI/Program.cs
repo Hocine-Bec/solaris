@@ -97,7 +97,7 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await context.Database.MigrateAsync();
-    await DatabaseSeeder.SeedAsync(context);
+    await new DatabaseSeeder(context).SeedAsync();
 }
 
 app.UseSerilogRequestLogging();
