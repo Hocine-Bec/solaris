@@ -1,6 +1,6 @@
-import Input from '../common/Input';
 import RadioGroup from '../common/RadioGroup';
 import type { QuoteFormStepData, FormErrors } from '../../types';
+import AddressAutocomplete from '../common/AddressAutoComplete';
 
 interface PropertyInfoStepProps {
   data: QuoteFormStepData;
@@ -31,14 +31,25 @@ export default function PropertyInfoStep({ data, errors, onChange }: PropertyInf
         </p>
       </div>
 
-      <Input
+      <AddressAutocomplete
         label="Property Address"
         value={data.propertyAddress}
-        onChange={(value) => onChange('propertyAddress', value)}
+        onChange={(value: any) => onChange('propertyAddress', value)}
+        onAddressSelect={(address: any) => {
+          // Store individual address components in state
+          onChange('propertyStreet', address.street || '');
+          onChange('propertyCity', address.city || '');
+          onChange('propertyState', address.state || '');
+          onChange('propertyZipCode', address.zipCode || '');
+          onChange('propertyCountry', address.country || '');
+          onChange('propertyLatitude', address.latitude?.toString() || '');
+          onChange('propertyLongitude', address.longitude?.toString() || '');
+        }}
         error={errors.propertyAddress}
         placeholder="123 Main St, City, State, ZIP"
         required
       />
+
 
       <RadioGroup
         label="Property Type"

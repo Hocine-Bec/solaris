@@ -17,9 +17,9 @@ export default function QualificationStep({ data, errors, onChange }: Qualificat
   ];
 
   const contactTimeOptions = [
-    { value: 'morning', label: 'Morning (8am-12pm)' },
-    { value: 'afternoon', label: 'Afternoon (12pm-5pm)' },
-    { value: 'evening', label: 'Evening (5pm-8pm)' },
+    { value: 'Morning', label: 'Morning (8am-12pm)' },
+    { value: 'Afternoon', label: 'Afternoon (12pm-5pm)' },
+    { value: 'Evening', label: 'Evening (5pm-8pm)' },
   ];
 
   return (

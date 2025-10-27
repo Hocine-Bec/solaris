@@ -16,13 +16,13 @@ export interface QuoteFormData {
 
 
 // Navigation link structure 
-export interface NavLink{
+export interface NavLink {
   label: string;
   href: string;
 }
 
 // Quote form data
-export interface QuoteFormData{
+export interface QuoteFormData {
   fullName: string;
   email: string;
   phone: string;
@@ -32,8 +32,8 @@ export interface QuoteFormData{
 }
 
 // Multi-step quote form data
-export interface QuoteFormStepData{
-// Step 1: Contact info
+export interface QuoteFormStepData {
+  // Step 1: Contact info
   firstName: string;
   lastName: string;
   email: string;
@@ -41,15 +41,23 @@ export interface QuoteFormStepData{
 
   // Step 2: Property Info
   propertyAddress: string;
-  propertyType: 'house' | 'apartment' | 'commercial' | '';
+  propertyType: 'House' | 'Apartment' | 'Commercial' | '';
   ownsProperty: 'yes' | 'no' | '';
+
+  propertyStreet?: string;
+  propertyCity?: string;
+  propertyState?: string;
+  propertyZipCode?: string;
+  propertyCountry?: string;
+  propertyLatitude?: number;
+  propertyLongitude?: number;
 
   // Step 3: Qualification
   electricBill: 'under100' | '100-200' | '200-300' | '300plus' | '';
-  contactTime: 'morning' | 'afternoon' | 'evening' | '';
+  contactTime: 'Morning' | 'Afternoon' | 'Evening' | '';
   additionalInfo: string;
 }
 
-export interface FormErrors{
+export interface FormErrors {
   [key: string]: string;
 }
