@@ -7,12 +7,14 @@ import PropertyInfoStep from '../components/forms/PropertyInfoStep';
 import QualificationStep from '../components/forms/QualificationStep';
 import ConfirmationStep from '../components/forms/ConfirmationStep';
 import Button from '../components/common/Button';
+import toast from 'react-hot-toast';
 import type { QuoteFormStepData, FormErrors } from '../types';
 
 export default function QuoteFormPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Form data state
   const [formData, setFormData] = useState<QuoteFormStepData>({
     firstName: '',
@@ -46,7 +48,7 @@ export default function QuoteFormPage() {
   // Validate Step 1
   const validateStep1 = (): boolean => {
     const newErrors: FormErrors = {};
-    
+
     if (!formData.firstName.trim()) {
       newErrors.firstName = 'First name is required';
     }
@@ -69,7 +71,7 @@ export default function QuoteFormPage() {
   // Validate Step 2
   const validateStep2 = (): boolean => {
     const newErrors: FormErrors = {};
-    
+
     if (!formData.propertyAddress.trim()) {
       newErrors.propertyAddress = 'Property address is required';
     }
@@ -87,7 +89,7 @@ export default function QuoteFormPage() {
   // Validate Step 3
   const validateStep3 = (): boolean => {
     const newErrors: FormErrors = {};
-    
+
     if (!formData.electricBill) {
       newErrors.electricBill = 'Please select your electric bill range';
     }
@@ -122,32 +124,64 @@ export default function QuoteFormPage() {
     window.scrollTo(0, 0);
   };
 
-  // Handle form submission
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateStep3()) {
-      // Log form data to console
-      console.log('=== QUOTE FORM SUBMISSION ===');
-      console.log('Contact Info:', {
+      // Build request object for backend
+      const createLeadRequest = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
-        phone: formData.phone,
-      });
-      console.log('Property Info:', {
-        address: formData.propertyAddress,
-        type: formData.propertyType,
-        owns: formData.ownsProperty,
-      });
-      console.log('Qualification:', {
-        electricBill: formData.electricBill,
-        contactTime: formData.contactTime,
-        additionalInfo: formData.additionalInfo,
-      });
+        phoneNumber: formData.phone,
+
+        // Property info
+        propertyStreet: formData.propertyStreet || '',
+        propertyCity: formData.propertyCity || '',
+        propertyState: formData.propertyState || '',
+        propertyZipCode: formData.propertyZipCode || '12345',
+        propertyCountry: formData.propertyCountry || '',
+        propertyLatitude: Number(formData.propertyLatitude).toFixed(3) || 0,
+        propertyLongitude: Number(formData.propertyLongitude).toFixed(3) || 0,
+        propertyType: formData.propertyType || '',
+        isPropertyOwner: formData.ownsProperty === 'yes',
+
+        // Qualification
+        monthlyBillRange: formData.electricBill || '',
+        bestTimeToContact: formData.contactTime || '',
+        notes: formData.additionalInfo || '',
+      };
+
+      console.log('=== QUOTE FORM SUBMISSION ===');
+      console.log('Payload to backend (CreateLeadRequest):', createLeadRequest);
+      console.log('JSON version:\n', JSON.stringify(createLeadRequest, null, 2));
       console.log('============================');
 
-      // Show confirmation
-      setIsSubmitted(true);
-      window.scrollTo(0, 0);
+      console.log('Submitting lead:', createLeadRequest);
+      setIsSubmitting(true);
+      const toastId = toast.loading('Submitting your quote...');
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/leads`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(createLeadRequest),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to submit lead. Status: ${response.status}`);
+        }
+        toast.success('Quote submitted successfully!', { id: toastId });
+        const result = await response.json();
+        console.log('✅ Lead submitted successfully:', result);
+        setIsSubmitted(true);
+        window.scrollTo(0, 0);
+      } catch (error) {
+        toast.error('Submission failed. Please try again.', { id: toastId });
+      }
+      finally {
+        setIsSubmitting(false);
+        toast.dismiss(toastId); // optional: hide spinner
+      }
     }
   };
 
@@ -190,9 +224,9 @@ export default function QuoteFormPage() {
   return (
     <div className="relative min-h-screen bg-background-light dark:bg-background-dark overflow-hidden">
       {/* Subtle Radial Gradient Background */}
-      <div 
-        className="absolute inset-0 opacity-20 dark:opacity-30 pointer-events-none" 
-        style={{ background: 'radial-gradient(circle at 50% 20%, rgba(242, 185, 13, 0.2) 0%, rgba(242, 185, 13, 0) 60%)' }} 
+      <div
+        className="absolute inset-0 opacity-20 dark:opacity-30 pointer-events-none"
+        style={{ background: 'radial-gradient(circle at 50% 20%, rgba(242, 185, 13, 0.2) 0%, rgba(242, 185, 13, 0) 60%)' }}
       />
 
       {/* Navbar */}
@@ -204,8 +238,8 @@ export default function QuoteFormPage() {
       <div className="relative max-w-3xl mx-auto px-6 py-20">
         {/* Back to Home Link */}
         {!isSubmitted && (
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-primary transition-colors mb-8"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -263,7 +297,7 @@ export default function QuoteFormPage() {
                   size="lg"
                   onClick={handleSubmit}
                 >
-                  Get My Free Quote!
+                  {isSubmitting ? 'Submitting...' : 'Get My Free Quote! 🚀'}
                 </Button>
               )}
             </div>
