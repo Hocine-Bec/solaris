@@ -1,7 +1,9 @@
 using System.Text;
 using Application.Interfaces.Repositories;
+using Application.Interfaces.Services;
 using Infrastructure.Data;
 using Infrastructure.Repositories;
+using Infrastructure.Services;
 using Infrastructure.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -66,7 +68,11 @@ public static class DependencyInjection
         services.AddScoped<ISupportTicketRepo, SupportTicketRepo>();
         services.AddScoped<IUserRepo, UserRepo>();
         services.AddScoped<IWeatherDataRepo, WeatherDataRepo>();
+        services.AddScoped<ILeadRepo, LeadRepo>();
         
+        // Gmail Services
+        services.AddSingleton<IGmailAuthService, GmailAuthService>();
+        services.AddScoped<IEmailService, EmailService>();
         
         
         return services;
