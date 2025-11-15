@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.Interfaces.Services;
 using Domain.ValueObjects;
 
@@ -54,27 +55,13 @@ public class GmailAuthService : IGmailAuthService
         if(!response.IsSuccessStatusCode)
             throw new Exception($"Failed to refresh Gmail access token: {responseContent}");
 
-        var accessToken = ExtractJsonValues(responseContent, "access_token") ?? string.Empty;
-        var expiresIn = int.Parse(ExtractJsonValues(responseContent, "expires_in") ?? "3600");
+        using var doc = JsonDocument.Parse(responseContent);
+        var root = doc.RootElement;
+
+        var accessToken = root.GetProperty("access_token").GetString() ?? string.Empty;
+        var expiresIn = root.GetProperty("expires_in").GetInt32();
         
         _cachedAccessToken = accessToken;
         _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 300);
-    }
-
-    private static string? ExtractJsonValues(string json, string key)
-    {
-        var searchKey = $"\"{key}\":";
-        var startIndex = json.IndexOf(searchKey);
-        if (startIndex == -1) return null;
-
-        startIndex += searchKey.Length;
-        while (startIndex < json.Length && (json[startIndex] == ' ' || json[startIndex] == '"'))
-            startIndex++;
-
-        var endIndex = startIndex;
-        while (endIndex < json.Length && json[endIndex] != '"' && json[endIndex] != ',' && json[endIndex] != '}')
-            endIndex++;
-
-        return json.Substring(startIndex, endIndex - startIndex).Trim('"');
     }
 }

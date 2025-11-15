@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Application.Common.Models;
 using Application.DTOs.Address;
 using Application.DTOs.Lead;
@@ -5,6 +6,7 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities;
 using Domain.Enums;
+using Hangfire;
 using Mapster;
 using Microsoft.Extensions.Logging;
 
@@ -13,14 +15,14 @@ namespace Application.Services;
 public class LeadService : ILeadService
 {
     private readonly ILeadRepo _repo;
-    private readonly IEmailService _emailService;
+    private readonly IEmailQueueHandler _emailQueueHandler;
     private readonly ICustomerRepo _customerRepo;
     private readonly IAddressService _addressRepo;
     private readonly ILogger<AddressService> _log;
     
-    public LeadService(ILeadRepo repo, IEmailService emailService, ICustomerRepo customerRepo, IAddressService addressRepo, ILogger<AddressService> log)
+    public LeadService(ILeadRepo repo, IEmailQueueHandler emailQueueHandler, ICustomerRepo customerRepo, IAddressService addressRepo, ILogger<AddressService> log)
     {
-        _emailService = emailService;
+        _emailQueueHandler = emailQueueHandler;
         _customerRepo = customerRepo;
         _addressRepo = addressRepo;
         _log = log;
@@ -82,15 +84,11 @@ public class LeadService : ILeadService
                 return Result.Failure<LeadResponse>("Failed to create the lead.");
             
             var fullAddress = $"{addressResult.Value.Street}, {addressResult.Value.State}, {addressResult.Value.ZipCode}, {addressResult.Value.City}, {addressResult.Value.Country}";
+            var fullName = $"{lead.FirstName} {lead.LastName}";
             
-            // Send notification email
-            await _emailService.SendLeadEmailAsync(lead.Email, lead.FirstName, fullAddress);
-            await _emailService.SendSalesNotificationEmailAsync(
-                created, 
-                $"{lead.FirstName} {lead.LastName}", 
-                lead.Email, 
-                lead.PhoneNumber, 
-                fullAddress);
+            // Enqueue background job
+            _emailQueueHandler.EnqueueLeadEmails(lead.Id, lead.Email, lead.FirstName, 
+                fullName, lead.PhoneNumber, fullAddress);
             
             var response = created.Adapt<LeadResponse>();
             return Result.Success(response, ResultStatusCode.Created);
