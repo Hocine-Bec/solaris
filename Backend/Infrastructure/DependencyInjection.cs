@@ -1,6 +1,8 @@
 using System.Text;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Infrastructure.Data;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
@@ -34,7 +36,28 @@ public static class DependencyInjection
         var connectionString = Environment.GetEnvironmentVariable("DEFAULTCONNECTION");
         services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
+        //Add Hangfire services
+        services.AddHangfire(config => 
+            config.SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+                .UseSimpleAssemblyNameTypeSerializer()
+                .UseRecommendedSerializerSettings()
+                .UsePostgreSqlStorage(options =>
+                {
+                    options.UseNpgsqlConnection(connectionString);
+                }, new PostgreSqlStorageOptions()
+                {
+                    QueuePollInterval = TimeSpan.FromSeconds(1),
+                    PrepareSchemaIfNecessary = true,
+                    InvisibilityTimeout = TimeSpan.FromMinutes(5),
+                    UseNativeDatabaseTransactions = true,
+                    EnableTransactionScopeEnlistment = true,
+                    SchemaName = "hangfire"
+                })
+        );
+        
+        services.AddHangfireServer();
 
+        //Configure Jwt settings
         services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -55,7 +78,7 @@ public static class DependencyInjection
                 ClockSkew = TimeSpan.Zero
             };
         });
-
+        
         //Repositories
         services.AddScoped<IAddressRepo, AddressRepo>();
         services.AddScoped<ICustomerRepo, CustomerRepo>();
@@ -73,6 +96,7 @@ public static class DependencyInjection
         // Gmail Services
         services.AddSingleton<IGmailAuthService, GmailAuthService>();
         services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<IEmailQueueHandler, EmailQueueHandler>();
         
         
         return services;
