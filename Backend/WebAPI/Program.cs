@@ -1,5 +1,6 @@
 using Application;
 using DotNetEnv;
+using Hangfire;
 using Infrastructure;
 using Infrastructure.Data;
 using Infrastructure.Data.Seeders;
@@ -8,6 +9,7 @@ using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
 using Serilog;
 using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
+using WebAPI.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -78,6 +80,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+app.UseHangfireDashboard();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -100,9 +104,12 @@ if (app.Environment.IsDevelopment())
     await new DatabaseSeeder(context).SeedAsync();
 }
 
+
 app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
+
+app.UseMiddleware<PerformanceMiddleware>();
 
 app.UseCors();
 
