@@ -1,73 +1,45 @@
-# React + TypeScript + Vite
+# Solaris marketing site
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The public website of [Solaris](../README.md): a landing page, and a quote form that sends a visitor's request
+to the Solaris API as a new lead.
 
-Currently, two official plugins are available:
+## Pages
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+| Route | Page |
+|---|---|
+| `/` | The landing page |
+| `/quote` | The quote form, in three steps (contact details, property, qualification), then a confirmation |
 
-## React Compiler
+The property step suggests addresses as the visitor types, using Geoapify's address autocomplete.
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+## Running locally
 
-## Expanding the ESLint configuration
+Prerequisites: Node.js 20.19+ or 22.12+ (required by Vite 7), and the Solaris API running.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```sh
+cp .env.example .env
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Configuration
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Variable | Purpose |
+|---|---|
+| `VITE_API_BASE_URL` | The API's base URL, including `/api` (locally `http://localhost:5228/api`) |
+| `VITE_GEOAPIFY_API_KEY` | A Geoapify API key for the address suggestions; without it, the address field shows a warning |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Vite builds both values into the JavaScript sent to the browser, so neither can be a secret.
+
+## Scripts
+
+| Command | Does |
+|---|---|
+| `npm run dev` | Starts the development server, with hot reload |
+| `npm run build` | Type-checks, then builds the site into `dist/` |
+| `npm run preview` | Serves the built `dist/` locally |
+| `npm run lint` | Runs ESLint |
+
+## Stack
+
+React 19 · TypeScript · Vite 7 · Tailwind CSS 4 · React Router 7
