@@ -1,6 +1,6 @@
 # Solaris marketing site
 
-The public website of [Solaris](../README.md): a landing page, and a quote form that sends a visitor's request
+The public website of [Solaris](../../README.md): a landing page, and a quote form that sends a visitor's request
 to the Solaris API as a new lead.
 
 ## Pages
@@ -11,6 +11,14 @@ to the Solaris API as a new lead.
 | `/quote` | The quote form, in three steps (contact details, property, qualification), then a confirmation |
 
 The property step suggests addresses as the visitor types, using Geoapify's address autocomplete.
+
+## Screenshots
+
+- Landing page: [hero](screenshots/1.hero-section.png), [about](screenshots/2.about-section.png),
+  [solutions](screenshots/3.solutions-section.png), [how it works](screenshots/4.how-it-works-section.png),
+  [testimonials](screenshots/5.testimonials-section.png), [why choose us](screenshots/6.why-choose-us-section.png),
+  [blog](screenshots/7.blog-section.png), [call to action and footer](screenshots/9.cta-footer-section.png)
+- [The quote form](screenshots/10.quote-form-page.png)
 
 ## Running locally
 
