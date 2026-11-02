@@ -266,7 +266,7 @@ public class LeadRepoTests : IntegrationTestBase
 
         // Assert
         result.Should().BeGreaterThan(0);
-        var savedLead = await Context.Leads.FindAsync(lead.Id);
+        var savedLead = await Context.Leads.FindAsync([lead.Id], TestContext.Current.CancellationToken);
         savedLead.Should().NotBeNull();
         savedLead!.FirstName.Should().Be(lead.FirstName);
     }
@@ -286,7 +286,7 @@ public class LeadRepoTests : IntegrationTestBase
         await _repo.CreateAsync(lead2);
 
         // Assert
-        var allLeads = await Context.Leads.ToListAsync();
+        var allLeads = await Context.Leads.ToListAsync(TestContext.Current.CancellationToken);
         allLeads.Should().HaveCount(2);
     }
 
@@ -318,7 +318,7 @@ public class LeadRepoTests : IntegrationTestBase
         ClearTracking();
 
         // Assert
-        var saved = await Context.Leads.FindAsync(lead.Id);
+        var saved = await Context.Leads.FindAsync([lead.Id], TestContext.Current.CancellationToken);
         saved.Should().NotBeNull();
         saved!.FirstName.Should().Be("Test");
         saved.LastName.Should().Be("User");
@@ -358,7 +358,7 @@ public class LeadRepoTests : IntegrationTestBase
         // Assert
         result.Should().BeTrue();
         ClearTracking();
-        var updated = await Context.Leads.FindAsync(1);
+        var updated = await Context.Leads.FindAsync([1], TestContext.Current.CancellationToken);
         updated!.Status.Should().Be(LeadStatus.Contacted);
         updated.ContactedAt.Should().NotBeNull();
     }
@@ -387,7 +387,7 @@ public class LeadRepoTests : IntegrationTestBase
         ClearTracking();
 
         // Assert
-        var updated = await Context.Leads.FindAsync(1);
+        var updated = await Context.Leads.FindAsync([1], TestContext.Current.CancellationToken);
         updated!.FirstName.Should().Be("New");
         updated.LastName.Should().Be("Person");
         updated.Status.Should().Be(LeadStatus.Contacted);
@@ -416,7 +416,7 @@ public class LeadRepoTests : IntegrationTestBase
         ClearTracking();
 
         // Assert
-        var updated = await Context.Leads.FindAsync(1);
+        var updated = await Context.Leads.FindAsync([1], TestContext.Current.CancellationToken);
         updated!.Status.Should().Be(LeadStatus.Converted);
         updated.ConvertedAt.Should().BeCloseTo(convertedAt, TimeSpan.FromSeconds(1));
         updated.CustomerId.Should().Be(100);
@@ -440,7 +440,7 @@ public class LeadRepoTests : IntegrationTestBase
 
         // Assert
         result.Should().BeTrue();
-        var deleted = await Context.Leads.FindAsync(1);
+        var deleted = await Context.Leads.FindAsync([1], TestContext.Current.CancellationToken);
         deleted.Should().BeNull();
     }
 
@@ -473,7 +473,7 @@ public class LeadRepoTests : IntegrationTestBase
         await _repo.DeleteAsync(leads[1]);
 
         // Assert
-        var remaining = await Context.Leads.ToListAsync();
+        var remaining = await Context.Leads.ToListAsync(TestContext.Current.CancellationToken);
         remaining.Should().HaveCount(2);
         remaining.Should().NotContain(l => l.Id == 2);
         remaining.Should().Contain(l => l.Id == 1);
@@ -528,7 +528,7 @@ public class LeadRepoTests : IntegrationTestBase
         }
 
         // Assert
-        var allLeads = await Context.Leads.ToListAsync();
+        var allLeads = await Context.Leads.ToListAsync(TestContext.Current.CancellationToken);
         allLeads.Should().HaveCount(5);
         allLeads.Should().Contain(l => l.Status == LeadStatus.New);
         allLeads.Should().Contain(l => l.Status == LeadStatus.Contacted);
@@ -586,7 +586,7 @@ public class LeadRepoTests : IntegrationTestBase
         await Task.WhenAll(task1, task2);
 
         // Assert
-        var allLeads = await Context.Leads.ToListAsync();
+        var allLeads = await Context.Leads.ToListAsync(TestContext.Current.CancellationToken);
         allLeads.Should().HaveCount(2);
     }
 

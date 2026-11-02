@@ -5,7 +5,6 @@ using Infrastructure;
 using Infrastructure.Data;
 using Infrastructure.Data.Seeders;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
 using Serilog;
 using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
@@ -24,42 +23,14 @@ builder.Services.AddControllers();
 // Auto-validation using FluentValidation 
 builder.Services.AddFluentValidationAutoValidation();
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddSwaggerGen(options =>
+// OpenAPI document for the API reference (mapped in Development only)
+builder.Services.AddOpenApi(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo 
-    { 
-        Title = "Solar CRM API", 
-        Version = "v1",
-        Description = "API for managing solar installations, customers, and energy monitoring",
-    });
-    
-    // Add JWT authentication to OpenAPI spec
-    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    options.AddDocumentTransformer((document, _, _) =>
     {
-        In = ParameterLocation.Header,
-        Description = "Please Enter 'Bearer' [space] and then your token in the text input below.",
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http, 
-        Scheme = "bearer",
-        BearerFormat = "JWT"
-    });
-    
-    // Apply security requirement globally to all operations
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                },
-                In = ParameterLocation.Header
-            },
-            new List<string>()
-        }
+        document.Info.Title = "Solar CRM API";
+        document.Info.Description = "API for managing solar installations, customers, and energy monitoring";
+        return Task.CompletedTask;
     });
 });
 
@@ -85,16 +56,14 @@ app.UseHangfireDashboard();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-    
+    app.MapOpenApi();
+
     app.MapScalarApiReference(options =>
     {
         options
             .WithTitle("Solar CRM API")
             .WithTheme(ScalarTheme.Kepler)
-            .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
-            .WithOpenApiRoutePattern("/swagger/{documentName}/swagger.json"); 
+            .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
     });
     
     // Auto-migrate database in development

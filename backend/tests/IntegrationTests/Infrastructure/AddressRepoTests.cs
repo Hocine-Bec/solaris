@@ -155,7 +155,7 @@ public class AddressRepoTests : IntegrationTestBase
 
         // Assert
         result.Should().BeGreaterThan(0);
-        var savedAddress = await Context.Addresses.FindAsync(address.Id);
+        var savedAddress = await Context.Addresses.FindAsync([address.Id], TestContext.Current.CancellationToken);
         savedAddress.Should().NotBeNull();
         savedAddress!.Street.Should().Be(address.Street);
     }
@@ -172,7 +172,7 @@ public class AddressRepoTests : IntegrationTestBase
         await _repo.CreateAsync(address2);
 
         // Assert
-        var allAddresses = await Context.Addresses.ToListAsync();
+        var allAddresses = await Context.Addresses.ToListAsync(TestContext.Current.CancellationToken);
         allAddresses.Should().HaveCount(2);
     }
 
@@ -193,7 +193,7 @@ public class AddressRepoTests : IntegrationTestBase
         ClearTracking();
 
         // Assert
-        var saved = await Context.Addresses.FindAsync(address.Id);
+        var saved = await Context.Addresses.FindAsync([address.Id], TestContext.Current.CancellationToken);
         saved.Should().NotBeNull();
         saved!.Street.Should().Be("123 Test St");
         saved.City.Should().Be("TestCity");
@@ -226,7 +226,7 @@ public class AddressRepoTests : IntegrationTestBase
         // Assert
         result.Should().BeTrue();
         ClearTracking();
-        var updated = await Context.Addresses.FindAsync(1);
+        var updated = await Context.Addresses.FindAsync([1], TestContext.Current.CancellationToken);
         updated!.Street.Should().Be("New Street");
     }
     
@@ -250,7 +250,7 @@ public class AddressRepoTests : IntegrationTestBase
         ClearTracking();
 
         // Assert
-        var updated = await Context.Addresses.FindAsync(address.Id);
+        var updated = await Context.Addresses.FindAsync([address.Id], TestContext.Current.CancellationToken);
         updated!.Street.Should().Be("New St");
         updated.City.Should().Be("NewCity");
         updated.State.Should().Be("CA");
@@ -273,7 +273,7 @@ public class AddressRepoTests : IntegrationTestBase
 
         // Assert
         result.Should().BeTrue();
-        var deleted = await Context.Addresses.FindAsync(1);
+        var deleted = await Context.Addresses.FindAsync([1], TestContext.Current.CancellationToken);
         deleted.Should().BeNull();
     }
 
@@ -303,7 +303,7 @@ public class AddressRepoTests : IntegrationTestBase
         await _repo.DeleteAsync(addresses[1]);
 
         // Assert
-        var remaining = await Context.Addresses.ToListAsync();
+        var remaining = await Context.Addresses.ToListAsync(TestContext.Current.CancellationToken);
         remaining.Should().HaveCount(2);
         remaining.Should().NotContain(a => a.Id == 2);
         remaining.Should().Contain(a => a.Id == 1);
@@ -719,7 +719,7 @@ public class AddressRepoTests : IntegrationTestBase
         await Task.WhenAll(task1, task2);
 
         // Assert
-        var allAddresses = await Context.Addresses.ToListAsync();
+        var allAddresses = await Context.Addresses.ToListAsync(TestContext.Current.CancellationToken);
         allAddresses.Should().HaveCount(2);
     }
 
