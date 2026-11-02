@@ -1,4 +1,4 @@
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/theme';
 import { HiOutlineSun, HiOutlineMoon } from 'react-icons/hi2';
 
 export default function ThemeToggle() {

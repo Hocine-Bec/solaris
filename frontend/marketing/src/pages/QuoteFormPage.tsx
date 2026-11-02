@@ -175,7 +175,7 @@ export default function QuoteFormPage() {
         console.log('✅ Lead submitted successfully:', result);
         setIsSubmitted(true);
         window.scrollTo(0, 0);
-      } catch (error) {
+      } catch {
         toast.error('Submission failed. Please try again.', { id: toastId });
       }
       finally {

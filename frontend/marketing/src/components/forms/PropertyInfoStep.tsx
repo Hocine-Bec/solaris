@@ -34,8 +34,8 @@ export default function PropertyInfoStep({ data, errors, onChange }: PropertyInf
       <AddressAutocomplete
         label="Property Address"
         value={data.propertyAddress}
-        onChange={(value: any) => onChange('propertyAddress', value)}
-        onAddressSelect={(address: any) => {
+        onChange={(value) => onChange('propertyAddress', value)}
+        onAddressSelect={(address) => {
           // Store individual address components in state
           onChange('propertyStreet', address.street || '');
           onChange('propertyCity', address.city || '');
