@@ -6,7 +6,6 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities;
 using Domain.Enums;
-using Hangfire;
 using Mapster;
 using Microsoft.Extensions.Logging;
 
