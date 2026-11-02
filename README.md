@@ -22,7 +22,7 @@ Docker setup.
 
 ## Stack
 
-ASP.NET Core (.NET 9, moving to .NET 10) · EF Core · PostgreSQL · Hangfire · MailKit ·
+ASP.NET Core (.NET 10) · EF Core · PostgreSQL · Hangfire · MailKit ·
 React + TypeScript + Vite (the marketing site and quote form)
 
 ## Documentation

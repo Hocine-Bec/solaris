@@ -13,9 +13,9 @@ Everything else below is *(planned)*, including the move to real PostgreSQL.
 
 | Project | Holds |
 |---|---|
-| `Tests/UnitTests` | Tests of pure logic in `Domain` and `Application`, with no database |
-| `Tests/IntegrationTests` | Tests against a real PostgreSQL: repositories, services, concurrency, the API |
-| `Tests/TestUtilities` | Shared helpers: test-data factories (Bogus), the PostgreSQL fixture and a database reset helper *(planned)* |
+| `backend/tests/UnitTests` | Tests of pure logic in `Domain` and `Application`, with no database |
+| `backend/tests/IntegrationTests` | Tests against a real PostgreSQL: repositories, services, concurrency, the API |
+| `backend/tests/TestUtilities` | Shared helpers: test-data factories (Bogus), the PostgreSQL fixture and a database reset helper *(planned)* |
 
 ---
 
@@ -46,5 +46,6 @@ Everything else below is *(planned)*, including the move to real PostgreSQL.
 
 ## Running the tests *(planned)*
 
-`dotnet test` from the repository root runs the unit and integration tests. The integration tests need Docker,
+`dotnet test` in `backend/` runs the unit and integration tests. The repository's `global.json` runs it on the
+Microsoft Testing Platform, which xUnit v3 uses. The integration tests need Docker,
 for the PostgreSQL container. CI runs the same command on every pull request ([operations](operations.md)).

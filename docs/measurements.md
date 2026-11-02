@@ -101,11 +101,11 @@ only, and measurement runs use the Development environment with a Release build.
 
 ## 5. Dataset generator *(planned)*
 
-`tools/Solaris.DataGen` is a console app that creates Active installations (4–12 kW) and writes their readings
+`backend/tools/Solaris.DataGen` is a console app that creates Active installations (4–12 kW) and writes their readings
 with `COPY` (`NpgsqlBinaryImporter`):
 
 ```
-dotnet run --project tools/Solaris.DataGen -- --installations 1000 --days 120 --seed 42 --schema final
+dotnet run --project backend/tools/Solaris.DataGen -- --installations 1000 --days 120 --seed 42 --schema final
 ```
 
 - `--schema naive | final` writes the readings in the P4 "before" or "after" table layout.

@@ -31,15 +31,21 @@ exists in the code.
 
 ```
 solaris/
-├── Backend/
-│   ├── Domain/            entities, enums, business rules (state machines, health, expected production)
-│   ├── Application/       services (use cases), DTOs, validators, mappings, repository and service interfaces
-│   ├── Infrastructure/    EF Core (AppDbContext, configurations, migrations), repositories, email, background jobs
-│   └── WebAPI/            controllers, authentication, error handling, startup wiring
-├── Frontend-Marketing/    the marketing site and the quote form
-├── Tests/                 unit and integration tests (see testing.md)
-├── tools/Solaris.DataGen/ dataset generator for the measurements (planned; see measurements.md)
-└── perf/                  load and fault scripts, and their raw results (planned; see measurements.md)
+├── global.json                .NET SDK version and test runner
+├── backend/
+│   ├── Solaris.slnx
+│   ├── Directory.Build.props  shared build settings (target framework, nullable)
+│   ├── Directory.Packages.props  every NuGet package version, in one place
+│   ├── src/
+│   │   ├── Domain/            entities, enums, business rules (state machines, health, expected production)
+│   │   ├── Application/       services (use cases), DTOs, validators, mappings, repository and service interfaces
+│   │   ├── Infrastructure/    EF Core (AppDbContext, configurations, migrations), repositories, email, background jobs
+│   │   └── WebAPI/            controllers, authentication, error handling, startup wiring
+│   ├── tests/                 unit and integration tests (see testing.md)
+│   └── tools/Solaris.DataGen/ dataset generator for the measurements (planned; see measurements.md)
+├── frontend/
+│   └── marketing/             the marketing site and the quote form
+└── perf/                      load and fault scripts, and their raw results (planned; see measurements.md)
 ```
 
 Dependencies point inward: `WebAPI` → `Infrastructure` → `Application` → `Domain` ([ADR 1](adr/0001-layered-solution.md)).

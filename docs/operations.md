@@ -45,7 +45,8 @@ Prerequisites: the .NET 10 SDK and Docker.
 - **The API from your IDE or `dotnet run`:** start only the database with `docker compose up postgres`, and keep
   the API's secrets in `dotnet user-secrets`.
 
-The API reference (Scalar) is served under `/scalar`. Demo data comes from the dataset generator
+In Development, the API reference (Scalar) is served under `/scalar`, from the OpenAPI document at
+`/openapi/v1.json`. Demo data comes from the dataset generator
 ([measurements](measurements.md)), not from seed code.
 
 ---
