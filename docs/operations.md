@@ -40,7 +40,7 @@ docker-compose's own `.env` file; in production they are environment variables.
 
 Prerequisites: the .NET 10 SDK and Docker.
 
-- **Everything in containers:** `docker compose up` starts PostgreSQL 17 and the API, configured from a `.env`
+- **Everything in containers:** `docker compose up` starts PostgreSQL 18 and the API, configured from a `.env`
   file next to `docker-compose.yml` (copy `.env.example`).
 - **The API from your IDE or `dotnet run`:** start only the database with `docker compose up postgres`, and keep
   the API's secrets in `dotnet user-secrets`.

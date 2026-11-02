@@ -47,7 +47,7 @@ Machine:        MSI Modern 15 H B13M · i7-13620H (10 cores / 16 threads) · 16 
 OS / kernel:    `lsb_release -ds` · `uname -r`
 Power profile:  `powerprofilesctl get` ; CPU MHz during the run: `grep MHz /proc/cpuinfo | sort -u | head`
 .NET:           `dotnet --version`  (Release build)
-PostgreSQL:     postgres:17 in Docker · configuration changes (if any):
+PostgreSQL:     postgres:18 in Docker · `SELECT version()` · configuration changes (if any):
 Dataset:        M / L · row counts
 Load tool:      name + version · script file
 Other load:     browser closed? other containers running?
