@@ -1,3 +1,4 @@
+using Application.Common.Exceptions;
 using Application.Common.Models;
 using Application.DTOs.Address;
 using Application.Interfaces.Repositories;
@@ -5,7 +6,6 @@ using Application.Interfaces.Services;
 using Domain.Entities;
 using Domain.Enums;
 using Mapster;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Services;
@@ -108,7 +108,7 @@ public sealed class AddressService(IAddressRepo repo, ILogger<AddressService> lo
                 ? Result.Success(ResultStatusCode.NoContent)
                 : Result.Failure("No changes were applied.", ResultStatusCode.BadRequest);
         }
-        catch (DbUpdateConcurrencyException ex)
+        catch (ConcurrencyConflictException ex)
         {
             log.LogError(ex, $"Error while {nameof(UpdateAsync)} for {nameof(Address)} {id}");
             return Result.Failure("The address was modified by another user.", ResultStatusCode.Conflict);
