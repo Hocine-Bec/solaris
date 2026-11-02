@@ -22,7 +22,8 @@ The property step suggests addresses as the visitor types, using Geoapify's addr
 
 ## Running locally
 
-Prerequisites: Node.js 20.19+ or 22.12+ (required by Vite 7), and the Solaris API running.
+Prerequisites: Node.js 20.19+, 22.13+ or 24+ (the versions both Vite 7 and ESLint 10 support), and the Solaris API
+running.
 
 ```sh
 cp .env.example .env
