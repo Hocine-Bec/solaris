@@ -4,8 +4,8 @@ What is tested, at which level, and how. Business rules (`BR-…`) are defined i
 [functional requirements](functional-requirements.md).
 
 **Status:** today there are 10 unit tests (8 for the `Lead` and `Address` entities, and the architecture test's 2
-cases, one each for `Domain` and `Application`) and 64 repository tests that run on EF Core's in-memory provider.
-Everything else below is *(planned)*, including the move to real PostgreSQL.
+cases, one each for `Domain` and `Application`) and 64 repository tests that run on PostgreSQL 18.
+Everything else below is *(planned)*.
 
 ---
 
@@ -15,7 +15,7 @@ Everything else below is *(planned)*, including the move to real PostgreSQL.
 |---|---|
 | `backend/tests/UnitTests` | Tests of pure logic in `Domain` and `Application`, with no database |
 | `backend/tests/IntegrationTests` | Tests against a real PostgreSQL: repositories, services, concurrency, the API |
-| `backend/tests/TestUtilities` | Shared helpers: test-data factories (Bogus), the PostgreSQL fixture and a database reset helper *(planned)* |
+| `backend/tests/TestUtilities` | Shared helpers: test-data factories (Bogus) and the PostgreSQL fixture, which gives each test its own database |
 
 ---
 
@@ -24,7 +24,7 @@ Everything else below is *(planned)*, including the move to real PostgreSQL.
 | Level | What | How |
 |---|---|---|
 | **Unit** | The lead and installation state machines (every from/to pair, allowed or rejected), stage conditions, health classification, expected production, reading validation, the outbox backoff schedule | xUnit + FluentAssertions, no database |
-| **Integration** | Services and repositories against real constraints; the outbox write path; rollup recalculation | Testcontainers `postgres:17`, with the database reset between tests |
+| **Integration** | Services and repositories against real constraints; the outbox write path; rollup recalculation | Testcontainers `postgres:18`: one container per test run; each test gets its own database, copied from a template that has the migrations applied, so tests run in parallel without sharing data |
 | **Concurrency** | 50 identical leads at once → 1 lead; two conversions of one lead → 1 success + 409; conflicting stage changes → 1 success + 409s; a stale `ETag` → 409; replayed reading batches → 0 duplicates; two dispatchers never send the same message | N parallel tasks, each with its own `DbContext` or `HttpClient`, released at the same moment, then the invariants are checked |
 | **API and authorization** | Anonymous → 401; a technician on an admin route → 403; a device key accepted only for its own installation | `WebApplicationFactory` + Testcontainers |
 | **Guard test** | Fails if any endpoint answers anonymously without being on the explicit list of public endpoints | Enumerates every endpoint through `EndpointDataSource` |
@@ -44,8 +44,8 @@ Everything else below is *(planned)*, including the move to real PostgreSQL.
 
 ---
 
-## Running the tests *(planned)*
+## Running the tests
 
 `dotnet test` in `backend/` runs the unit and integration tests. The repository's `global.json` runs it on the
 Microsoft Testing Platform, which xUnit v3 uses. The integration tests need Docker,
-for the PostgreSQL container. CI runs the same command on every pull request ([operations](operations.md)).
+for the PostgreSQL container. CI will run the same command on every pull request *(planned)* ([operations](operations.md)).

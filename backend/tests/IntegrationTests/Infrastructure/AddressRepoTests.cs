@@ -3,18 +3,15 @@ using FluentAssertions;
 using Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using TestUtilities.Base;
+using TestUtilities.Database;
 using TestUtilities.Factories;
 
 namespace IntegrationTests.Infrastructure;
 
-public class AddressRepoTests : IntegrationTestBase
+public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(database)
 {
-    private readonly AddressRepo _repo;
-
-    public AddressRepoTests()
-    {
-        _repo = new AddressRepo(Context);
-    }
+    // The context is created per test, after the constructor runs, so the repository is created on use.
+    private AddressRepo Repo => new(Context);
 
     #region GetAllAsync Tests
 
@@ -22,7 +19,7 @@ public class AddressRepoTests : IntegrationTestBase
     public async Task GetAllAsync_EmptyDatabase_ReturnsEmptyList()
     {
         // Act
-        var result = await _repo.GetAllAsync();
+        var result = await Repo.GetAllAsync();
 
         // Assert
         result.Should().NotBeNull();
@@ -41,7 +38,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await _repo.GetAllAsync();
+        var result = await Repo.GetAllAsync();
 
         // Assert
         result.Should().NotBeNull();
@@ -57,7 +54,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act
-        var result = await _repo.GetAllAsync();
+        var result = await Repo.GetAllAsync();
 
         // Assert
         var returnedAddress = result[0];
@@ -76,7 +73,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act
-        var result = await _repo.GetByIdAsync(1);
+        var result = await Repo.GetByIdAsync(1);
 
         // Assert
         result.Should().NotBeNull();
@@ -93,7 +90,7 @@ public class AddressRepoTests : IntegrationTestBase
     public async Task GetByIdAsync_NonExistingId_ReturnsNull()
     {
         // Act
-        var result = await _repo.GetByIdAsync(999);
+        var result = await Repo.GetByIdAsync(999);
 
         // Assert
         result.Should().BeNull();
@@ -103,7 +100,7 @@ public class AddressRepoTests : IntegrationTestBase
     public async Task GetByIdAsync_NegativeId_ReturnsNull()
     {
         // Act
-        var result = await _repo.GetByIdAsync(-1);
+        var result = await Repo.GetByIdAsync(-1);
 
         // Assert
         result.Should().BeNull();
@@ -113,7 +110,7 @@ public class AddressRepoTests : IntegrationTestBase
     public async Task GetByIdAsync_ZeroId_ReturnsNull()
     {
         // Act
-        var result = await _repo.GetByIdAsync(0);
+        var result = await Repo.GetByIdAsync(0);
 
         // Assert
         result.Should().BeNull();
@@ -132,7 +129,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await _repo.GetByIdAsync(2);
+        var result = await Repo.GetByIdAsync(2);
 
         // Assert
         result.Should().NotBeNull();
@@ -151,7 +148,7 @@ public class AddressRepoTests : IntegrationTestBase
         var address = AddressFactory.CreateFakeAddress();
 
         // Act
-        var result = await _repo.CreateAsync(address);
+        var result = await Repo.CreateAsync(address);
 
         // Assert
         result.Should().BeGreaterThan(0);
@@ -168,8 +165,8 @@ public class AddressRepoTests : IntegrationTestBase
         var address2 = AddressFactory.CreateFakeAddress(id: 2);
 
         // Act
-        await _repo.CreateAsync(address1);
-        await _repo.CreateAsync(address2);
+        await Repo.CreateAsync(address1);
+        await Repo.CreateAsync(address2);
 
         // Assert
         var allAddresses = await Context.Addresses.ToListAsync(TestContext.Current.CancellationToken);
@@ -189,7 +186,7 @@ public class AddressRepoTests : IntegrationTestBase
         );
 
         // Act
-        await _repo.CreateAsync(address);
+        await Repo.CreateAsync(address);
         ClearTracking();
 
         // Assert
@@ -221,7 +218,7 @@ public class AddressRepoTests : IntegrationTestBase
             address.Street, address.City, address.State, address.ZipCode, address.Country);
 
         // Act
-        var result = await _repo.UpdateAsync(address);
+        var result = await Repo.UpdateAsync(address);
 
         // Assert
         result.Should().BeTrue();
@@ -246,7 +243,7 @@ public class AddressRepoTests : IntegrationTestBase
             address.Street, address.City, address.State, address.ZipCode, address.Country);
 
         // Act
-        await _repo.UpdateAsync(address);
+        await Repo.UpdateAsync(address);
         ClearTracking();
 
         // Assert
@@ -269,7 +266,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act
-        var result = await _repo.DeleteAsync(address);
+        var result = await Repo.DeleteAsync(address);
 
         // Assert
         result.Should().BeTrue();
@@ -284,7 +281,7 @@ public class AddressRepoTests : IntegrationTestBase
         var address = AddressFactory.CreateFakeAddress(id: 999);
 
         // Act & Assert
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(async () => await _repo.DeleteAsync(address));
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(async () => await Repo.DeleteAsync(address));
     }
 
     [Fact]
@@ -300,7 +297,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        await _repo.DeleteAsync(addresses[1]);
+        await Repo.DeleteAsync(addresses[1]);
 
         // Assert
         var remaining = await Context.Addresses.ToListAsync(TestContext.Current.CancellationToken);
@@ -327,7 +324,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("Chicago");
+        var result = await Repo.SearchByCityAndStateAsync("Chicago");
 
         // Assert
         result.Should().HaveCount(2);
@@ -342,7 +339,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("chicago");
+        var result = await Repo.SearchByCityAndStateAsync("chicago");
 
         // Assert
         result.Should().HaveCount(1);
@@ -362,7 +359,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("Spring");
+        var result = await Repo.SearchByCityAndStateAsync("Spring");
 
         // Assert
         result.Should().HaveCount(2);
@@ -384,7 +381,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("Springfield", "IL");
+        var result = await Repo.SearchByCityAndStateAsync("Springfield", "IL");
 
         // Assert
         result.Should().HaveCount(2);
@@ -403,7 +400,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("Chicago", "il");
+        var result = await Repo.SearchByCityAndStateAsync("Chicago", "il");
 
         // Assert
         result.Should().HaveCount(1);
@@ -417,7 +414,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("NonExistentCity");
+        var result = await Repo.SearchByCityAndStateAsync("NonExistentCity");
 
         // Assert
         result.Should().BeEmpty();
@@ -436,7 +433,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("Springfield", null);
+        var result = await Repo.SearchByCityAndStateAsync("Springfield", null);
 
         // Assert
         result.Should().HaveCount(3);
@@ -454,7 +451,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("Springfield", "");
+        var result = await Repo.SearchByCityAndStateAsync("Springfield", "");
 
         // Assert
         result.Should().HaveCount(2);
@@ -474,7 +471,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("o"); // Matches Boston and Chicago
+        var result = await Repo.SearchByCityAndStateAsync("o"); // Matches Boston and Chicago
 
         // Assert
         result.Should().HaveCount(4);
@@ -496,7 +493,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("Chicago");
+        var result = await Repo.SearchByCityAndStateAsync("Chicago");
 
         // Assert
         var returnedAddress = result.First();
@@ -515,7 +512,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act
-        var exists = await _repo.ExistsAsync(address.UniqueAddressHash);
+        var exists = await Repo.ExistsAsync(address.UniqueAddressHash);
 
         // Assert
         exists.Should().BeTrue();
@@ -525,7 +522,7 @@ public class AddressRepoTests : IntegrationTestBase
     public async Task ExistsAsync_ByHash_NonExistingHash_ReturnsFalse()
     {
         // Act
-        var exists = await _repo.ExistsAsync("nonexistent-hash-12345");
+        var exists = await Repo.ExistsAsync("nonexistent-hash-12345");
 
         // Assert
         exists.Should().BeFalse();
@@ -535,7 +532,7 @@ public class AddressRepoTests : IntegrationTestBase
     public async Task ExistsAsync_ByHash_EmptyHash_ReturnsFalse()
     {
         // Act
-        var exists = await _repo.ExistsAsync("");
+        var exists = await Repo.ExistsAsync("");
 
         // Assert
         exists.Should().BeFalse();
@@ -549,7 +546,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var exists = await _repo.ExistsAsync(addresses[1].UniqueAddressHash);
+        var exists = await Repo.ExistsAsync(addresses[1].UniqueAddressHash);
 
         // Assert
         exists.Should().BeTrue();
@@ -563,7 +560,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act
-        await _repo.ExistsAsync(address.UniqueAddressHash);
+        await Repo.ExistsAsync(address.UniqueAddressHash);
 
         // Assert
         Context.ChangeTracker.Entries().Should().BeEmpty();
@@ -581,7 +578,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act - Check if hash exists for a different ID (excluding ID 1)
-        var exists = await _repo.ExistsAsync(1, address.UniqueAddressHash);
+        var exists = await Repo.ExistsAsync(1, address.UniqueAddressHash);
 
         // Assert - Should return false because we're excluding the same ID
         exists.Should().BeFalse();
@@ -596,7 +593,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act - check the hash for a different address (ID 2), e.g. one being updated to this address
-        var exists = await _repo.ExistsAsync(2, address.UniqueAddressHash);
+        var exists = await Repo.ExistsAsync(2, address.UniqueAddressHash);
 
         // Assert - true, because address 1 already has this hash
         exists.Should().BeTrue();
@@ -610,7 +607,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act
-        var exists = await _repo.ExistsAsync(1, "nonexistent-hash");
+        var exists = await Repo.ExistsAsync(1, "nonexistent-hash");
 
         // Assert
         exists.Should().BeFalse();
@@ -629,7 +626,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act - Check if address 1's hash exists elsewhere
-        var exists = await _repo.ExistsAsync(1, addresses[0].UniqueAddressHash);
+        var exists = await Repo.ExistsAsync(1, addresses[0].UniqueAddressHash);
 
         // Assert
         exists.Should().BeFalse();
@@ -643,7 +640,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
         
         // Act
-        await _repo.ExistsAsync(1, address.UniqueAddressHash);
+        await Repo.ExistsAsync(1, address.UniqueAddressHash);
 
         // Assert
         Context.ChangeTracker.Entries().Should().BeEmpty();
@@ -661,7 +658,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await _repo.GetAllAsync();
+        var result = await Repo.GetAllAsync();
 
         // Assert
         result.Should().HaveCount(20);
@@ -675,7 +672,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(address);
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("O'Fallon");
+        var result = await Repo.SearchByCityAndStateAsync("O'Fallon");
 
         // Assert
         result.Should().HaveCount(1);
@@ -694,7 +691,7 @@ public class AddressRepoTests : IntegrationTestBase
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await _repo.SearchByCityAndStateAsync("Springfield", "   ");
+        var result = await Repo.SearchByCityAndStateAsync("Springfield", "   ");
 
         // Assert
         result.Should().HaveCount(2); // Should treat whitespace as null/empty
@@ -707,9 +704,11 @@ public class AddressRepoTests : IntegrationTestBase
         var address1 = AddressFactory.CreateFakeAddress(id: 1);
         var address2 = AddressFactory.CreateFakeAddress(id: 2);
 
-        // Act
-        var task1 = _repo.CreateAsync(address1);
-        var task2 = _repo.CreateAsync(address2);
+        // Act - one context per operation, as two simultaneous requests would have
+        await using var context1 = CreateContext();
+        await using var context2 = CreateContext();
+        var task1 = new AddressRepo(context1).CreateAsync(address1);
+        var task2 = new AddressRepo(context2).CreateAsync(address2);
         await Task.WhenAll(task1, task2);
 
         // Assert

@@ -4,18 +4,15 @@ using FluentAssertions;
 using Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using TestUtilities.Base;
+using TestUtilities.Database;
 using TestUtilities.Factories;
 
 namespace IntegrationTests.Infrastructure;
 
-public class LeadRepoTests : IntegrationTestBase
+public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(database)
 {
-    private readonly LeadRepo _repo;
-
-    public LeadRepoTests()
-    {
-        _repo = new LeadRepo(Context);
-    }
+    // The context is created per test, after the constructor runs, so the repository is created on use.
+    private LeadRepo Repo => new(Context);
 
     #region GetAllAsync Tests
 
@@ -23,7 +20,7 @@ public class LeadRepoTests : IntegrationTestBase
     public async Task GetAllAsync_EmptyDatabase_ReturnsEmptyList()
     {
         // Act
-        var result = await _repo.GetAllAsync();
+        var result = await Repo.GetAllAsync();
 
         // Assert
         result.Should().NotBeNull();
@@ -44,7 +41,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(leads.ToArray());
 
         // Act
-        var result = await _repo.GetAllAsync();
+        var result = await Repo.GetAllAsync();
 
         // Assert
         result.Should().NotBeNull();
@@ -61,7 +58,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(lead);
 
         // Act
-        var result = await _repo.GetAllAsync();
+        var result = await Repo.GetAllAsync();
 
         // Assert
         result.Should().HaveCount(1);
@@ -94,7 +91,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(lead);
 
         // Act
-        var result = await _repo.GetAllAsync();
+        var result = await Repo.GetAllAsync();
 
         // Assert
         result.Should().HaveCount(1);
@@ -112,7 +109,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(lead);
 
         // Act
-        var result = await _repo.GetAllAsync();
+        var result = await Repo.GetAllAsync();
 
         // Assert
         var returnedLead = result[0];
@@ -138,7 +135,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(lead);
 
         // Act
-        var result = await _repo.GetByIdAsync(1);
+        var result = await Repo.GetByIdAsync(1);
 
         // Assert
         result.Should().NotBeNull();
@@ -152,7 +149,7 @@ public class LeadRepoTests : IntegrationTestBase
     public async Task GetByIdAsync_NonExistingId_ReturnsNull()
     {
         // Act
-        var result = await _repo.GetByIdAsync(999);
+        var result = await Repo.GetByIdAsync(999);
 
         // Assert
         result.Should().BeNull();
@@ -168,7 +165,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(lead);
 
         // Act
-        var result = await _repo.GetByIdAsync(1);
+        var result = await Repo.GetByIdAsync(1);
 
         // Assert
         result.Should().NotBeNull();
@@ -201,7 +198,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(lead);
 
         // Act
-        var result = await _repo.GetByIdAsync(1);
+        var result = await Repo.GetByIdAsync(1);
 
         // Assert
         result.Should().NotBeNull();
@@ -224,7 +221,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(leads.ToArray());
 
         // Act
-        var result = await _repo.GetByIdAsync(2);
+        var result = await Repo.GetByIdAsync(2);
 
         // Assert
         result.Should().NotBeNull();
@@ -242,7 +239,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(lead);
 
         // Act
-        var result = await _repo.GetByIdAsync(1);
+        var result = await Repo.GetByIdAsync(1);
 
         // Assert
         Context.Entry(result!).State.Should().Be(EntityState.Detached);
@@ -262,7 +259,7 @@ public class LeadRepoTests : IntegrationTestBase
         var lead = LeadFactory.CreateFakeLead(addressId: 1);
 
         // Act
-        var result = await _repo.CreateAsync(lead);
+        var result = await Repo.CreateAsync(lead);
 
         // Assert
         result.Should().BeGreaterThan(0);
@@ -282,8 +279,8 @@ public class LeadRepoTests : IntegrationTestBase
         var lead2 = LeadFactory.CreateFakeLead(id: 2, addressId: 1);
 
         // Act
-        await _repo.CreateAsync(lead1);
-        await _repo.CreateAsync(lead2);
+        await Repo.CreateAsync(lead1);
+        await Repo.CreateAsync(lead2);
 
         // Assert
         var allLeads = await Context.Leads.ToListAsync(TestContext.Current.CancellationToken);
@@ -314,7 +311,7 @@ public class LeadRepoTests : IntegrationTestBase
         );
 
         // Act
-        await _repo.CreateAsync(lead);
+        await Repo.CreateAsync(lead);
         ClearTracking();
 
         // Assert
@@ -353,7 +350,7 @@ public class LeadRepoTests : IntegrationTestBase
         lead.ContactedAt = DateTime.UtcNow;
 
         // Act
-        var result = await _repo.UpdateAsync(lead);
+        var result = await Repo.UpdateAsync(lead);
 
         // Assert
         result.Should().BeTrue();
@@ -383,7 +380,7 @@ public class LeadRepoTests : IntegrationTestBase
         lead.Notes = "Updated notes";
 
         // Act
-        await _repo.UpdateAsync(lead);
+        await Repo.UpdateAsync(lead);
         ClearTracking();
 
         // Assert
@@ -423,7 +420,7 @@ public class LeadRepoTests : IntegrationTestBase
         lead.CustomerId = 100;
 
         // Act
-        await _repo.UpdateAsync(lead);
+        await Repo.UpdateAsync(lead);
         ClearTracking();
 
         // Assert
@@ -447,7 +444,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(lead);
 
         // Act
-        var result = await _repo.DeleteAsync(lead);
+        var result = await Repo.DeleteAsync(lead);
 
         // Assert
         result.Should().BeTrue();
@@ -463,7 +460,7 @@ public class LeadRepoTests : IntegrationTestBase
 
         // Act & Assert
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
-            async () => await _repo.DeleteAsync(lead));
+            async () => await Repo.DeleteAsync(lead));
     }
 
     [Fact]
@@ -481,7 +478,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(leads.ToArray());
 
         // Act
-        await _repo.DeleteAsync(leads[1]);
+        await Repo.DeleteAsync(leads[1]);
 
         // Assert
         var remaining = await Context.Leads.ToListAsync(TestContext.Current.CancellationToken);
@@ -510,7 +507,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(leads.ToArray());
 
         // Act
-        var result = await _repo.GetAllAsync();
+        var result = await Repo.GetAllAsync();
 
         // Assert
         result.Should().HaveCount(50);
@@ -535,7 +532,7 @@ public class LeadRepoTests : IntegrationTestBase
         // Act
         foreach (var lead in leads)
         {
-            await _repo.CreateAsync(lead);
+            await Repo.CreateAsync(lead);
         }
 
         // Assert
@@ -571,7 +568,7 @@ public class LeadRepoTests : IntegrationTestBase
         await SeedAsync(lead);
 
         // Act
-        var result = await _repo.GetByIdAsync(1);
+        var result = await Repo.GetByIdAsync(1);
 
         // Assert
         result.Should().NotBeNull();
@@ -591,9 +588,11 @@ public class LeadRepoTests : IntegrationTestBase
         var lead1 = LeadFactory.CreateFakeLead(id: 1, addressId: 1);
         var lead2 = LeadFactory.CreateFakeLead(id: 2, addressId: 1);
 
-        // Act
-        var task1 = _repo.CreateAsync(lead1);
-        var task2 = _repo.CreateAsync(lead2);
+        // Act - one context per operation, as two simultaneous requests would have
+        await using var context1 = CreateContext();
+        await using var context2 = CreateContext();
+        var task1 = new LeadRepo(context1).CreateAsync(lead1);
+        var task2 = new LeadRepo(context2).CreateAsync(lead2);
         await Task.WhenAll(task1, task2);
 
         // Assert
