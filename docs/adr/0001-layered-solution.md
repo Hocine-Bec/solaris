@@ -13,10 +13,11 @@ a database.
 - **C.** Vertical slices: one folder per feature, holding its endpoint, logic and data access.
 
 ## Decision
-**A.** Business rules (the installation state machine, the health thresholds) are plain code, unit-tested
-with no database. Infrastructure is swappable behind interfaces (for example, the email sender has Gmail,
-recording and fault-injecting versions). The compiler enforces the direction through project references,
-and an architecture test fails if `Domain` or `Application` reference EF Core, Npgsql, Hangfire or MailKit.
+**A.** Business rules (the installation state machine, the health thresholds) are plain code, unit-tested with
+no database. Infrastructure is swappable behind interfaces (for example, email goes through `IEmailService`,
+so tests and measurements can replace Gmail with another sender). The compiler enforces the direction through
+project references, and an architecture test fails if `Domain` or `Application` reference EF Core, Npgsql,
+Hangfire or MailKit.
 
 ## Trade-offs
 More projects and interfaces; a feature touches three or four projects.
