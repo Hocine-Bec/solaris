@@ -403,8 +403,19 @@ public class LeadRepoTests : IntegrationTestBase
             id: 1,
             addressId: 1,
             status: LeadStatus.Contacted);
+        // The lead's customer must exist: PostgreSQL enforces the foreign key
+        var customer = new Customer
+        {
+            Id = 100,
+            FirstName = "John",
+            LastName = "Doe",
+            Email = "john@example.com",
+            PhoneNumber = "123-456-7890",
+            ContactAddressId = 1
+        };
         await SeedAsync(address);
         await SeedAsync(lead);
+        await SeedAsync(customer);
 
         var convertedAt = DateTime.UtcNow;
         lead.Status = LeadStatus.Converted;

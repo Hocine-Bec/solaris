@@ -590,21 +590,15 @@ public class AddressRepoTests : IntegrationTestBase
     [Fact]
     public async Task ExistsAsync_ByIdAndHash_DifferentIdWithSameHash_ReturnsTrue()
     {
-        // Arrange
-        var address1 = AddressFactory.CreateFakeAddress(
+        // Arrange - the unique index allows only one row per hash
+        var address = AddressFactory.CreateFakeAddress(
             id: 1, street: "123 Main St", city: "Chicago", state: "IL", zipCode: "60601");
-        var address2 = AddressFactory.CreateFakeAddress(
-            id: 2, street: "123 Main St", city: "Chicago", state: "IL", zipCode: "60601");
-        
-        // Force same hash for testing duplicate detection
-        address2.UniqueAddressHash = address1.UniqueAddressHash;
-        var addresses = new List<Address> { address1, address2 };
-        await SeedAsync(addresses.ToArray());
+        await SeedAsync(address);
 
-        // Act - Check if hash exists for address with different ID
-        var exists = await _repo.ExistsAsync(1, address1.UniqueAddressHash);
+        // Act - check the hash for a different address (ID 2), e.g. one being updated to this address
+        var exists = await _repo.ExistsAsync(2, address.UniqueAddressHash);
 
-        // Assert - Should return true because ID 2 has the same hash
+        // Assert - true, because address 1 already has this hash
         exists.Should().BeTrue();
     }
 
