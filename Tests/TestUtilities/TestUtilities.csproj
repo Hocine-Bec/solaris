@@ -8,6 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Bogus" Version="35.6.5" />
         <PackageReference Include="coverlet.collector" Version="6.0.2"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0"/>
@@ -22,12 +23,6 @@
     <ItemGroup>
       <ProjectReference Include="..\..\Backend\Domain\Domain.csproj" />
       <ProjectReference Include="..\..\Backend\Infrastructure\Infrastructure.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="Bogus">
-        <HintPath>..\..\..\..\.nuget\packages\bogus\35.6.4\lib\net6.0\Bogus.dll</HintPath>
-      </Reference>
     </ItemGroup>
 
 </Project>
