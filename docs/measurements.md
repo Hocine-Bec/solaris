@@ -44,7 +44,7 @@ Copied into each run's `env.md`:
 Date / time:
 Git tag or commit:
 Machine:        MSI Modern 15 H B13M · i7-13620H (10 cores / 16 threads) · 16 GB RAM · NVMe SSD
-OS / kernel:    Ubuntu 24.04 · `uname -r`
+OS / kernel:    `lsb_release -ds` · `uname -r`
 Power profile:  `powerprofilesctl get` ; CPU MHz during the run: `grep MHz /proc/cpuinfo | sort -u | head`
 .NET:           `dotnet --version`  (Release build)
 PostgreSQL:     postgres:17 in Docker · configuration changes (if any):
