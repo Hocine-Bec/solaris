@@ -44,7 +44,7 @@ solaris/
 
 Dependencies point inward: `WebAPI` → `Infrastructure` → `Application` → `Domain` ([ADR 1](adr/0001-layered-solution.md)).
 `Domain` and `Application` don't reference EF Core, Npgsql, Hangfire or MailKit; an architecture test fails if
-they do *(planned)*.
+they do.
 
 ---
 

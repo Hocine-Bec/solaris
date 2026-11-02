@@ -3,8 +3,9 @@
 What is tested, at which level, and how. Business rules (`BR-…`) are defined in
 [functional requirements](functional-requirements.md).
 
-**Status:** today there are 8 unit tests (the `Lead` and `Address` entities) and 64 repository tests that run on
-EF Core's in-memory provider. Everything else below is *(planned)*, including the move to real PostgreSQL.
+**Status:** today there are 10 unit tests (8 for the `Lead` and `Address` entities, and the architecture test's 2
+cases, one each for `Domain` and `Application`) and 64 repository tests that run on EF Core's in-memory provider.
+Everything else below is *(planned)*, including the move to real PostgreSQL.
 
 ---
 
