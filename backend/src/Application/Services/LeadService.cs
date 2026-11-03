@@ -50,7 +50,7 @@ public class LeadService : ILeadService
         {
             var lead = await _repo.GetByIdAsync(id);
             if (lead is null)
-                Result.NotFound<LeadResponse>($"Lead with ID {id} not found.");
+                return Result.NotFound<LeadResponse>($"Lead with ID {id} not found.");
 
             var response = lead.Adapt<LeadResponse>();
             return Result.Success(response);
