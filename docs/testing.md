@@ -4,7 +4,8 @@ What is tested, at which level, and how. Business rules (`BR-…`) are defined i
 [functional requirements](functional-requirements.md).
 
 **Status:** today there are 10 unit tests (8 for the `Lead` and `Address` entities, and the architecture test's 2
-cases, one each for `Domain` and `Application`) and 64 repository tests that run on PostgreSQL 18.
+cases, one each for `Domain` and `Application`) and 70 integration tests that run on PostgreSQL 18: 64 for the repositories, 2 for the unit of work and 4 for
+`LeadService`.
 Everything else below is *(planned)*.
 
 ---
