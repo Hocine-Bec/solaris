@@ -1,3 +1,5 @@
+using Application.Common.Models;
+using Infrastructure.Data;
 using Domain.Entities;
 using FluentAssertions;
 using Infrastructure.Repositories;
@@ -139,34 +141,37 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
 
     #endregion
 
-    #region CreateAsync Tests
+    #region Add Tests
 
     [Fact]
-    public async Task CreateAsync_ValidAddress_AddsToDatabase()
+    public async Task Add_ValidAddress_AddsToDatabase()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress();
 
         // Act
-        var result = await Repo.CreateAsync(address);
+        Repo.Add(address);
+        var result = await SaveAsync();
 
         // Assert
-        result.Should().BeGreaterThan(0);
+        result.Should().Be(SaveOutcome.Saved);
         var savedAddress = await Context.Addresses.FindAsync([address.Id], TestContext.Current.CancellationToken);
         savedAddress.Should().NotBeNull();
         savedAddress!.Street.Should().Be(address.Street);
     }
 
     [Fact]
-    public async Task CreateAsync_MultipleAddresses_AllSavedCorrectly()
+    public async Task Add_MultipleAddresses_AllSavedCorrectly()
     {
         // Arrange
         var address1 = AddressFactory.CreateFakeAddress(id: 1);
         var address2 = AddressFactory.CreateFakeAddress(id: 2);
 
         // Act
-        await Repo.CreateAsync(address1);
-        await Repo.CreateAsync(address2);
+        Repo.Add(address1);
+        await SaveAsync();
+        Repo.Add(address2);
+        await SaveAsync();
 
         // Assert
         var allAddresses = await Context.Addresses.ToListAsync(TestContext.Current.CancellationToken);
@@ -174,7 +179,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
     }
 
     [Fact]
-    public async Task CreateAsync_AddressWithAllFields_SavesAllProperties()
+    public async Task Add_AddressWithAllFields_SavesAllProperties()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(
@@ -186,7 +191,8 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         );
 
         // Act
-        await Repo.CreateAsync(address);
+        Repo.Add(address);
+        await SaveAsync();
         ClearTracking();
 
         // Assert
@@ -204,10 +210,10 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
 
     #endregion
 
-    #region UpdateAsync Tests
+    #region Update Tests
 
     [Fact]
-    public async Task UpdateAsync_ExistingAddress_UpdatesSuccessfully()
+    public async Task Update_ExistingAddress_UpdatesSuccessfully()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1, street: "Old Street");
@@ -218,17 +224,18 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
             address.Street, address.City, address.State, address.ZipCode, address.Country);
 
         // Act
-        var result = await Repo.UpdateAsync(address);
+        Repo.Update(address);
+        var result = await SaveAsync();
 
         // Assert
-        result.Should().BeTrue();
+        result.Should().Be(SaveOutcome.Saved);
         ClearTracking();
         var updated = await Context.Addresses.FindAsync([1], TestContext.Current.CancellationToken);
         updated!.Street.Should().Be("New Street");
     }
     
     [Fact]
-    public async Task UpdateAsync_UpdatesAllModifiedFields()
+    public async Task Update_UpdatesAllModifiedFields()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(
@@ -243,7 +250,8 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
             address.Street, address.City, address.State, address.ZipCode, address.Country);
 
         // Act
-        await Repo.UpdateAsync(address);
+        Repo.Update(address);
+        await SaveAsync();
         ClearTracking();
 
         // Assert
@@ -256,36 +264,38 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
 
     #endregion
 
-    #region DeleteAsync Tests
+    #region Remove Tests
 
     [Fact]
-    public async Task DeleteAsync_ExistingAddress_ReturnsTrue()
+    public async Task Remove_ExistingAddress_SaveSucceeds()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress();
         await SeedAsync(address);
 
         // Act
-        var result = await Repo.DeleteAsync(address);
+        Repo.Remove(address);
+        var result = await SaveAsync();
 
         // Assert
-        result.Should().BeTrue();
+        result.Should().Be(SaveOutcome.Saved);
         var deleted = await Context.Addresses.FindAsync([1], TestContext.Current.CancellationToken);
         deleted.Should().BeNull();
     }
 
     [Fact]
-    public async Task DeleteAsync_NonExistingAddress_ReturnsFalse()
+    public async Task Remove_NonExistingAddress_SaveReturnsConflict()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 999);
 
         // Act & Assert
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(async () => await Repo.DeleteAsync(address));
+        Repo.Remove(address);
+        (await SaveAsync()).Should().Be(SaveOutcome.Conflict);
     }
 
     [Fact]
-    public async Task DeleteAsync_OneOfMultipleAddresses_DeletesOnlySpecified()
+    public async Task Remove_OneOfMultipleAddresses_DeletesOnlySpecified()
     {
         // Arrange
         var addresses = new List<Address>
@@ -297,7 +307,8 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(addresses.ToArray());
 
         // Act
-        await Repo.DeleteAsync(addresses[1]);
+        Repo.Remove(addresses[1]);
+        await SaveAsync();
 
         // Assert
         var remaining = await Context.Addresses.ToListAsync(TestContext.Current.CancellationToken);
@@ -698,7 +709,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
     }
 
     [Fact]
-    public async Task CreateAsync_ConcurrentCreates_BothSucceed()
+    public async Task Add_ConcurrentCreates_BothSucceed()
     {
         // Arrange
         var address1 = AddressFactory.CreateFakeAddress(id: 1);
@@ -707,9 +718,12 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         // Act - one context per operation, as two simultaneous requests would have
         await using var context1 = CreateContext();
         await using var context2 = CreateContext();
-        var task1 = new AddressRepo(context1).CreateAsync(address1);
-        var task2 = new AddressRepo(context2).CreateAsync(address2);
-        await Task.WhenAll(task1, task2);
+        new AddressRepo(context1).Add(address1);
+        new AddressRepo(context2).Add(address2);
+        var outcomes = await Task.WhenAll(
+            new UnitOfWork(context1).SaveAsync(TestContext.Current.CancellationToken),
+            new UnitOfWork(context2).SaveAsync(TestContext.Current.CancellationToken));
+        outcomes.Should().AllBeEquivalentTo(SaveOutcome.Saved);
 
         // Assert
         var allAddresses = await Context.Addresses.ToListAsync(TestContext.Current.CancellationToken);

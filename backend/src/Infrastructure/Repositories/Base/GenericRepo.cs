@@ -20,21 +20,9 @@ public class GenericRepo<T>(AppDbContext context) : IGenericRepo<T>
         return await _set.FindAsync(id);
     }
 
-    public virtual async Task<int> CreateAsync(T entity)
-    {
-        await _set.AddAsync(entity);
-        return await Context.SaveChangesAsync();
-    }
+    public virtual void Add(T entity) => _set.Add(entity);
 
-    public virtual async Task<bool> UpdateAsync(T entity)
-    {
-        _set.Update(entity);
-        return await Context.SaveChangesAsync() > 0;
-    }
+    public virtual void Update(T entity) => _set.Update(entity);
 
-    public virtual async Task<bool> DeleteAsync(T entity)
-    {
-        _set.Remove(entity);
-        return await Context.SaveChangesAsync() > 0;
-    }
+    public virtual void Remove(T entity) => _set.Remove(entity);
 }

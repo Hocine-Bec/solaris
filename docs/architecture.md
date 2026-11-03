@@ -111,9 +111,10 @@ rollups use the company's local day (America/Chicago).
 ## 5. Request handling
 
 - **One service operation is one transaction.** Controllers stay thin; a service runs the use case through the
-  repositories, which add, change and query but never save; the operation ends with a single save
-  ([ADR 2](adr/0002-services-and-repositories.md)) *(the single save is planned; repositories save on every call
-  today)*.
+  repositories, which add, change and query but never save; the operation ends with a single save through the
+  unit of work ([ADR 2](adr/0002-services-and-repositories.md)). The unit of work turns the two failures a service
+  can expect into an outcome: `Conflict` (the row changed or was deleted after it was read) and `Duplicate` (a unique
+  index rejected the write).
 - **Outcomes:** expected failures are `Result` values with an error kind; unexpected errors are exceptions,
   handled once by a global handler ([ADR 3](adr/0003-result-objects-for-expected-outcomes.md)). Every error
   response is a ProblemDetails (RFC 9457) with a stable `code` *(planned)*.

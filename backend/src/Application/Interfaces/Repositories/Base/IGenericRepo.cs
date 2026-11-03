@@ -1,10 +1,14 @@
 namespace Application.Interfaces.Repositories.Base;
 
+/// <summary>
+/// Reads and changes one kind of entity. Changes are only saved when the service calls
+/// <c>IUnitOfWork.SaveAsync</c>, once per operation.
+/// </summary>
 public interface IGenericRepo<T> where T : class
 {
     Task<IReadOnlyList<T>> GetAllAsync();
     Task<T?> GetByIdAsync(int id);
-    Task<int> CreateAsync(T entity);
-    Task<bool> UpdateAsync(T entity);
-    Task<bool> DeleteAsync(T entity);
+    void Add(T entity);
+    void Update(T entity);
+    void Remove(T entity);
 }

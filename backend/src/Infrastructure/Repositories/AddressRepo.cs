@@ -1,4 +1,3 @@
-using Application.Common.Exceptions;
 using Application.Interfaces.Repositories;
 using Domain.Entities;
 using Infrastructure.Data;
@@ -9,18 +8,6 @@ namespace Infrastructure.Repositories;
 
 public class AddressRepo(AppDbContext context) : GenericRepo<Address>(context), IAddressRepo
 {
-    public override async Task<bool> UpdateAsync(Address entity)
-    {
-        try
-        {
-            return await base.UpdateAsync(entity);
-        }
-        catch (DbUpdateConcurrencyException ex)
-        {
-            throw new ConcurrencyConflictException("The address was changed or deleted after it was read.", ex);
-        }
-    }
-
     public async Task<IReadOnlyList<Address>> SearchByCityAndStateAsync(string city, string? state = null)
     {
         var query = Context.Addresses.AsNoTracking();

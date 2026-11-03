@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using Application.Common.Models;
-using Application.DTOs.Address;
 using Application.DTOs.Lead;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
@@ -14,20 +12,23 @@ namespace Application.Services;
 public class LeadService : ILeadService
 {
     private readonly ILeadRepo _repo;
-    private readonly IEmailQueueHandler _emailQueueHandler;
+    private readonly IAddressRepo _addressRepo;
     private readonly ICustomerRepo _customerRepo;
-    private readonly IAddressService _addressRepo;
-    private readonly ILogger<AddressService> _log;
-    
-    public LeadService(ILeadRepo repo, IEmailQueueHandler emailQueueHandler, ICustomerRepo customerRepo, IAddressService addressRepo, ILogger<AddressService> log)
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IEmailQueueHandler _emailQueueHandler;
+    private readonly ILogger<LeadService> _log;
+
+    public LeadService(ILeadRepo repo, IAddressRepo addressRepo, ICustomerRepo customerRepo, IUnitOfWork unitOfWork,
+        IEmailQueueHandler emailQueueHandler, ILogger<LeadService> log)
     {
-        _emailQueueHandler = emailQueueHandler;
-        _customerRepo = customerRepo;
-        _addressRepo = addressRepo;
-        _log = log;
         _repo = repo;
+        _addressRepo = addressRepo;
+        _customerRepo = customerRepo;
+        _unitOfWork = unitOfWork;
+        _emailQueueHandler = emailQueueHandler;
+        _log = log;
     }
-    
+
     public async Task<Result<IReadOnlyList<LeadResponse>>> GetListAsync()
     {
         try
@@ -44,6 +45,7 @@ public class LeadService : ILeadService
                 ResultStatusCode.InternalServerError);
         }
     }
+
     public async Task<Result<LeadResponse>> GetByIdAsync(int id)
     {
         try
@@ -63,33 +65,34 @@ public class LeadService : ILeadService
                 ResultStatusCode.InternalServerError);
         }
     }
+
     public async Task<Result<LeadResponse>> CreateAsync(CreateLeadRequest request)
-    {   
+    {
         try
         {
             var lead = request.Adapt<Lead>();
             lead.Status = LeadStatus.New;
             lead.CreatedAt = DateTime.UtcNow;
 
-            var address = lead.Address.Adapt<CreateAddressRequest>();
-            var addressResult = await _addressRepo.CreateAsync(address);
-            if (!addressResult.IsSuccess)
+            var address = lead.Address;
+            address.UniqueAddressHash = Address.BuildHash(address.Street, address.City, address.State,
+                address.ZipCode, address.Country);
+            if (await _addressRepo.ExistsAsync(address.UniqueAddressHash))
                 return Result.Failure<LeadResponse>("Failed to create the address.");
 
-            lead.AddressId = addressResult.Value.Id;
-            lead.Address = null!;
-            var created = await _repo.CreateAsync(lead);
-            if (created <= 0)
-                return Result.Failure<LeadResponse>("Failed to create the lead.");
-            
-            var fullAddress = $"{addressResult.Value.Street}, {addressResult.Value.State}, {addressResult.Value.ZipCode}, {addressResult.Value.City}, {addressResult.Value.Country}";
+            // The lead and its address are saved together, in one transaction.
+            _repo.Add(lead);
+            if (await _unitOfWork.SaveAsync() == SaveOutcome.Duplicate)
+                return Result.Failure<LeadResponse>("Failed to create the address.");
+
+            var fullAddress = $"{address.Street}, {address.State}, {address.ZipCode}, {address.City}, {address.Country}";
             var fullName = $"{lead.FirstName} {lead.LastName}";
-            
+
             // Enqueue background job
-            _emailQueueHandler.EnqueueLeadEmails(lead.Id, lead.Email, lead.FirstName, 
+            _emailQueueHandler.EnqueueLeadEmails(lead.Id, lead.Email, lead.FirstName,
                 fullName, lead.PhoneNumber, fullAddress);
-            
-            var response = created.Adapt<LeadResponse>();
+
+            var response = lead.Adapt<LeadResponse>();
             return Result.Success(response, ResultStatusCode.Created);
         }
         catch (Exception ex)
@@ -100,24 +103,26 @@ public class LeadService : ILeadService
                 ResultStatusCode.InternalServerError);
         }
     }
+
     public async Task<Result> UpdateLeadStatusAsync(int id, UpdateLeadStatusRequest request)
     {
         try
         {
             var lead = await _repo.GetByIdAsync(id);
-            if (lead is null) 
+            if (lead is null)
                 return Result.NotFound($"Lead with ID {id} not found.");
 
             lead.Status = Enum.Parse<LeadStatus>(request.Status);
             if(lead.Status == LeadStatus.Converted)
                 lead.ConvertedAt = DateTime.UtcNow;
-            
+
             lead.ContactedAt = request.ContactedAt;
             lead.Notes = request.Notes;
-            
-            var updated = await _repo.UpdateAsync(lead);  
-            return updated ? Result.Success(ResultStatusCode.NoContent)
-                : Result.Failure("No changes were applied.", ResultStatusCode.BadRequest);
+
+            _repo.Update(lead);
+            return await _unitOfWork.SaveAsync() == SaveOutcome.Saved
+                ? Result.Success(ResultStatusCode.NoContent)
+                : Result.Failure("The lead was changed by another user.", ResultStatusCode.Conflict);
         }
         catch (Exception ex)
         {
@@ -125,18 +130,20 @@ public class LeadService : ILeadService
             return Result.Failure("An error occurred while updating the lead.", ResultStatusCode.InternalServerError);
         }
     }
+
     public async Task<Result> DeleteAsync(int id)
     {
         try
         {
             var lead = await _repo.GetByIdAsync(id);
-            if (lead is null) 
+            if (lead is null)
                 return Result.Success(ResultStatusCode.NoContent);
 
-            var deleted = await _repo.DeleteAsync(lead);
-            return deleted
-                ? Result.Success(ResultStatusCode.NoContent)
-                : Result.Failure("Failed to delete the lead.");
+            _repo.Remove(lead);
+
+            // A conflict here means another request already deleted it, which is the outcome asked for.
+            await _unitOfWork.SaveAsync();
+            return Result.Success(ResultStatusCode.NoContent);
         }
         catch (Exception ex)
         {
@@ -144,6 +151,7 @@ public class LeadService : ILeadService
             return Result.Failure("An error occurred while deleting the lead.", ResultStatusCode.InternalServerError);
         }
     }
+
     public async Task<Result> ConvertLeadToCustomerAsync(ConvertLeadRequest request)
     {
         try
@@ -155,18 +163,22 @@ public class LeadService : ILeadService
             if (lead.Status == LeadStatus.Converted)
                 return Result.Failure("Lead has already been converted.");
 
+            // The new customer and the converted lead are saved together; the lead gets the customer's real ID.
             var customer = lead.Adapt<Customer>();
-            var createdCustomer = await _customerRepo.CreateAsync(customer);
-            if (createdCustomer <= 0)
-                return Result.Failure("Failed to create the customer.");
+            _customerRepo.Add(customer);
 
             lead.Status = LeadStatus.Converted;
             lead.ConvertedAt = DateTime.UtcNow;
-            lead.CustomerId = createdCustomer;
+            lead.Customer = customer;
             lead.Notes = request.AdditionalNotes;
+            _repo.Update(lead);
 
-            await _repo.UpdateAsync(lead);
-            return Result.Success("Lead converted to customer successfully.");
+            return await _unitOfWork.SaveAsync() switch
+            {
+                SaveOutcome.Saved => Result.Success("Lead converted to customer successfully."),
+                SaveOutcome.Duplicate => Result.Failure("A customer with this email already exists.", ResultStatusCode.Conflict),
+                _ => Result.Failure("The lead was changed by another user.", ResultStatusCode.Conflict)
+            };
         }
         catch (Exception ex)
         {

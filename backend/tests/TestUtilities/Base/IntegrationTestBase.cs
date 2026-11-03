@@ -1,3 +1,4 @@
+using Application.Common.Models;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -36,6 +37,10 @@ public abstract class IntegrationTestBase(PostgresFixture database) : IAsyncLife
         await Context.SaveChangesAsync();
         Context.ChangeTracker.Clear();
     }
+
+    /// <summary>Saves this test's changes the way services do: once, through the unit of work.</summary>
+    protected Task<SaveOutcome> SaveAsync() =>
+        new UnitOfWork(Context).SaveAsync(TestContext.Current.CancellationToken);
 
     protected void ClearTracking()
     {

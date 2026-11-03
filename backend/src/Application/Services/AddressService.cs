@@ -1,4 +1,3 @@
-using Application.Common.Exceptions;
 using Application.Common.Models;
 using Application.DTOs.Address;
 using Application.Interfaces.Repositories;
@@ -10,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Application.Services;
 
-public sealed class AddressService(IAddressRepo repo, ILogger<AddressService> log) : IAddressService
+public sealed class AddressService(IAddressRepo repo, IUnitOfWork unitOfWork, ILogger<AddressService> log) : IAddressService
 {
     public async Task<Result<IReadOnlyList<AddressResponse>>> GetListAsync()
     {
@@ -75,7 +74,12 @@ public sealed class AddressService(IAddressRepo repo, ILogger<AddressService> lo
             
             var address = request.Adapt<Address>();
             address.UniqueAddressHash = hash;
-            await repo.CreateAsync(address);
+            repo.Add(address);
+
+            // A simultaneous request can create the same address between the check above and this save.
+            if (await unitOfWork.SaveAsync() == SaveOutcome.Duplicate)
+                return Result.Failure<AddressResponse>("Address already exists.", ResultStatusCode.Conflict);
+
             return Result.Success(address.Adapt<AddressResponse>(), ResultStatusCode.Created);
         }
         catch (Exception ex)
@@ -103,15 +107,19 @@ public sealed class AddressService(IAddressRepo repo, ILogger<AddressService> lo
                 return Result.Failure<AddressResponse>("Address already exists.", ResultStatusCode.Conflict);
 
             address.UniqueAddressHash = newHash;
-            var updated = await repo.UpdateAsync(address);
-            return updated
-                ? Result.Success(ResultStatusCode.NoContent)
-                : Result.Failure("No changes were applied.", ResultStatusCode.BadRequest);
-        }
-        catch (ConcurrencyConflictException ex)
-        {
-            log.LogError(ex, $"Error while {nameof(UpdateAsync)} for {nameof(Address)} {id}");
-            return Result.Failure("The address was modified by another user.", ResultStatusCode.Conflict);
+            repo.Update(address);
+
+            var outcome = await unitOfWork.SaveAsync();
+            if (outcome == SaveOutcome.Conflict)
+                log.LogError($"Conflict while {nameof(UpdateAsync)} for {nameof(Address)} {id}");
+
+            return outcome switch
+            {
+                SaveOutcome.Saved => Result.Success(ResultStatusCode.NoContent),
+                SaveOutcome.Conflict => Result.Failure("The address was modified by another user.", ResultStatusCode.Conflict),
+                SaveOutcome.Duplicate => Result.Failure("Address already exists.", ResultStatusCode.Conflict),
+                _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null)
+            };
         }
         catch (Exception ex)
         {
@@ -127,10 +135,11 @@ public sealed class AddressService(IAddressRepo repo, ILogger<AddressService> lo
             var address = await repo.GetByIdAsync(id);
             if (address is null) return Result.Success(ResultStatusCode.NoContent);
 
-            var deleted = await repo.DeleteAsync(address);
-            return deleted
-                ? Result.Success(ResultStatusCode.NoContent)
-                : Result.Failure("Failed to delete the address.", ResultStatusCode.BadRequest);
+            repo.Remove(address);
+
+            // A conflict here means another request already deleted it, which is the outcome asked for.
+            await unitOfWork.SaveAsync();
+            return Result.Success(ResultStatusCode.NoContent);
         }
         catch (Exception ex)
         {

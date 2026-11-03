@@ -1,3 +1,5 @@
+using Application.Common.Models;
+using Infrastructure.Data;
 using Domain.Entities;
 using Domain.Enums;
 using FluentAssertions;
@@ -247,10 +249,10 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
 
     #endregion
 
-    #region CreateAsync Tests
+    #region Add Tests
 
     [Fact]
-    public async Task CreateAsync_ValidLead_AddsToDatabase()
+    public async Task Add_ValidLead_AddsToDatabase()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -259,17 +261,18 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         var lead = LeadFactory.CreateFakeLead(addressId: 1);
 
         // Act
-        var result = await Repo.CreateAsync(lead);
+        Repo.Add(lead);
+        var result = await SaveAsync();
 
         // Assert
-        result.Should().BeGreaterThan(0);
+        result.Should().Be(SaveOutcome.Saved);
         var savedLead = await Context.Leads.FindAsync([lead.Id], TestContext.Current.CancellationToken);
         savedLead.Should().NotBeNull();
         savedLead!.FirstName.Should().Be(lead.FirstName);
     }
 
     [Fact]
-    public async Task CreateAsync_MultipleLeads_AllSavedCorrectly()
+    public async Task Add_MultipleLeads_AllSavedCorrectly()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -279,8 +282,10 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         var lead2 = LeadFactory.CreateFakeLead(id: 2, addressId: 1);
 
         // Act
-        await Repo.CreateAsync(lead1);
-        await Repo.CreateAsync(lead2);
+        Repo.Add(lead1);
+        await SaveAsync();
+        Repo.Add(lead2);
+        await SaveAsync();
 
         // Assert
         var allLeads = await Context.Leads.ToListAsync(TestContext.Current.CancellationToken);
@@ -288,7 +293,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     }
 
     [Fact]
-    public async Task CreateAsync_LeadWithAllFields_SavesAllProperties()
+    public async Task Add_LeadWithAllFields_SavesAllProperties()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -311,7 +316,8 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         );
 
         // Act
-        await Repo.CreateAsync(lead);
+        Repo.Add(lead);
+        await SaveAsync();
         ClearTracking();
 
         // Assert
@@ -332,10 +338,10 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
 
     #endregion
 
-    #region UpdateAsync Tests
+    #region Update Tests
 
     [Fact]
-    public async Task UpdateAsync_ExistingLead_UpdatesSuccessfully()
+    public async Task Update_ExistingLead_UpdatesSuccessfully()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -350,10 +356,11 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         lead.ContactedAt = DateTime.UtcNow;
 
         // Act
-        var result = await Repo.UpdateAsync(lead);
+        Repo.Update(lead);
+        var result = await SaveAsync();
 
         // Assert
-        result.Should().BeTrue();
+        result.Should().Be(SaveOutcome.Saved);
         ClearTracking();
         var updated = await Context.Leads.FindAsync([1], TestContext.Current.CancellationToken);
         updated!.Status.Should().Be(LeadStatus.Contacted);
@@ -361,7 +368,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     }
 
     [Fact]
-    public async Task UpdateAsync_UpdatesAllModifiedFields()
+    public async Task Update_UpdatesAllModifiedFields()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -380,7 +387,8 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         lead.Notes = "Updated notes";
 
         // Act
-        await Repo.UpdateAsync(lead);
+        Repo.Update(lead);
+        await SaveAsync();
         ClearTracking();
 
         // Assert
@@ -392,7 +400,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     }
 
     [Fact]
-    public async Task UpdateAsync_ConvertLead_SetsConvertedAtAndCustomerId()
+    public async Task Update_ConvertLead_SetsConvertedAtAndCustomerId()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -420,7 +428,8 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         lead.CustomerId = 100;
 
         // Act
-        await Repo.UpdateAsync(lead);
+        Repo.Update(lead);
+        await SaveAsync();
         ClearTracking();
 
         // Assert
@@ -432,10 +441,10 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
 
     #endregion
 
-    #region DeleteAsync Tests
+    #region Remove Tests
 
     [Fact]
-    public async Task DeleteAsync_ExistingLead_ReturnsTrue()
+    public async Task Remove_ExistingLead_SaveSucceeds()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -444,27 +453,28 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(lead);
 
         // Act
-        var result = await Repo.DeleteAsync(lead);
+        Repo.Remove(lead);
+        var result = await SaveAsync();
 
         // Assert
-        result.Should().BeTrue();
+        result.Should().Be(SaveOutcome.Saved);
         var deleted = await Context.Leads.FindAsync([1], TestContext.Current.CancellationToken);
         deleted.Should().BeNull();
     }
 
     [Fact]
-    public async Task DeleteAsync_NonExistingLead_ThrowsException()
+    public async Task Remove_NonExistingLead_SaveReturnsConflict()
     {
         // Arrange
         var lead = LeadFactory.CreateFakeLead(id: 999, addressId: 1);
 
         // Act & Assert
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
-            async () => await Repo.DeleteAsync(lead));
+        Repo.Remove(lead);
+        (await SaveAsync()).Should().Be(SaveOutcome.Conflict);
     }
 
     [Fact]
-    public async Task DeleteAsync_OneOfMultipleLeads_DeletesOnlySpecified()
+    public async Task Remove_OneOfMultipleLeads_DeletesOnlySpecified()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -478,7 +488,8 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(leads.ToArray());
 
         // Act
-        await Repo.DeleteAsync(leads[1]);
+        Repo.Remove(leads[1]);
+        await SaveAsync();
 
         // Assert
         var remaining = await Context.Leads.ToListAsync(TestContext.Current.CancellationToken);
@@ -514,7 +525,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     }
 
     [Fact]
-    public async Task CreateAsync_LeadWithDifferentStatuses_SavesCorrectly()
+    public async Task Add_LeadWithDifferentStatuses_SavesCorrectly()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -532,7 +543,8 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         // Act
         foreach (var lead in leads)
         {
-            await Repo.CreateAsync(lead);
+            Repo.Add(lead);
+            await SaveAsync();
         }
 
         // Assert
@@ -579,7 +591,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     }
 
     [Fact]
-    public async Task CreateAsync_ConcurrentCreates_BothSucceed()
+    public async Task Add_ConcurrentCreates_BothSucceed()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -591,9 +603,12 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         // Act - one context per operation, as two simultaneous requests would have
         await using var context1 = CreateContext();
         await using var context2 = CreateContext();
-        var task1 = new LeadRepo(context1).CreateAsync(lead1);
-        var task2 = new LeadRepo(context2).CreateAsync(lead2);
-        await Task.WhenAll(task1, task2);
+        new LeadRepo(context1).Add(lead1);
+        new LeadRepo(context2).Add(lead2);
+        var outcomes = await Task.WhenAll(
+            new UnitOfWork(context1).SaveAsync(TestContext.Current.CancellationToken),
+            new UnitOfWork(context2).SaveAsync(TestContext.Current.CancellationToken));
+        outcomes.Should().AllBeEquivalentTo(SaveOutcome.Saved);
 
         // Assert
         var allLeads = await Context.Leads.ToListAsync(TestContext.Current.CancellationToken);
