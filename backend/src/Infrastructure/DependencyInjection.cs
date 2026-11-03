@@ -92,6 +92,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepo, UserRepo>();
         services.AddScoped<IWeatherDataRepo, WeatherDataRepo>();
         services.AddScoped<ILeadRepo, LeadRepo>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         
         // Gmail Services
         services.AddSingleton<IGmailAuthService, GmailAuthService>();
