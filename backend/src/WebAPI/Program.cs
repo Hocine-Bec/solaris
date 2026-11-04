@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
 using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
-using WebAPI.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -77,8 +76,6 @@ if (app.Environment.IsDevelopment())
 app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
-
-app.UseMiddleware<PerformanceMiddleware>();
 
 app.UseCors();
 
