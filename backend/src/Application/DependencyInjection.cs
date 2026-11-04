@@ -28,16 +28,6 @@ public static class DependencyInjection
         
         //Services
         services.AddScoped<IAddressService, AddressService>();
-        services.AddScoped<ICustomerService, CustomerService>();
-        services.AddScoped<IDocumentService, DocumentService>();
-        services.AddScoped<IEnergyProductionService, EnergyProductionService>();
-        services.AddScoped<IEquipmentService, EquipmentService>();
-        services.AddScoped<IInstallationService, InstallationService>();
-        services.AddScoped<IInstallationStatusHistoryService, InstallationStatusHistoryService>();
-        services.AddScoped<IInstallationTechnicianService, InstallationTechnicianService>();
-        services.AddScoped<ISupportTicketService, SupportTicketService>();
-        services.AddScoped<IUserService, UserService>();
-        services.AddScoped<IWeatherDataService, WeatherDataService>();
         services.AddScoped<ILeadService, LeadService>();
         
         return services;
