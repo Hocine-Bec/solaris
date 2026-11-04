@@ -4,7 +4,7 @@ How Solaris is configured, run, observed, built and deployed.
 
 **Status:** most of this is *(planned)*. Today the API reads differently named environment variables
 (`DEFAULTCONNECTION`, `SECRET_KEY`, …) from a `.env` file, requires the Gmail settings at startup, and applies
-migrations and demo seed data automatically in Development only.
+migrations automatically in Development only.
 
 ---
 

@@ -3,7 +3,6 @@ using DotNetEnv;
 using Hangfire;
 using Infrastructure;
 using Infrastructure.Data;
-using Infrastructure.Data.Seeders;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
@@ -69,7 +68,6 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await context.Database.MigrateAsync();
-    await new DatabaseSeeder(context).SeedAsync();
 }
 
 
