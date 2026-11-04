@@ -150,7 +150,7 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
 |---|---|
 | Proposals, pricing, contracts, financing | A large domain of its own, and not what v1 is about |
 | Payments, billing, invoices | Same |
-| Documents and file upload (permits, photos) | Needs file storage and adds no measurable problem |
+| Documents and file upload (permits, photos) | Planned after v1: the permit, the inspection certificate and warranties kept as proof for each stage. v1 records each stage's status only |
 | Customer portal, customer logins | A frontend product rather than backend depth |
 | Weather data and weather APIs | Expected production uses fixed monthly sun hours (BR-P1) |
 | Equipment inventory | Planned after v1 |
