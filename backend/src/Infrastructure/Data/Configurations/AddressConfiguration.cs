@@ -10,7 +10,8 @@ public class AddressConfiguration : IEntityTypeConfiguration<Address>
     {
         builder.ToTable("addresses");
 
-        builder.HasKey(a => a.Id);
+        builder.HasKey(a => a.Id)
+            .HasName("pk_addresses");
 
         builder.Property(a => a.Id)
             .HasColumnName("id");

@@ -19,9 +19,4 @@ public class Customer
     // Contact address (where customer lives/receives mail)
     public int? ContactAddressId { get; set; }
     public Address? ContactAddress { get; set; }
-        
-    // Navigation properties
-    public ICollection<Installation> Installations { get; set; } = new List<Installation>();
-    public ICollection<Document> Documents { get; set; } = new List<Document>();
-    public ICollection<SupportTicket> SupportTickets { get; set; } = new List<SupportTicket>();
 }

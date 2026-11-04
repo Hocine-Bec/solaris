@@ -10,7 +10,8 @@ public class LeadConfiguration : IEntityTypeConfiguration<Lead>
     {
         builder.ToTable("leads");
 
-        builder.HasKey(l => l.Id);
+        builder.HasKey(l => l.Id)
+            .HasName("pk_leads");
 
         builder.Property(l => l.Id)
             .HasColumnName("id");
@@ -95,18 +96,23 @@ public class LeadConfiguration : IEntityTypeConfiguration<Lead>
         builder.HasIndex(l => new { l.Status, l.CreatedAt })
             .HasDatabaseName("ix_leads_status_created_at");
 
+        builder.HasIndex(l => l.AddressId)
+            .HasDatabaseName("ix_leads_address_id");
+
         // Relationships
 
         // One Lead has one Address (required)
         builder.HasOne(l => l.Address)
             .WithMany()
             .HasForeignKey(l => l.AddressId)
+            .HasConstraintName("fk_leads_addresses_address_id")
             .OnDelete(DeleteBehavior.Restrict);
 
         // One Lead can be converted to one Customer (optional)
         builder.HasOne(l => l.Customer)
             .WithMany()
             .HasForeignKey(l => l.CustomerId)
+            .HasConstraintName("fk_leads_customers_customer_id")
             .OnDelete(DeleteBehavior.SetNull);
     }
 }

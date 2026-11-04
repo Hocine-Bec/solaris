@@ -12,7 +12,8 @@ public class CustomerConfig : IEntityTypeConfiguration<Customer>
         builder.ToTable("customers");
 
         // Primary key
-        builder.HasKey(c => c.Id);
+        builder.HasKey(c => c.Id)
+            .HasName("pk_customers");
 
         // Properties configuration
         builder.Property(c => c.Id)
@@ -62,30 +63,16 @@ public class CustomerConfig : IEntityTypeConfiguration<Customer>
         builder.HasIndex(c => c.Status)
             .HasDatabaseName("ix_customers_status");
 
+        builder.HasIndex(c => c.ContactAddressId)
+            .HasDatabaseName("ix_customers_contact_address_id");
+
         // Relationships
-            
+
         // One Customer can have one ContactAddress (optional)
         builder.HasOne(c => c.ContactAddress)
             .WithMany()
             .HasForeignKey(c => c.ContactAddressId)
+            .HasConstraintName("fk_customers_addresses_contact_address_id")
             .OnDelete(DeleteBehavior.SetNull); // If address deleted, set to null
-
-        // One Customer can have many Installations
-        builder.HasMany(c => c.Installations)
-            .WithOne(i => i.Customer)
-            .HasForeignKey(i => i.CustomerId)
-            .OnDelete(DeleteBehavior.Restrict); // Can't delete customer if they have installations
-
-        // One Customer can have many Documents
-        builder.HasMany(c => c.Documents)
-            .WithOne(d => d.Customer)
-            .HasForeignKey(d => d.CustomerId)
-            .OnDelete(DeleteBehavior.Cascade); // Delete documents when customer is deleted
-
-        // One Customer can have many SupportTickets
-        builder.HasMany(c => c.SupportTickets)
-            .WithOne(t => t.Customer)
-            .HasForeignKey(t => t.CustomerId)
-            .OnDelete(DeleteBehavior.Restrict); // Can't delete customer if they have tickets
     }
 }

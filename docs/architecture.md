@@ -75,6 +75,9 @@ saved, which the outbox replaces (§6).
 
 ## 4. Data model
 
+Today the code has `Lead`, `Address` and `Customer`. The other entities are *(planned)*, each built with its
+feature.
+
 | Entity | What it is | Key rules |
 |---|---|---|
 | **Lead** | A quote request | One open lead per email: `NormalizedEmail` with a partial unique index over the open statuses (BR-L1) *(planned)*; an `xmin` concurrency token *(planned)* |
@@ -82,7 +85,7 @@ saved, which the outbox replaces (§6).
 | **Customer** | A converted lead | Email unique; status derived from its installations (BR-C1) *(planned)* |
 | **Installation** | One project at one address | Its status is its stage; design data (size, panel count, inverter type); an `xmin` concurrency token and the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` *(planned)* |
 | **InstallationStatusHistory** | One row per status change | From, to, who, when, note; append-only, never updated or deleted |
-| **InstallationTechnician** | A technician's assignment | Role Surveyor, Installer or Inspector (an enum *(planned)*; free text today); completion date |
+| **InstallationTechnician** | A technician's assignment | Role Surveyor, Installer or Inspector (an enum); completion date |
 | **User** | A staff account | BCrypt password hash, role (Admin or Technician), active flag, last login |
 | **EnergyProduction** | The daily production rollup | One row per installation and local day, enforced by a unique index; `ReadingCount` and `ComputedAt` *(planned)* |
 

@@ -82,15 +82,6 @@ public static class DependencyInjection
         //Repositories
         services.AddScoped<IAddressRepo, AddressRepo>();
         services.AddScoped<ICustomerRepo, CustomerRepo>();
-        services.AddScoped<IDocumentRepo, DocumentRepo>();
-        services.AddScoped<IEnergyProductionRepo, EnergyProductionRepo>();
-        services.AddScoped<IEquipmentRepo, EquipmentRepo>();
-        services.AddScoped<IInstallationRepo, InstallationRepo>();
-        services.AddScoped<IInstallationStatusHistoryRepo, InstallationStatusHistoryRepo>();
-        services.AddScoped<IInstallationTechnicianRepo, InstallationTechnicianRepo>();
-        services.AddScoped<ISupportTicketRepo, SupportTicketRepo>();
-        services.AddScoped<IUserRepo, UserRepo>();
-        services.AddScoped<IWeatherDataRepo, WeatherDataRepo>();
         services.AddScoped<ILeadRepo, LeadRepo>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         
