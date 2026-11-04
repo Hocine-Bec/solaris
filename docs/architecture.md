@@ -106,8 +106,9 @@ production_dirty_days  installation_id int, day date, PK (installation_id, day)
 `energy_wh` is an integer number of watt-hours: 4 bytes instead of a `numeric`, and exact. At about 11.5 million
 readings, the table and its index stay under 1 GB.
 
-Conventions: snake_case columns, enums stored as strings, every timestamp a UTC `timestamptz`. Only the daily
-rollups use the company's local day (America/Chicago).
+Conventions: snake_case names for tables, columns, keys and indexes (a test checks the migrated database), enums
+stored as strings, every timestamp a UTC `timestamptz`. Only the daily rollups use the company's local day
+(America/Chicago).
 
 ---
 
