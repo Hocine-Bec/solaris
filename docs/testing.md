@@ -4,9 +4,9 @@ What is tested, at which level, and how. Business rules (`BR-…`) are defined i
 [functional requirements](functional-requirements.md).
 
 **Status:** today there are 10 unit tests (8 for the `Lead` and `Address` entities, and the architecture test's 2
-cases, one each for `Domain` and `Application`) and 71 integration tests that run on PostgreSQL 18: 64 for the
-repositories, 2 for the unit of work, 4 for `LeadService` and 1 for the schema's names. Everything else below is
-*(planned)*.
+cases, one each for `Domain` and `Application`) and 86 integration tests: 71 on PostgreSQL 18 (64 for the
+repositories, 2 for the unit of work, 4 for `LeadService` and 1 for the schema's names), and 15 for the settings'
+startup validation, which need no database. Everything else below is *(planned)*.
 
 ---
 
@@ -31,6 +31,7 @@ repositories, 2 for the unit of work, 4 for `LeadService` and 1 for the schema's
 | **Guard test** | Fails if any endpoint answers anonymously without being on the explicit list of public endpoints | Enumerates every endpoint through `EndpointDataSource` |
 | **Architecture test** | Fails if `Domain` or `Application` reference EF Core, Npgsql, Hangfire or MailKit ([ADR 1](adr/0001-layered-solution.md)) | Reads each project's assembly references |
 | **Schema naming test** | Fails if any table, column, constraint or index in the migrated database isn't snake_case (EF Core's own `__EFMigrationsHistory` table excepted) | Reads PostgreSQL's catalog in a test database |
+| **Settings tests** | Fail if a required setting can be missing or invalid without stopping the API at startup, or if the error doesn't name it ([operations](operations.md#configuration)) | Builds the services from in-memory settings and runs the startup validation |
 | **Performance and fault** | The four measured problems, P1–P4 | Scripts in `perf/`, run by hand, results committed; not part of CI ([measurements](measurements.md)) |
 
 ---
