@@ -2,8 +2,8 @@
 
 How Solaris is configured, run, observed, built and deployed.
 
-**Status:** most of this is *(planned)*. Built today: typed configuration, and migrations applied automatically in
-Development. The API still requires the Gmail settings at startup.
+**Status:** most of this is *(planned)*. Built today: typed configuration, the local database in docker compose, and
+migrations applied automatically in Development. The API still requires the Gmail settings at startup.
 
 ---
 
@@ -40,6 +40,7 @@ variables directly, and secrets never go in `appsettings.json`.
 | `FaultInjection__Enabled` *(planned)* | — | Development only, for measurements |
 | `RateLimiting__Enabled` *(planned)* | — | `true` by default; `false` only for measurement runs |
 | `Database__MigrateOnStartup` *(planned)* | — | Apply pending migrations at startup |
+| `POSTGRES_PASSWORD` | `.env` | Not read by the API: docker compose gives it to the local database ([running locally](#running-locally)) |
 
 ---
 
@@ -47,6 +48,11 @@ variables directly, and secrets never go in `appsettings.json`.
 
 Prerequisites: the .NET 10 SDK and Docker. Copy `.env.example` to `.env` at the repository root and fill it in.
 
+- **The database:** `docker compose up -d` at the repository root starts PostgreSQL 18, with the password from
+  `.env` (`POSTGRES_PASSWORD`, which the connection string repeats). It listens on `localhost:5433`, for this
+  machine only, so it never collides with another PostgreSQL on 5432. It restarts with Docker, and its data stays in
+  the `postgres-data` volume until `docker compose down -v`. Any PostgreSQL client connects with the same host, port,
+  user (`postgres`) and password.
 - **The API from VS Code:** a launch configuration with `"envFile"` pointing at the repository's `.env` loads it
   into the API's environment.
 - **The API from a terminal:** load the file into the shell, then run the API from its folder:
@@ -56,8 +62,7 @@ Prerequisites: the .NET 10 SDK and Docker. Copy `.env.example` to `.env` at the 
   cd backend/src/WebAPI && dotnet run
   ```
 
-- **Everything in containers** *(planned)*: `docker compose up` starts PostgreSQL 18 and the API, reading the same
-  `.env`; `docker compose up postgres` starts only the database.
+- **The API in a container** *(planned)*: comes with the Dockerfile ([Build and CI](#build-and-ci-planned)).
 
 In Development, the API reference (Scalar) is served under `/scalar`, from the OpenAPI document at
 `/openapi/v1.json`. Demo data comes from the dataset generator
@@ -91,7 +96,8 @@ dotnet ef database update --project backend/src/Infrastructure --connection "Hos
 
 ## Build and CI *(planned)*
 
-- **Docker image:** a multi-stage `Dockerfile`, building with `dotnet/sdk:10.0` and running on `dotnet/aspnet:10.0`.
+- **Docker image:** a multi-stage `Dockerfile`, building with `dotnet/sdk:10.0` and running on `dotnet/aspnet:10.0`;
+  docker compose gains an `api` service built from it, next to the database.
 - **CI:** GitHub Actions on every pull request and on `main`: set up .NET 10 → restore → build → unit and
   integration tests. Testcontainers runs on the hosted Ubuntu runners.
 

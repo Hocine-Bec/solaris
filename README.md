@@ -17,8 +17,8 @@ here with the method to reproduce them.
 Version 1 is being built on top of an earlier version, in which lead capture was the only feature working
 end to end: a React quote form posts to the API, which stores the lead in PostgreSQL and emails the lead and
 the sales team. That code is being brought up to standard first; the rest of v1 is described in the
-documentation below. No measurements have been published yet, and setup instructions will come with the
-Docker setup.
+documentation below. No measurements have been published yet. To run it locally, see
+[Operations: running locally](docs/operations.md#running-locally).
 
 ## Stack
 
