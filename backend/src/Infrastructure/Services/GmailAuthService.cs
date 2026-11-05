@@ -1,23 +1,17 @@
 using System.Text.Json;
 using Application.Interfaces.Services;
-using Domain.ValueObjects;
+using Infrastructure.Settings;
+using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Services;
 
-public class GmailAuthService : IGmailAuthService
+public class GmailAuthService(IOptions<EmailOptions> options) : IGmailAuthService
 {
-    private readonly GmailSetting _settings = new();
+    private readonly GmailOptions _settings = options.Value.Gmail;
     private readonly HttpClient _httpClient = new();
     private readonly SemaphoreSlim _refreshLock = new SemaphoreSlim(1, 1);
     private string? _cachedAccessToken;
     private DateTime _tokenExpiry = DateTime.MinValue;
-    
-    public GmailAuthService()
-    {
-        _settings.ClientId = Environment.GetEnvironmentVariable("CLIENT_ID") ?? throw new InvalidOperationException("CLIENT_ID environment variable is not set");
-        _settings.ClientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET") ?? throw new InvalidOperationException("CLIENT_SECRET environment variable is not set");
-        _settings.RefreshToken = Environment.GetEnvironmentVariable("GMAIL_REFRESH_TOKEN") ?? throw new InvalidOperationException("GMAIL_REFRESH_TOKEN environment variable is not set");
-    }
 
     public async Task<string> GetAccessTokenAsync()
     {

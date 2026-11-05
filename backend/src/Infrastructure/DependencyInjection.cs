@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Infrastructure;
@@ -19,31 +20,32 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<JwtSetting>(options =>
-        {
-            options.Secret = Environment.GetEnvironmentVariable("SECRET_KEY") ??
-                             throw new InvalidOperationException("SECRET_KEY environment variable is not set");
-            options.Issuer = Environment.GetEnvironmentVariable("ISSUER") ??
-                             throw new InvalidOperationException("ISSUER environment variable is not set");
-            options.Audience = Environment.GetEnvironmentVariable("AUDIENCE") ??
-                               throw new InvalidOperationException("AUDIENCE environment variable is not set");
-            options.LifeTime =
-                int.Parse(Environment.GetEnvironmentVariable("EXPIRY_MINUTES") ?? "15");
-            options.RefreshTokenLifeTime =
-                int.Parse(Environment.GetEnvironmentVariable("REFRESH_TOKEN_LIFETIME_DAYS") ?? "7");
-        });
+        // Typed settings, validated when the host starts: a missing or invalid one stops the API and names the key.
+        services.AddOptions<ConnectionStringsOptions>()
+            .Bind(configuration.GetSection(ConnectionStringsOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddOptions<EmailOptions>()
+            .Bind(configuration.GetSection(EmailOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
-        var connectionString = Environment.GetEnvironmentVariable("DEFAULTCONNECTION");
-        services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddDbContext<AppDbContext>((provider, options) =>
+            options.UseNpgsql(provider.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Default));
 
         //Add Hangfire services
-        services.AddHangfire(config => 
+        services.AddHangfire((provider, config) =>
             config.SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
                 .UseSimpleAssemblyNameTypeSerializer()
                 .UseRecommendedSerializerSettings()
                 .UsePostgreSqlStorage(options =>
                 {
-                    options.UseNpgsqlConnection(connectionString);
+                    options.UseNpgsqlConnection(
+                        provider.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Default);
                 }, new PostgreSqlStorageOptions()
                 {
                     QueuePollInterval = TimeSpan.FromSeconds(1),
@@ -62,22 +64,26 @@ public static class DependencyInjection
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        }).AddJwtBearer(options =>
-        {
-            options.SaveToken = true;
-            options.TokenValidationParameters = new TokenValidationParameters
+        }).AddJwtBearer();
+
+        // The bearer options read the validated JwtOptions instead of the configuration directly.
+        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<IOptions<JwtOptions>>((options, jwtOptions) =>
             {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ValidAudience = Environment.GetEnvironmentVariable("AUDIENCE"),
-                ValidIssuer = Environment.GetEnvironmentVariable("ISSUER"),
-                IssuerSigningKey =
-                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Environment.GetEnvironmentVariable("SECRET_KEY")!)),
-                ClockSkew = TimeSpan.Zero
-            };
-        });
+                var jwt = jwtOptions.Value;
+                options.SaveToken = true;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidAudience = jwt.Audience,
+                    ValidIssuer = jwt.Issuer,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret)),
+                    ClockSkew = TimeSpan.Zero
+                };
+            });
         
         //Repositories
         services.AddScoped<IAddressRepo, AddressRepo>();

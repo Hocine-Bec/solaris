@@ -1,21 +1,21 @@
 using Application;
-using DotNetEnv;
 using Hangfire;
 using Infrastructure;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
 using Serilog;
 using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
 
+// Settings come from appsettings.json (non-secret defaults) and environment variables (secrets), which
+// CreateBuilder reads; the app never loads a .env file itself (docs/operations.md, Configuration).
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Serilog
 builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
 
-Env.Load();
-builder.Configuration.AddEnvironmentVariables();
 builder.Services.AddControllers();
 
 // Auto-validation using FluentValidation 
@@ -48,6 +48,9 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Check every setting now, before the database is touched; app.Run() would only check them after the migrations.
+app.Services.GetRequiredService<IStartupValidator>().Validate();
 
 app.UseHangfireDashboard();
 
