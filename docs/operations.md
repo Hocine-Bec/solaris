@@ -2,48 +2,62 @@
 
 How Solaris is configured, run, observed, built and deployed.
 
-**Status:** most of this is *(planned)*. Today the API reads differently named environment variables
-(`DEFAULTCONNECTION`, `SECRET_KEY`, …) from a `.env` file, requires the Gmail settings at startup, and applies
-migrations automatically in Development only.
+**Status:** most of this is *(planned)*. Built today: typed configuration, and migrations applied automatically in
+Development. The API still requires the Gmail settings at startup.
 
 ---
 
-## Configuration *(planned)*
+## Configuration
 
-Standard ASP.NET Core configuration: `appsettings.json` holds non-secret defaults, and environment variables
-override them using `Section__Key` names. Each section binds to a typed options class validated at startup, so
-a missing or invalid setting stops the API with a clear message. Code never reads environment variables
-directly.
+Standard ASP.NET Core configuration, from two places:
 
-Secrets are never committed: locally they live in `dotnet user-secrets` (when running the API directly) or in
-docker-compose's own `.env` file; in production they are environment variables.
+- **`backend/src/WebAPI/appsettings.json`** (committed): non-secret defaults only, such as the JWT issuer and the
+  SMTP host.
+- **Environment variables**, which override it using `Section__Key` names: the secrets, and anything specific to
+  one machine. Locally they come from one gitignored `.env` file at the repository root (copy `.env.example`),
+  which the IDE and docker compose load; in production, the hosting platform sets them. The API never reads a
+  `.env` file itself.
 
-| Key | Values / notes |
-|---|---|
-| `ConnectionStrings__Default` | PostgreSQL connection string |
-| `Jwt__Secret`, `Jwt__Issuer`, `Jwt__Audience`, `Jwt__LifetimeHours` | Lifetime 8 hours |
-| `Admin__Email`, `Admin__Password` | The first Admin account, created at startup if none exists |
-| `Cors__AllowedOrigins` | The marketing site's URL |
-| `Notifications__Mode` | `Outbox` (default) \| `Synchronous` (Development only, for measurements) |
-| `Email__Provider` | `Gmail` \| `Recording` |
-| `Email__FromName`, `Email__FromAddress` | The sender shown on emails |
-| `Email__SimulatedLatencyMs` | `Recording` only |
-| `Email__Smtp__Host`, `Email__Smtp__Port` | `Gmail` only |
-| `Email__Gmail__ClientId`, `Email__Gmail__ClientSecret`, `Email__Gmail__RefreshToken` | Required only when `Email__Provider=Gmail` |
-| `FaultInjection__Enabled` | Development only, for measurements |
-| `RateLimiting__Enabled` | `true` by default; `false` only for measurement runs |
-| `Database__MigrateOnStartup` | Apply pending migrations at startup |
+Each section binds to a typed options class, validated as soon as the API is built: a missing or invalid setting
+stops it before it touches the database, and the error names every setting at fault. Code never reads environment
+variables directly, and secrets never go in `appsettings.json`.
+
+| Key | Where | Values / notes |
+|---|---|---|
+| `ConnectionStrings__Default` | `.env` | PostgreSQL connection string |
+| `Jwt__Secret` | `.env` | The token signing key, at least 32 characters |
+| `Jwt__Issuer`, `Jwt__Audience` | `appsettings.json` | `solaris-api`, `solaris-staff` |
+| `Jwt__LifetimeHours` *(planned)* | — | 8 hours |
+| `Admin__Email`, `Admin__Password` *(planned)* | — | The first Admin account, created at startup if none exists |
+| `Cors__AllowedOrigins` *(planned)* | — | The marketing site's URL |
+| `Notifications__Mode` *(planned)* | — | `Outbox` (default) \| `Synchronous` (Development only, for measurements) |
+| `Email__Provider` *(planned)* | — | `Gmail` \| `Recording` |
+| `Email__FromName` | `appsettings.json` | The sender name shown on emails: `Solaris` |
+| `Email__FromAddress` | `.env` | The sender's address; sales notifications are sent to it too |
+| `Email__SimulatedLatencyMs` *(planned)* | — | `Recording` only |
+| `Email__Smtp__Host`, `Email__Smtp__Port` | `appsettings.json` | `smtp.gmail.com`, 587 |
+| `Email__Gmail__ClientId`, `Email__Gmail__ClientSecret`, `Email__Gmail__RefreshToken` | `.env` | Required today; required only when `Email__Provider=Gmail` *(planned)* |
+| `FaultInjection__Enabled` *(planned)* | — | Development only, for measurements |
+| `RateLimiting__Enabled` *(planned)* | — | `true` by default; `false` only for measurement runs |
+| `Database__MigrateOnStartup` *(planned)* | — | Apply pending migrations at startup |
 
 ---
 
-## Running locally *(planned)*
+## Running locally
 
-Prerequisites: the .NET 10 SDK and Docker.
+Prerequisites: the .NET 10 SDK and Docker. Copy `.env.example` to `.env` at the repository root and fill it in.
 
-- **Everything in containers:** `docker compose up` starts PostgreSQL 18 and the API, configured from a `.env`
-  file next to `docker-compose.yml` (copy `.env.example`).
-- **The API from your IDE or `dotnet run`:** start only the database with `docker compose up postgres`, and keep
-  the API's secrets in `dotnet user-secrets`.
+- **The API from VS Code:** a launch configuration with `"envFile"` pointing at the repository's `.env` loads it
+  into the API's environment.
+- **The API from a terminal:** load the file into the shell, then run the API from its folder:
+
+  ```sh
+  set -a; . ./.env; set +a          # at the repository root
+  cd backend/src/WebAPI && dotnet run
+  ```
+
+- **Everything in containers** *(planned)*: `docker compose up` starts PostgreSQL 18 and the API, reading the same
+  `.env`; `docker compose up postgres` starts only the database.
 
 In Development, the API reference (Scalar) is served under `/scalar`, from the OpenAPI document at
 `/openapi/v1.json`. Demo data comes from the dataset generator
@@ -55,6 +69,13 @@ In Development, the API reference (Scalar) is served under `/scalar`, from the O
 
 EF Core migrations live in `Infrastructure`. They are applied at startup when `Database__MigrateOnStartup=true`,
 which suits a single-instance deployment *(planned)*. Production gets no demo seeding.
+
+The EF Core tools build the model through a design-time factory (`DesignTimeDbContextFactory`), so they don't need
+the API's settings. Commands that reach a database take the connection string explicitly:
+
+```sh
+dotnet ef database update --project backend/src/Infrastructure --connection "Host=…;Database=…;Username=…;Password=…"
+```
 
 ---
 
