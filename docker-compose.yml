@@ -1,0 +1,20 @@
+# The local PostgreSQL 18 database. The API runs on the host and connects to it on localhost:5433
+# (docs/operations.md, Running locally). Compose reads POSTGRES_PASSWORD from the .env file next to this one.
+name: solaris
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: solaris
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?is not set; copy .env.example to .env and fill it in}
+    ports:
+      # Only this machine can connect; 5433 leaves 5432 free for any other PostgreSQL.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      # The 18 image keeps its data under /var/lib/postgresql (in a version folder), so the volume goes there.
+      - postgres-data:/var/lib/postgresql
+
+volumes:
+  postgres-data:
