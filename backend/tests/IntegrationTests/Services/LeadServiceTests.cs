@@ -1,4 +1,5 @@
 using Application.DTOs.Lead;
+using Application.Errors;
 using Application.Services;
 using Domain.Entities;
 using Domain.Enums;
@@ -7,7 +8,6 @@ using Infrastructure.Data;
 using Infrastructure.Repositories;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 using TestUtilities.Base;
 using TestUtilities.Database;
 using TestUtilities.Factories;
@@ -28,7 +28,7 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
 
     private LeadService CreateService() => new(
         new LeadRepo(Context), new AddressRepo(Context), new CustomerRepo(Context), new UnitOfWork(Context),
-        _emails, NullLogger<LeadService>.Instance);
+        _emails);
 
     private static CreateLeadRequest ValidRequest(string email = "jane.doe@example.com") => new()
     {
@@ -65,16 +65,17 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
     }
 
     [Fact]
-    public async Task CreateAsync_LeadCannotBeSaved_StoresNoAddressEither()
+    public async Task CreateAsync_LeadCannotBeSaved_ThrowsAndStoresNoAddressEither()
     {
         // Arrange - an email longer than its 255-character column makes the save fail
         var request = ValidRequest(email: new string('a', 250) + "@example.com");
 
         // Act
-        var result = await CreateService().CreateAsync(request);
+        var act = () => CreateService().CreateAsync(request);
 
-        // Assert - one transaction: the address is rolled back with the lead
-        result.IsSuccess.Should().BeFalse();
+        // Assert - an unexpected failure is an exception for the API's handler, not a result (ADR 3); and one
+        // transaction: the address is rolled back with the lead
+        await act.Should().ThrowAsync<DbUpdateException>();
         ClearTracking();
         (await Context.Leads.CountAsync(TestContext.Current.CancellationToken)).Should().Be(0);
         (await Context.Addresses.CountAsync(TestContext.Current.CancellationToken)).Should().Be(0);
@@ -89,7 +90,7 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.StatusCode.Should().Be(ResultStatusCode.NotFound);
+        result.Error.Should().Be(LeadErrors.NotFound(999));
     }
 
     [Fact]

@@ -11,5 +11,5 @@ public interface IAddressService
     Task<PagedResponse<AddressResponse>> SearchAsync(string city, string? state, PageRequest request);
     Task<Result<AddressResponse>> CreateAsync(CreateAddressRequest request);
     Task<Result> UpdateAsync(int id, UpdateAddressRequest request);
-    Task<Result> DeleteAsync(int id);
+    Task DeleteAsync(int id);
 }

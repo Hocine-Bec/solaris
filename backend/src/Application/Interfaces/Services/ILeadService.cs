@@ -10,6 +10,6 @@ public interface ILeadService
     Task<Result<LeadResponse>> GetByIdAsync(int id);
     Task<Result<LeadResponse>> CreateAsync(CreateLeadRequest request);
     Task<Result> UpdateLeadStatusAsync(int id, UpdateLeadStatusRequest request);
-    Task<Result> DeleteAsync(int id);
+    Task DeleteAsync(int id);
     Task<Result> ConvertLeadToCustomerAsync(ConvertLeadRequest request);
 }
