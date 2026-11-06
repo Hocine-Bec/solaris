@@ -2,6 +2,7 @@ using Application;
 using Hangfire;
 using Infrastructure;
 using Infrastructure.Data;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
@@ -19,6 +20,23 @@ builder.Host.UseSerilog((context, configuration) =>
 
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter()));
+
+// Every error response is a ProblemDetails (RFC 9457) with a stable code (ADR 3). An expected failure sets its own
+// (ApiControllerBase.Problem); the others get one here: validation_failed, internal_error, or the status's name.
+builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
+{
+    var problem = context.ProblemDetails;
+    if (problem.Extensions.ContainsKey("code")) return;
+    var status = problem.Status ?? context.HttpContext.Response.StatusCode;
+    problem.Extensions["code"] = problem switch
+    {
+        HttpValidationProblemDetails => "validation_failed",
+        _ when status == StatusCodes.Status500InternalServerError => "internal_error",
+        _ => ReasonPhrases.GetReasonPhrase(status) is { Length: > 0 } phrase
+            ? phrase.ToLowerInvariant().Replace(' ', '_')
+            : "error"
+    };
+});
 
 // Auto-validation using FluentValidation 
 builder.Services.AddFluentValidationAutoValidation();
@@ -54,6 +72,18 @@ var app = builder.Build();
 // Check every setting now, before the database is touched; app.Run() would only check them after the migrations.
 app.Services.GetRequiredService<IStartupValidator>().Validate();
 
+// One log line per request, with its final status. It comes first, so it sees the status the client gets and an
+// exception reaches it already handled: the exception handler below logs it, once.
+app.UseSerilogRequestLogging();
+
+// Outside Development, an unhandled exception becomes a 500 ProblemDetails with a traceId and no stack trace; the
+// exception is logged with the same trace id. In Development, the developer exception page shows the details.
+if (!app.Environment.IsDevelopment())
+    app.UseExceptionHandler();
+
+// Responses that end with an error status and no body (an unknown URL, a wrong method) get a ProblemDetails body too.
+app.UseStatusCodePages();
+
 app.UseHangfireDashboard();
 
 // Configure the HTTP request pipeline.
@@ -75,8 +105,6 @@ if (app.Environment.IsDevelopment())
     await context.Database.MigrateAsync();
 }
 
-
-app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
 
