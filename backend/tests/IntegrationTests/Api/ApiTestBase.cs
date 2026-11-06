@@ -1,0 +1,68 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Application.Interfaces.Services;
+using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using TestUtilities.Base;
+using TestUtilities.Database;
+using TestUtilities.Fakes;
+
+namespace IntegrationTests.Api;
+
+/// <summary>
+/// Runs the real API in memory, on this test's own PostgreSQL database, outside Development (so errors look as they
+/// do in production). Only the email queue is a fake.
+/// </summary>
+public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBase(database)
+{
+    private WebApplicationFactory<Program>? _factory;
+
+    protected RecordingEmailQueueHandler Emails { get; } = new();
+
+    /// <summary>A client for the API; <paramref name="configureServices"/> can replace services, before the first call only.</summary>
+    protected HttpClient CreateClient(Action<IServiceCollection>? configureServices = null)
+    {
+        _factory ??= new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("ConnectionStrings:Default", ConnectionString);
+            builder.UseSetting("Jwt:Secret", "test-secret-test-secret-test-secret-test-secret");
+            builder.UseSetting("Email:FromAddress", "solaris.test@example.com");
+            builder.UseSetting("Email:Gmail:ClientId", "test-client-id");
+            builder.UseSetting("Email:Gmail:ClientSecret", "test-client-secret");
+            builder.UseSetting("Email:Gmail:RefreshToken", "test-refresh-token");
+            builder.UseSetting("Serilog:MinimumLevel", "Warning");
+            builder.ConfigureTestServices(services =>
+            {
+                services.AddSingleton<IEmailQueueHandler>(Emails);
+                configureServices?.Invoke(services);
+            });
+        });
+        return _factory.CreateClient();
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        // Stop the API (and its Hangfire server) before the database is dropped.
+        if (_factory is not null)
+            await _factory.DisposeAsync();
+        await base.DisposeAsync();
+    }
+
+    /// <summary>Checks the response is a ProblemDetails with this status and code, and returns its body.</summary>
+    protected static async Task<JsonElement> ShouldBeProblemAsync(HttpResponseMessage response, HttpStatusCode status,
+        string code)
+    {
+        response.StatusCode.Should().Be(status);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        body.GetProperty("status").GetInt32().Should().Be((int)status);
+        body.GetProperty("code").GetString().Should().Be(code);
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrEmpty();
+        return body;
+    }
+}
