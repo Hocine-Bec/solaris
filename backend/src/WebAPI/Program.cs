@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
 using Serilog;
 using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
+using WebAPI.Json;
 
 // Settings come from appsettings.json (non-secret defaults) and environment variables (secrets), which
 // CreateBuilder reads; the app never loads a .env file itself (docs/operations.md, Configuration).
@@ -16,7 +17,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter()));
 
 // Auto-validation using FluentValidation 
 builder.Services.AddFluentValidationAutoValidation();
