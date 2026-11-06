@@ -89,7 +89,8 @@ dotnet ef database update --project backend/src/Infrastructure --connection "Hos
 - **Health checks** *(planned)*: `/health/live` (the process is up) and `/health/ready` (the database is
   reachable). Both are public.
 - **Logging:** Serilog structured logs, including a line for every request (method, path, status, elapsed time), written
-  to the console and to daily-rolling files. Performance numbers come from the load tool, not from logs
+  to the console and to daily-rolling files. Every line written during a request ends with its trace id, which is
+  the middle part of an error response's `traceId` (`00-<trace id>-…`), so a 500 leads to its exception. Performance numbers come from the load tool, not from logs
   ([measurements](measurements.md)).
 
 ---

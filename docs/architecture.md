@@ -119,12 +119,31 @@ stored as strings, every timestamp a UTC `timestamptz`. Only the daily rollups u
   unit of work ([ADR 2](adr/0002-services-and-repositories.md)). The unit of work turns the two failures a service
   can expect into an outcome: `Conflict` (the row changed or was deleted after it was read) and `Duplicate` (a unique
   index rejected the write).
-- **Outcomes:** expected failures are `Result` values with an error kind; unexpected errors are exceptions,
-  handled once by a global handler ([ADR 3](adr/0003-result-objects-for-expected-outcomes.md)). Every error
-  response is a ProblemDetails (RFC 9457) with a stable `code` *(planned)*.
+- **Outcomes:** expected failures are `Result` values carrying an `Error` (a kind, a stable code and a message);
+  unexpected errors are exceptions, handled once by a global handler
+  ([ADR 3](adr/0003-result-objects-for-expected-outcomes.md)). The kinds are `NotFound` (404) and `Conflict`
+  (409); a new kind is added when a service first needs it. Controllers choose the success status (200, 201 with
+  the new resource's URL, 204).
+- **Error responses:** every one is a ProblemDetails (RFC 9457) with a stable `code` and a `traceId`:
+
+  | Code | Status | When |
+  |---|---|---|
+  | `lead.not_found`, `address.not_found` | 404 | No lead or address has this ID |
+  | `lead.already_converted` | 409 | The lead is already converted |
+  | `lead.concurrent_change`, `address.concurrent_change` | 409 | Someone else changed or deleted the row since it was read |
+  | `address.already_exists` | 409 | An address with the same key exists ([ADR 5](adr/0005-address-natural-key.md)) |
+  | `customer.email_taken` | 409 | A customer already has this email |
+  | `validation_failed` | 400 | The request is malformed or fails validation; `errors` lists the fields |
+  | `internal_error` | 500 | A bug. Outside Development the body has no exception details; the log line has the same trace id |
+  | The status's name, such as `not_found` or `method_not_allowed` | 4xx | Errors from the framework itself, such as an unknown URL |
+
 - **Validation:** FluentValidation rejects malformed requests with 400 and the failing fields.
+- **Timestamps:** every timestamp in a request must carry `Z` or an offset (`2026-11-02T10:00:00Z`,
+  `2026-11-02T11:00:00+01:00`) and is converted to UTC; one without a zone is rejected with 400, because it could
+  be UTC or local time. Responses are always UTC, with `Z`.
 - **Pagination:** every list takes `?page=1&pageSize=20` (maximum 100) and returns
-  `{ items, page, pageSize, totalCount }` *(planned)*.
+  `{ items, page, pageSize, totalCount }`. Each list has a total order, ending with the ID, so no row moves between
+  pages: leads newest first, addresses by ID, address search by city, then street.
 - **Cancellation:** every async path takes a `CancellationToken` *(planned)*.
 
 ---
