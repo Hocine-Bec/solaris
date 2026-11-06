@@ -1,12 +1,12 @@
 using Application.Common.Models;
-using Application.DTOs.Address;
+using Application.DTOs.Common;
 using Application.DTOs.Lead;
 
 namespace Application.Interfaces.Services;
 
 public interface ILeadService
 {
-    Task<Result<IReadOnlyList<LeadResponse>>> GetListAsync();
+    Task<PagedResponse<LeadResponse>> GetPageAsync(PageRequest request);
     Task<Result<LeadResponse>> GetByIdAsync(int id);
     Task<Result<LeadResponse>> CreateAsync(CreateLeadRequest request);
     Task<Result> UpdateLeadStatusAsync(int id, UpdateLeadStatusRequest request);

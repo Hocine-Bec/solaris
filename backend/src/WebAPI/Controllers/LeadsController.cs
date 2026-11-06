@@ -1,3 +1,4 @@
+using Application.DTOs.Common;
 using Application.DTOs.Lead;
 using Application.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -11,13 +12,10 @@ public class LeadsController(ILeadService service) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<IReadOnlyList<LeadResponse>>> GetAll()
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PagedResponse<LeadResponse>>> GetPage([FromQuery] PageRequest request)
     {
-        var response = await service.GetListAsync();
-        return response.HandleResult();
+        return Ok(await service.GetPageAsync(request));
     }
 
     [HttpGet("{id:int}")]

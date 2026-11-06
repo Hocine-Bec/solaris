@@ -1,4 +1,5 @@
 using Application.Common.Models;
+using Application.DTOs.Common;
 using Application.DTOs.Lead;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
@@ -29,21 +30,11 @@ public class LeadService : ILeadService
         _log = log;
     }
 
-    public async Task<Result<IReadOnlyList<LeadResponse>>> GetListAsync()
+    public async Task<PagedResponse<LeadResponse>> GetPageAsync(PageRequest request)
     {
-        try
-        {
-            var leads = await _repo.GetAllAsync();
-            var response = leads.Adapt<IReadOnlyList<LeadResponse>>();
-            return Result.Success(response);
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, $"Error while {nameof(GetByIdAsync)} for {nameof(Lead)}s List");
-            return Result.Failure<IReadOnlyList<LeadResponse>>(
-                "An error occurred while retrieving leads.",
-                ResultStatusCode.InternalServerError);
-        }
+        var (leads, totalCount) = await _repo.GetPageAsync(request.Offset(), request.PageSize);
+        return new PagedResponse<LeadResponse>(leads.Adapt<IReadOnlyList<LeadResponse>>(), request.Page,
+            request.PageSize, totalCount);
     }
 
     public async Task<Result<LeadResponse>> GetByIdAsync(int id)

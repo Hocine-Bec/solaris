@@ -15,21 +15,21 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
     // The context is created per test, after the constructor runs, so the repository is created on use.
     private AddressRepo Repo => new(Context);
 
-    #region GetAllAsync Tests
+    #region GetPageAsync Tests
 
     [Fact]
-    public async Task GetAllAsync_EmptyDatabase_ReturnsEmptyList()
+    public async Task GetPageAsync_EmptyDatabase_ReturnsNoAddressesAndZeroTotal()
     {
         // Act
-        var result = await Repo.GetAllAsync();
+        var (items, totalCount) = await Repo.GetPageAsync(skip: 0, take: 20);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().BeEmpty();
+        items.Should().BeEmpty();
+        totalCount.Should().Be(0);
     }
 
     [Fact]
-    public async Task GetAllAsync_WithAddresses_ReturnsAllAddresses()
+    public async Task GetPageAsync_WithAddresses_ReturnsAllAddresses()
     {
         // Arrange
         var addresses = new List<Address>
@@ -40,28 +40,41 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await Repo.GetAllAsync();
+        var (items, totalCount) = await Repo.GetPageAsync(skip: 0, take: 20);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().HaveCount(2);
-        result.Should().BeEquivalentTo(addresses, options => options.ComparingByMembers<Address>());
+        items.Should().BeEquivalentTo(addresses, options => options.ComparingByMembers<Address>());
+        totalCount.Should().Be(2);
     }
 
     [Fact]
-    public async Task GetAllAsync_ReturnsDetachedEntities()
+    public async Task GetPageAsync_LaterPage_ReturnsTheNextAddressesByIdAndCountsThemAll()
+    {
+        // Arrange - pages of 2 by ID are [1, 2], [3, 4], [5]
+        await SeedAsync(Enumerable.Range(1, 5).Select(i => AddressFactory.CreateFakeAddress(id: i)).ToArray());
+
+        // Act
+        var (items, totalCount) = await Repo.GetPageAsync(skip: 2, take: 2);
+
+        // Assert
+        items.Select(a => a.Id).Should().Equal(3, 4);
+        totalCount.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task GetPageAsync_ReturnsDetachedEntities()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress();
         await SeedAsync(address);
 
         // Act
-        var result = await Repo.GetAllAsync();
+        var (items, _) = await Repo.GetPageAsync(skip: 0, take: 20);
 
         // Assert
-        var returnedAddress = result[0];
-        Context.Entry(returnedAddress).State.Should().Be(EntityState.Detached);
+        Context.Entry(items[0]).State.Should().Be(EntityState.Detached);
     }
+
 
     #endregion
 
@@ -335,7 +348,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("Chicago");
+        var (result, _) = await Repo.SearchByCityAndStateAsync("Chicago", null, skip: 0, take: 20);
 
         // Assert
         result.Should().HaveCount(2);
@@ -350,7 +363,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(address);
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("chicago");
+        var (result, _) = await Repo.SearchByCityAndStateAsync("chicago", null, skip: 0, take: 20);
 
         // Assert
         result.Should().HaveCount(1);
@@ -370,7 +383,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("Spring");
+        var (result, _) = await Repo.SearchByCityAndStateAsync("Spring", null, skip: 0, take: 20);
 
         // Assert
         result.Should().HaveCount(2);
@@ -392,7 +405,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("Springfield", "IL");
+        var (result, _) = await Repo.SearchByCityAndStateAsync("Springfield", "IL", skip: 0, take: 20);
 
         // Assert
         result.Should().HaveCount(2);
@@ -411,7 +424,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(address);
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("Chicago", "il");
+        var (result, _) = await Repo.SearchByCityAndStateAsync("Chicago", "il", skip: 0, take: 20);
 
         // Assert
         result.Should().HaveCount(1);
@@ -425,7 +438,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(address);
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("NonExistentCity");
+        var (result, _) = await Repo.SearchByCityAndStateAsync("NonExistentCity", null, skip: 0, take: 20);
 
         // Assert
         result.Should().BeEmpty();
@@ -444,7 +457,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("Springfield", null);
+        var (result, _) = await Repo.SearchByCityAndStateAsync("Springfield", null, skip: 0, take: 20);
 
         // Assert
         result.Should().HaveCount(3);
@@ -462,7 +475,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("Springfield", "");
+        var (result, _) = await Repo.SearchByCityAndStateAsync("Springfield", "", skip: 0, take: 20);
 
         // Assert
         result.Should().HaveCount(2);
@@ -482,7 +495,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("o"); // Matches Boston and Chicago
+        var (result, _) = await Repo.SearchByCityAndStateAsync("o", null, skip: 0, take: 20); // Matches Boston and Chicago
 
         // Assert
         result.Should().HaveCount(4);
@@ -497,6 +510,27 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
     }
 
     [Fact]
+    public async Task SearchByCityAndStateAsync_LaterPage_KeepsTheOrderAndCountsAllMatches()
+    {
+        // Arrange - the same city and street in three states, so only the ID orders them
+        var addresses = new List<Address>
+        {
+            AddressFactory.CreateFakeAddress(id: 1, city: "Springfield", street: "Main St", state: "IL"),
+            AddressFactory.CreateFakeAddress(id: 2, city: "Springfield", street: "Main St", state: "MA"),
+            AddressFactory.CreateFakeAddress(id: 3, city: "Springfield", street: "Main St", state: "MO"),
+            AddressFactory.CreateFakeAddress(id: 4, city: "Chicago")
+        };
+        await SeedAsync(addresses.ToArray());
+
+        // Act
+        var (items, totalCount) = await Repo.SearchByCityAndStateAsync("Springfield", null, skip: 1, take: 1);
+
+        // Assert
+        items.Select(a => a.Id).Should().Equal(2);
+        totalCount.Should().Be(3);
+    }
+
+    [Fact]
     public async Task SearchByCityAndStateAsync_ReturnsDetachedEntities()
     {
         // Arrange
@@ -504,7 +538,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(address);
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("Chicago");
+        var (result, _) = await Repo.SearchByCityAndStateAsync("Chicago", null, skip: 0, take: 20);
 
         // Assert
         var returnedAddress = result.First();
@@ -662,17 +696,18 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
     #region Edge Cases and Boundary Tests
 
     [Fact]
-    public async Task GetAllAsync_LargeDataset_ReturnsAllRecords()
+    public async Task GetPageAsync_LargeDataset_ReturnsOnePageAndTheTotal()
     {
         // Arrange
-        var addresses = AddressFactory.CreateFakeAddresses(20);
+        var addresses = AddressFactory.CreateFakeAddresses(30);
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await Repo.GetAllAsync();
+        var (items, totalCount) = await Repo.GetPageAsync(skip: 0, take: 20);
 
         // Assert
-        result.Should().HaveCount(20);
+        items.Should().HaveCount(20);
+        totalCount.Should().Be(30);
     }
 
     [Fact]
@@ -683,7 +718,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(address);
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("O'Fallon");
+        var (result, _) = await Repo.SearchByCityAndStateAsync("O'Fallon", null, skip: 0, take: 20);
 
         // Assert
         result.Should().HaveCount(1);
@@ -702,7 +737,7 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
         await SeedAsync(addresses.ToArray());
 
         // Act
-        var result = await Repo.SearchByCityAndStateAsync("Springfield", "   ");
+        var (result, _) = await Repo.SearchByCityAndStateAsync("Springfield", "   ", skip: 0, take: 20);
 
         // Assert
         result.Should().HaveCount(2); // Should treat whitespace as null/empty

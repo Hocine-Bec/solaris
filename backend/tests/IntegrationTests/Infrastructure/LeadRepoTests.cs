@@ -16,21 +16,21 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     // The context is created per test, after the constructor runs, so the repository is created on use.
     private LeadRepo Repo => new(Context);
 
-    #region GetAllAsync Tests
+    #region GetPageAsync Tests
 
     [Fact]
-    public async Task GetAllAsync_EmptyDatabase_ReturnsEmptyList()
+    public async Task GetPageAsync_EmptyDatabase_ReturnsNoLeadsAndZeroTotal()
     {
         // Act
-        var result = await Repo.GetAllAsync();
+        var (items, totalCount) = await Repo.GetPageAsync(skip: 0, take: 20);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().BeEmpty();
+        items.Should().BeEmpty();
+        totalCount.Should().Be(0);
     }
 
     [Fact]
-    public async Task GetAllAsync_WithLeads_ReturnsAllLeads()
+    public async Task GetPageAsync_WithLeads_ReturnsAllLeads()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -43,15 +43,46 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(leads.ToArray());
 
         // Act
-        var result = await Repo.GetAllAsync();
+        var (items, totalCount) = await Repo.GetPageAsync(skip: 0, take: 20);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().HaveCount(2);
+        items.Should().HaveCount(2);
+        totalCount.Should().Be(2);
     }
 
     [Fact]
-    public async Task GetAllAsync_IncludesAddress()
+    public async Task GetPageAsync_ReturnsNewestFirst()
+    {
+        // Arrange
+        var address = AddressFactory.CreateFakeAddress(id: 1);
+        await SeedAsync(address);
+        await SeedAsync(Enumerable.Range(1, 3).Select(i => LeadFactory.CreateFakeLead(id: i, addressId: 1)).ToArray());
+
+        // Act
+        var (items, _) = await Repo.GetPageAsync(skip: 0, take: 20);
+
+        // Assert
+        items.Select(l => l.Id).Should().Equal(3, 2, 1);
+    }
+
+    [Fact]
+    public async Task GetPageAsync_LaterPage_SkipsTheEarlierLeadsAndCountsThemAll()
+    {
+        // Arrange - newest first, so pages of 2 are [5, 4], [3, 2], [1]
+        var address = AddressFactory.CreateFakeAddress(id: 1);
+        await SeedAsync(address);
+        await SeedAsync(Enumerable.Range(1, 5).Select(i => LeadFactory.CreateFakeLead(id: i, addressId: 1)).ToArray());
+
+        // Act
+        var (items, totalCount) = await Repo.GetPageAsync(skip: 2, take: 2);
+
+        // Assert
+        items.Select(l => l.Id).Should().Equal(3, 2);
+        totalCount.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task GetPageAsync_IncludesAddress()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1, city: "Chicago");
@@ -60,16 +91,16 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(lead);
 
         // Act
-        var result = await Repo.GetAllAsync();
+        var (items, _) = await Repo.GetPageAsync(skip: 0, take: 20);
 
         // Assert
-        result.Should().HaveCount(1);
-        result[0].Address.Should().NotBeNull();
-        result[0].Address.City.Should().Be("Chicago");
+        items.Should().HaveCount(1);
+        items[0].Address.Should().NotBeNull();
+        items[0].Address.City.Should().Be("Chicago");
     }
 
     [Fact]
-    public async Task GetAllAsync_IncludesCustomer_WhenConverted()
+    public async Task GetPageAsync_IncludesCustomer_WhenConverted()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -93,16 +124,16 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(lead);
 
         // Act
-        var result = await Repo.GetAllAsync();
+        var (items, _) = await Repo.GetPageAsync(skip: 0, take: 20);
 
         // Assert
-        result.Should().HaveCount(1);
-        result[0].Customer.Should().NotBeNull();
-        result[0].Customer!.FirstName.Should().Be("John");
+        items.Should().HaveCount(1);
+        items[0].Customer.Should().NotBeNull();
+        items[0].Customer!.FirstName.Should().Be("John");
     }
 
     [Fact]
-    public async Task GetAllAsync_ReturnsDetachedEntities()
+    public async Task GetPageAsync_ReturnsDetachedEntities()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -111,11 +142,10 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(lead);
 
         // Act
-        var result = await Repo.GetAllAsync();
+        var (items, _) = await Repo.GetPageAsync(skip: 0, take: 20);
 
         // Assert
-        var returnedLead = result[0];
-        Context.Entry(returnedLead).State.Should().Be(EntityState.Detached);
+        Context.Entry(items[0]).State.Should().Be(EntityState.Detached);
     }
 
     #endregion
@@ -504,7 +534,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     #region Edge Cases and Boundary Tests
 
     [Fact]
-    public async Task GetAllAsync_LargeDataset_ReturnsAllRecords()
+    public async Task GetPageAsync_LargeDataset_ReturnsOnePageAndTheTotal()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -518,10 +548,11 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(leads.ToArray());
 
         // Act
-        var result = await Repo.GetAllAsync();
+        var (items, totalCount) = await Repo.GetPageAsync(skip: 0, take: 20);
 
         // Assert
-        result.Should().HaveCount(50);
+        items.Should().HaveCount(20);
+        totalCount.Should().Be(50);
     }
 
     [Fact]

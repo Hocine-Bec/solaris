@@ -1,5 +1,6 @@
 using Application.Common.Models;
 using Application.DTOs.Address;
+using Application.DTOs.Common;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities;
@@ -11,21 +12,10 @@ namespace Application.Services;
 
 public sealed class AddressService(IAddressRepo repo, IUnitOfWork unitOfWork, ILogger<AddressService> log) : IAddressService
 {
-    public async Task<Result<IReadOnlyList<AddressResponse>>> GetListAsync()
+    public async Task<PagedResponse<AddressResponse>> GetPageAsync(PageRequest request)
     {
-        try
-        {
-            var addresses = await repo.GetAllAsync();
-            var response = addresses.Adapt<IReadOnlyList<AddressResponse>>();
-            return Result.Success(response);
-        }
-        catch (Exception ex)
-        {
-            log.LogError(ex, $"Error while {nameof(GetByIdAsync)} for {nameof(Address)} List");
-            return Result.Failure<IReadOnlyList<AddressResponse>>(
-                "An error occurred while retrieving addresses.",
-                ResultStatusCode.InternalServerError);
-        }
+        var (addresses, totalCount) = await repo.GetPageAsync(request.Offset(), request.PageSize);
+        return ToPage(addresses, request, totalCount);
     }
 
     public async Task<Result<AddressResponse>> GetByIdAsync(int id)
@@ -45,21 +35,11 @@ public sealed class AddressService(IAddressRepo repo, IUnitOfWork unitOfWork, IL
                 ResultStatusCode.InternalServerError);
         }
     }
-    
-    public async Task<Result<IEnumerable<AddressResponse>>> SearchAsync(string city, string? state = null)
+
+    public async Task<PagedResponse<AddressResponse>> SearchAsync(string city, string? state, PageRequest request)
     {
-        try
-        {
-            var response = await repo.SearchByCityAndStateAsync(city, state);
-            return Result.Success(response.Adapt<IEnumerable<AddressResponse>>());
-        }
-        catch (Exception ex)
-        {
-            log.LogError(ex, $"Error while {nameof(SearchAsync)} for {nameof(Address)} city: {city} state: {state ?? string.Empty}");
-            return Result.Failure<IEnumerable<AddressResponse>>(
-                "An error occurred while searching for the address.",
-                ResultStatusCode.InternalServerError);
-        }
+        var (addresses, totalCount) = await repo.SearchByCityAndStateAsync(city, state, request.Offset(), request.PageSize);
+        return ToPage(addresses, request, totalCount);
     }
 
     public async Task<Result<AddressResponse>> CreateAsync(CreateAddressRequest request)
@@ -147,4 +127,7 @@ public sealed class AddressService(IAddressRepo repo, IUnitOfWork unitOfWork, IL
             return Result.Failure("An error occurred while deleting the address.", ResultStatusCode.InternalServerError);
         }
     }
+
+    private static PagedResponse<AddressResponse> ToPage(IReadOnlyList<Address> addresses, PageRequest request, int totalCount) =>
+        new(addresses.Adapt<IReadOnlyList<AddressResponse>>(), request.Page, request.PageSize, totalCount);
 }

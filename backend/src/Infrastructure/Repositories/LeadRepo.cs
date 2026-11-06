@@ -8,15 +8,17 @@ namespace Infrastructure.Repositories;
 
 public class LeadRepo(AppDbContext context) : GenericRepo<Lead>(context), ILeadRepo
 {
-    public override async Task<IReadOnlyList<Lead>> GetAllAsync()
+    public async Task<(IReadOnlyList<Lead> Items, int TotalCount)> GetPageAsync(int skip, int take)
     {
-        return await Context.Leads
+        // IDs grow with creation, so the highest ID is the newest lead.
+        var query = Context.Leads
             .Include(x => x.Customer)
             .Include(x => x.Address)
             .AsNoTracking()
-            .ToListAsync();
+            .OrderByDescending(x => x.Id);
+        return await ToPageAsync(query, skip, take);
     }
-    
+
     public override async Task<Lead?> GetByIdAsync(int id)
     {
         return await Context.Leads

@@ -1,4 +1,5 @@
 using Application.DTOs.Address;
+using Application.DTOs.Common;
 using Application.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.Extensions;
@@ -11,13 +12,10 @@ namespace WebAPI.Controllers
     {
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<IReadOnlyList<AddressResponse>>> GetAll()
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<PagedResponse<AddressResponse>>> GetPage([FromQuery] PageRequest request)
         {
-            var response = await service.GetListAsync();
-            return response.HandleResult();
+            return Ok(await service.GetPageAsync(request));
         }
 
         [HttpGet("{id:int}")]
@@ -36,13 +34,10 @@ namespace WebAPI.Controllers
         [HttpGet("search")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status403Forbidden)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<IEnumerable<AddressResponse>>> Search([FromQuery] string city,[FromQuery] string? state = null)
+        public async Task<ActionResult<PagedResponse<AddressResponse>>> Search([FromQuery] string city,
+            [FromQuery] PageRequest request, [FromQuery] string? state = null)
         {
-            var response = await service.SearchAsync(city, state);
-            return response.HandleResult();
+            return Ok(await service.SearchAsync(city, state, request));
         }
 
         [HttpPost]
