@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
@@ -35,6 +36,7 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(EmailOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<EmailOptions>, EmailOptionsValidator>();
 
         services.AddDbContext<AppDbContext>((provider, options) => options
             .UseNpgsql(provider.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Default)
@@ -102,13 +104,24 @@ public static class DependencyInjection
         services.AddScoped<ILeadRepo, LeadRepo>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         
-        // Gmail Services
+        // Email: the provider's sender (Email:Provider), which the measurement harness wraps in Development
         services.AddSingleton<IGmailAuthService, GmailAuthService>();
-        services.AddScoped<IEmailSender, GmailSmtpEmailSender>();
+        services.AddScoped<IEmailSender>(CreateProviderSender);
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IEmailQueueHandler, EmailQueueHandler>();
-        
-        
+
         return services;
+    }
+
+    /// <summary>The sender of the configured provider, without any wrapper.</summary>
+    internal static IEmailSender CreateProviderSender(IServiceProvider provider)
+    {
+        var options = provider.GetRequiredService<IOptions<EmailOptions>>();
+        return options.Value.Provider switch
+        {
+            EmailProvider.Gmail => new GmailSmtpEmailSender(provider.GetRequiredService<IGmailAuthService>(), options),
+            EmailProvider.Recording => new RecordingEmailSender(options),
+            var other => throw new UnreachableException($"No sender for the email provider {other}.")
+        };
     }
 }
