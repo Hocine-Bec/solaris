@@ -9,8 +9,10 @@ using Infrastructure.Services;
 using Infrastructure.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -34,8 +36,17 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services.AddDbContext<AppDbContext>((provider, options) =>
-            options.UseNpgsql(provider.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Default));
+        services.AddDbContext<AppDbContext>((provider, options) => options
+            .UseNpgsql(provider.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Default)
+            // EF Core logs a failed command, save or query as an error even when the code expects the failure (a
+            // unique index rejecting a duplicate, which the unit of work turns into SaveOutcome.Duplicate). Whoever
+            // catches the exception decides: an expected failure isn't an error, and an unexpected one reaches the
+            // API's exception handler, which logs it once. Raise the EF Core categories to Debug to see these events.
+            .ConfigureWarnings(warnings => warnings.Log(
+                (RelationalEventId.CommandError, LogLevel.Debug),
+                (RelationalEventId.ConnectionError, LogLevel.Debug),
+                (CoreEventId.SaveChangesFailed, LogLevel.Debug),
+                (CoreEventId.QueryIterationFailed, LogLevel.Debug))));
 
         //Add Hangfire services
         services.AddHangfire((provider, config) =>
