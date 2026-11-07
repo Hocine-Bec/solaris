@@ -5,8 +5,10 @@ using Infrastructure.Data;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Serilog;
+using System.Text.Json;
 using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
 using WebAPI.Json;
 
@@ -48,6 +50,18 @@ builder.Services.AddOpenApi(options =>
     {
         document.Info.Title = "Solar CRM API";
         document.Info.Description = "API for managing solar installations, customers, and energy monitoring";
+        return Task.CompletedTask;
+    });
+
+    // Query parameters bind whatever their case; the reference names them in camelCase, like the JSON bodies
+    // (?page=1&pageSize=20 rather than the C# property names Page and PageSize).
+    options.AddOperationTransformer((operation, _, _) =>
+    {
+        foreach (var parameter in operation.Parameters?.OfType<OpenApiParameter>() ?? [])
+        {
+            if (parameter.In == ParameterLocation.Query && parameter.Name is { } name)
+                parameter.Name = JsonNamingPolicy.CamelCase.ConvertName(name);
+        }
         return Task.CompletedTask;
     });
 });
