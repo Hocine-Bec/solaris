@@ -2,6 +2,7 @@ using Application;
 using Hangfire;
 using Infrastructure;
 using Infrastructure.Data;
+using Infrastructure.Measurement;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -69,6 +70,10 @@ builder.Services.AddOpenApi(options =>
 //Services
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// The measurement harness (docs/measurements.md §4) exists in Development only.
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddMeasurementHarness();
 
 // Add CORS
 builder.Services.AddCors(options =>

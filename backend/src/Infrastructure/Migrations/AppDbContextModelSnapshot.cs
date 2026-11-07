@@ -266,6 +266,40 @@ namespace Infrastructure.Migrations
                     b.ToTable("leads", (string)null);
                 });
 
+            modelBuilder.Entity("Infrastructure.Measurement.EmailDelivery", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("NotificationKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("notification_key");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("recipient");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("subject");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_delivery_log");
+
+                    b.ToTable("email_delivery_log", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.Customer", b =>
                 {
                     b.HasOne("Domain.Entities.Address", "ContactAddress")
