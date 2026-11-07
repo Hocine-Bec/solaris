@@ -60,37 +60,56 @@ Notes:
 
 | Need | Tool | Note |
 |---|---|---|
-| HTTP load and fault scripts | **k6** | Readable JavaScript scripts, a constant-arrival-rate executor, built-in percentiles |
-| | *or* a small Go load generator in `perf/loadgen/` | Open-model pacing and percentiles must then be implemented correctly and documented |
+| HTTP load and fault scripts | **k6** v2.3.0 | Readable JavaScript scripts, a constant-arrival-rate executor, built-in percentiles |
 | Volume data | The dataset generator (§5) | `COPY`-based; produces the naive or the final schema |
 | Query plans | `psql` + `EXPLAIN (ANALYZE, BUFFERS)` | Each plan saved to `perf/results/p4/explain-*.txt` |
 | Delivery counts | SQL on `email_delivery_log` and `outbox_messages` | See P2 |
 
-**Load tool:** chosen before the first run, and recorded here.
+**Load tool: k6 v2.3.0** (chosen 2026-11-07). It has what P1–P4 need built in: the `constant-arrival-rate` executor
+for the open model (rule 5), which reports dropped iterations when it can't keep the rate instead of silently
+slowing down; percentiles computed from every sample; `http.batch` to release up to 50 requests at the same moment
+(P3); and scenarios with start times for the fault toggles (P2). The alternative, a small Go load generator, would
+have needed its own pacing, percentile and scenario code, itself a possible source of measurement errors.
+
+- **Install:** the `k6-v2.3.0-linux-amd64.tar.gz` release from github.com/grafana/k6, checked against the
+  release's `k6-v2.3.0-checksums.txt` (SHA-256), with its `k6` binary on the `PATH`. `k6 version` prints the version
+  for `env.md`.
+- **Expected statuses:** k6 counts every 4xx as a failed request. Each script declares the statuses its scenario
+  expects (`http.setResponseCallback(http.expectedStatuses(...))`, for example 409 in P3), so its error rate counts
+  only real errors.
 
 ---
 
-## 4. Measurement harness *(planned)*
+## 4. Measurement harness
 
 These parts exist only to make the measurements possible. They are registered in the Development environment
 only, and measurement runs use the Development environment with a Release build.
 
-- **Synchronous notifications** (`Notifications__Mode=Synchronous`): the P1 "before". The request sends its
-  emails itself, before answering. The API refuses to start with this mode outside Development.
-- **Email senders**, layered as decorators around the real sender interface:
+- **Synchronous notifications** (`Notifications__Mode=Synchronous`) *(planned)*: the P1 "before". The request sends
+  its emails itself, before answering. The API refuses to start with this mode outside Development.
+- **Email senders:** the provider's sender, chosen by `Email__Provider`, wrapped in two decorators:
 
   | Sender | Role |
   |---|---|
-  | `RecordingEmailSender` | Sends nothing; waits a configurable time per email (`Email__SimulatedLatencyMs`, default 2 s) to stand in for a real mail server |
-  | `FaultInjectingEmailSender` | When the fault is on, every send fails as "mail server unreachable". Toggled by a Development-only endpoint |
+  | `RecordingEmailSender` | The provider in Development (`Email__Provider=Recording`): sends nothing; waits a configurable time per email (`Email__SimulatedLatencyMs`, default 2 s) to stand in for a real mail server. `Email__Provider=Gmail` sends real email instead (the P1 realism check) |
+  | `FaultInjectingEmailSender` | When the fault is on, every send fails with `MailServerUnavailableException`, as if the mail server were unreachable, without reaching it. Off at startup |
   | `DeliveryLoggingEmailSender` | The outermost decorator. After the inner sender succeeds, it writes one row to `email_delivery_log` in its own transaction. It is the **only** writer of that table |
+
+- **The fault toggle** (Development only): `GET /api/dev/email-fault` answers `{ "on": false }`;
+  `PUT /api/dev/email-fault` with `{ "on": true }` or `{ "on": false }` turns it on or off (204), and the API logs a
+  warning each time. `FaultInjection__Enabled=true` starts the API with the fault on, so an API restarted during a
+  measurement (P2 scenario C) is still cut off from the mail server.
 
 - **The delivery log:**
 
   ```
-  email_delivery_log   id bigserial PK, notification_key text (e.g. 'LeadWelcome:123'),
-                       outbox_message_id uuid NULL, recipient, subject, sent_at
+  email_delivery_log   id bigint identity PK, notification_key text (e.g. 'LeadWelcome:123'),
+                       recipient text, subject text, sent_at timestamptz
+                       outbox_message_id uuid NULL   (planned: added with the outbox)
   ```
+
+  `notification_key` is deliberately not unique, so a re-send is a second row. The table exists in every
+  environment, through the migrations, but is written only in Development.
 
   One row per email the mail server accepted. Both the original Hangfire design and the outbox design send
   through the same decorator with the same keys, so their counts compare directly. A row survives even if the
@@ -134,8 +153,13 @@ The data is shaped to look real:
 1. Reset the database; start the API in Release mode.
 2. Warm up: 30 s at 2 req/s.
 3. Run `POST /api/leads` at a **constant 10 req/s for 2 minutes**, each request with a unique email and address.
-4. After only: also read the *time to delivery* from the database: the p95 of `sent_at − created_at` in
-   `outbox_messages`.
+4. Reference and after: once every notification has gone, also read the *time to delivery* from the database: the
+   p95, over the measured phase's leads, of an email's `sent_at` in `email_delivery_log` minus its lead's
+   `created_at`. The same table for both designs, written by the same code (§4).
+
+**Running:** `perf/p1/run.sh <run number> <reference|before|after>` does all of this on a fresh `postgres:18`
+container, with `perf/p1/leads.js`, and writes `results.json`, k6's summary and `env.md` to
+`perf/results/p1/<date>-<label>/run<N>/`. 3 runs; the median run by p95 is reported.
 
 **Realism check:** one before run at 1 req/s with `Email__Provider=Gmail`, to confirm that the simulated 2 s per
 email is honest. Its result is recorded below.
@@ -157,8 +181,10 @@ when the API crashes mid-burst?
 
 | | Build |
 |---|---|
-| **Before** | tag `p2-before`: the original design (a `Task.Run` around the Hangfire enqueue, errors swallowed, `[AutomaticRetry(Attempts = 3)]` at 30/60/120 s), plus the measurement harness (§4) |
+| **Before** | tag `p2-before`: the original design as it really runs: a `Task.Run` around the Hangfire enqueue, errors swallowed, and Hangfire's default retry policy (10 attempts, with growing random delays), plus the measurement harness (§4) |
 | **After** | the outbox + dispatcher |
+
+The jobs declare `[AutomaticRetry(Attempts = 3)]` at 30/60/120 s, but it has never applied: they are enqueued through their interface (`Enqueue<IEmailQueueHandler>`), and Hangfire reads filter attributes from the job's type, so it finds none and uses its global default. Found while building the harness (2026-11-07) and checked with Hangfire's own filter provider. The before is measured as it runs, not as it was declared.
 
 `email_delivery_log.notification_key` identifies each logical notification, e.g. `LeadWelcome:123` or
 `SalesNewLeadAlert:123` (§4).
@@ -168,8 +194,8 @@ when the API crashes mid-burst?
 | # | Scenario | How |
 |---|---|---|
 | A | Mail outage | Turn the mail fault **on**. Create 500 leads at 5 req/s. Keep the fault on for **10 minutes** from the start, then turn it off. Wait until nothing is pending (outbox empty, or Hangfire queue idle), at most 60 minutes. |
-| B | API crash | Fault off. Create 500 leads at 20 req/s. About 10 s in, `kill -9` the API process and restart it at once. Wait until nothing is pending. |
-| C | Both | A and B together: fault on, crash at about 10 s, restart, fault off at 10 minutes. |
+| B | API crash | Fault off. Create 500 leads at 20 req/s. About 10 s in, `kill -9` the API process and restart it at once. Wait until nothing is pending, at most 60 minutes after the restart. |
+| C | Both | A and B together, with A's load: fault on, 500 leads at 5 req/s, crash at about 10 s, restart (the fault stays on: `FaultInjection__Enabled=true` at every start), fault off at 10 minutes. |
 
 **Counting** (after the wait)
 
@@ -180,21 +206,32 @@ SELECT 2 * count(*) AS expected FROM leads;
 SELECT count(DISTINCT notification_key) AS delivered_unique,
        count(*) - count(DISTINCT notification_key) AS duplicates
 FROM email_delivery_log;
--- lost = expected − delivered_unique
+-- still waiting when the wait ends (the before: Hangfire jobs not yet run or retried)
+SELECT count(*) AS pending_at_cutoff FROM hangfire.job
+WHERE statename IN ('Enqueued', 'Scheduled', 'Awaiting', 'Processing');
+-- lost = expected − delivered_unique − pending_at_cutoff
 ```
 
-Also recorded: the **drain time**, from "fault off" or "restart" until the last delivery.
+A notification still pending at the cutoff isn't counted as lost: it gets its own column, so "not delivered yet" and
+"gone" stay apart. Also recorded: the **drain time**, from "fault off" (A, C) or the restart (B) until the last
+delivery.
+
+**Running:** `perf/p2/run.sh <A|B|C> <run number> <before|after>` runs one scenario end to end on a fresh
+`postgres:18` container: the API's Release build in Development, a warm-up of read requests only (so the only leads
+are the 500 counted), the load (`perf/p2/leads.js`), the fault and the crash, the wait, and the counts. It writes
+`results.json`, k6's summary and `env.md` to `perf/results/p2/<date>-<design>/<scenario>-run<N>/`; the API's own log
+(`api.log`) stays out of git. Each scenario runs 3 times; the median run by Lost is reported.
 
 **Results**
 
-| Scenario | Design | Expected | Delivered | **Lost** | Duplicates | Drain time |
-|---|---|---|---|---|---|---|
-| A outage | before | | | | | |
-| A outage | after | | | | | |
-| B crash | before | | | | | |
-| B crash | after | | | | | |
-| C both | before | | | | | |
-| C both | after | | | | | |
+| Scenario | Design | Expected | Delivered | **Lost** | Pending at cutoff | Duplicates | Drain time |
+|---|---|---|---|---|---|---|---|
+| A outage | before | | | | | | |
+| A outage | after | | | | | | |
+| B crash | before | | | | | | |
+| B crash | after | | | | | | |
+| C both | before | | | | | | |
+| C both | after | | | | | | |
 
 Duplicates are reported as they are, whatever they are.
 
