@@ -3,10 +3,17 @@ using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Settings;
 
-/// <summary>The <c>Email</c> section: the sender, the SMTP server and the Gmail OAuth client.</summary>
+/// <summary>The <c>Email</c> section: the provider, the sender, the SMTP server and the Gmail OAuth client.</summary>
 public sealed class EmailOptions
 {
     public const string SectionName = "Email";
+
+    /// <summary>Who sends the emails: Gmail, or nobody (Recording). <see cref="EmailOptionsValidator"/> keeps Recording out of Production.</summary>
+    public EmailProvider Provider { get; set; } = EmailProvider.Gmail;
+
+    /// <summary>Recording only: how long each email takes to "send", in milliseconds.</summary>
+    [Range(0, 60_000)]
+    public int SimulatedLatencyMs { get; set; } = 2000;
 
     /// <summary>The sender name shown on emails.</summary>
     [Required]
@@ -19,8 +26,17 @@ public sealed class EmailOptions
     [Required, ValidateObjectMembers]
     public SmtpOptions Smtp { get; set; } = new();
 
-    [Required, ValidateObjectMembers]
+    /// <summary>Required only when <see cref="Provider"/> is Gmail (<see cref="EmailOptionsValidator"/>).</summary>
     public GmailOptions Gmail { get; set; } = new();
+}
+
+public enum EmailProvider
+{
+    /// <summary>Gmail's SMTP server, with an OAuth2 token: real emails.</summary>
+    Gmail,
+
+    /// <summary>No email is sent; each one takes <see cref="EmailOptions.SimulatedLatencyMs"/>.</summary>
+    Recording
 }
 
 public sealed class SmtpOptions

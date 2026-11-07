@@ -13,7 +13,7 @@ public class EmailQueueHandler(IEmailService service, ILogger<EmailQueueHandler>
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            await service.SendLeadEmailAsync(email, firstName, address);
+            await service.SendLeadEmailAsync(leadId, email, firstName, address);
             logger.LogInformation(
                 "Lead welcome email sent successfully for lead {LeadId} to {Email} in {ElapsedMs}ms",
                 leadId, email, stopwatch.ElapsedMilliseconds);

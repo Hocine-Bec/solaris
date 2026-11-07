@@ -2,8 +2,9 @@
 
 How Solaris is configured, run, observed, built and deployed.
 
-**Status:** most of this is *(planned)*. Built today: typed configuration, the local database in docker compose, and
-migrations applied automatically in Development. The API still requires the Gmail settings at startup.
+**Status:** most of this is *(planned)*. Built today: typed configuration, the local database in docker compose,
+migrations applied automatically in Development, and the email provider switch: the Gmail settings are required only
+when Gmail sends.
 
 ---
 
@@ -31,13 +32,13 @@ variables directly, and secrets never go in `appsettings.json`.
 | `Admin__Email`, `Admin__Password` *(planned)* | — | The first Admin account, created at startup if none exists |
 | `Cors__AllowedOrigins` *(planned)* | — | The marketing site's URL |
 | `Notifications__Mode` *(planned)* | — | `Outbox` (default) \| `Synchronous` (Development only, for measurements) |
-| `Email__Provider` *(planned)* | — | `Gmail` \| `Recording` |
+| `Email__Provider` | `appsettings.json` (`Gmail`), `appsettings.Development.json` (`Recording`) | `Gmail` sends real email; `Recording` sends nothing, and the API refuses it in Production |
 | `Email__FromName` | `appsettings.json` | The sender name shown on emails: `Solaris` |
 | `Email__FromAddress` | `.env` | The sender's address; sales notifications are sent to it too |
-| `Email__SimulatedLatencyMs` *(planned)* | — | `Recording` only |
+| `Email__SimulatedLatencyMs` | `appsettings.json` | `Recording` only: how long each email takes, 2000 ms by default |
 | `Email__Smtp__Host`, `Email__Smtp__Port` | `appsettings.json` | `smtp.gmail.com`, 587 |
-| `Email__Gmail__ClientId`, `Email__Gmail__ClientSecret`, `Email__Gmail__RefreshToken` | `.env` | Required today; required only when `Email__Provider=Gmail` *(planned)* |
-| `FaultInjection__Enabled` *(planned)* | — | Development only, for measurements |
+| `Email__Gmail__ClientId`, `Email__Gmail__ClientSecret`, `Email__Gmail__RefreshToken` | `.env` | Required only when `Email__Provider=Gmail` |
+| `FaultInjection__Enabled` | — | Development only (the measurement harness): `true` starts the API with the email fault on; `false` by default |
 | `RateLimiting__Enabled` *(planned)* | — | `true` by default; `false` only for measurement runs |
 | `Database__MigrateOnStartup` *(planned)* | — | Apply pending migrations at startup |
 | `POSTGRES_PASSWORD` | `.env` | Not read by the API: docker compose gives it to the local database ([running locally](#running-locally)) |
@@ -64,6 +65,10 @@ Prerequisites: the .NET 10 SDK and Docker. Copy `.env.example` to `.env` at the 
 
 - **The API in a container** *(planned)*: comes with the Dockerfile ([Build and CI](#build-and-ci-planned)).
 
+In Development, the API sends no real email: `Email__Provider` is `Recording`, so the Gmail settings can stay out
+of `.env`. To send real emails locally, set `Email__Provider=Gmail` with the three Gmail secrets. Development also
+runs the measurement harness ([measurements](measurements.md#4-measurement-harness)).
+
 In Development, the API reference (Scalar) is served under `/scalar`, from the OpenAPI document at
 `/openapi/v1.json`. Demo data comes from the dataset generator
 ([measurements](measurements.md)), not from seed code.
@@ -76,10 +81,12 @@ EF Core migrations live in `Infrastructure`. They are applied at startup when `D
 which suits a single-instance deployment *(planned)*. Production gets no demo seeding.
 
 The EF Core tools build the model through a design-time factory (`DesignTimeDbContextFactory`), so they don't need
-the API's settings. Commands that reach a database take the connection string explicitly:
+the API's settings. They need the API as the startup project, since it references `Microsoft.EntityFrameworkCore.Design`.
+Commands that reach a database take the connection string explicitly:
 
 ```sh
-dotnet ef database update --project backend/src/Infrastructure --connection "Host=…;Database=…;Username=…;Password=…"
+dotnet ef database update --project backend/src/Infrastructure --startup-project backend/src/WebAPI \
+  --connection "Host=…;Database=…;Username=…;Password=…"
 ```
 
 ---
@@ -90,7 +97,9 @@ dotnet ef database update --project backend/src/Infrastructure --connection "Hos
   reachable). Both are public.
 - **Logging:** Serilog structured logs, including a line for every request (method, path, status, elapsed time), written
   to the console and to daily-rolling files. Every line written during a request ends with its trace id, which is
-  the middle part of an error response's `traceId` (`00-<trace id>-…`), so a 500 leads to its exception. Performance numbers come from the load tool, not from logs
+  the middle part of an error response's `traceId` (`00-<trace id>-…`), so a 500 leads to its exception. EF Core's
+  own failure events (a failed command, save, query or connection) are logged at Debug: the code that catches the
+  exception decides whether it is an error, so an expected duplicate logs nothing and a bug is logged once. Performance numbers come from the load tool, not from logs
   ([measurements](measurements.md)).
 
 ---

@@ -187,9 +187,12 @@ every 2 s (and again immediately if the last batch was full):
 `COMMIT`, the message is still Pending and is sent again: a rare duplicate is accepted, a loss is not.
 
 ### Senders
-`IEmailSender` hides the mail provider. In production it is `GmailSmtpEmailSender` (MailKit over SMTP, with a
-Gmail OAuth2 token). Development has extra implementations used by the measurements: see
-[measurements](measurements.md).
+`IEmailSender` hides the mail provider, chosen by `Email:Provider`. In production it is `GmailSmtpEmailSender`
+(MailKit over SMTP, with a Gmail OAuth2 token); it reports a mail server it can't reach with
+`MailServerUnavailableException`. `RecordingEmailSender` sends nothing and waits a set time per email: the
+Development default, refused in Production. Development wraps the provider's sender in the measurement harness
+([measurements](measurements.md#4-measurement-harness)). Built today; until the outbox, the Hangfire jobs send
+through it.
 
 ### Administration
 - `GET /api/notifications/failed` (paginated) lists the Failed messages.

@@ -2,6 +2,8 @@ using FluentAssertions;
 using Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace IntegrationTests.Infrastructure;
@@ -25,11 +27,23 @@ public class SettingsValidationTests
     };
 
     // What the API runs right after it is built (Program.cs), before it touches the database.
-    private static Action ValidateStartup(Dictionary<string, string?> settings)
+    private static Action ValidateStartup(Dictionary<string, string?> settings, string environment = "Development")
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
-        var provider = new ServiceCollection().AddInfrastructure(configuration).BuildServiceProvider();
+        var provider = new ServiceCollection()
+            .AddSingleton<IHostEnvironment>(new TestHostEnvironment(environment))
+            .AddInfrastructure(configuration)
+            .BuildServiceProvider();
         return () => provider.GetRequiredService<IStartupValidator>().Validate();
+    }
+
+    private static Dictionary<string, string?> RecordingSettingsWithoutGmail()
+    {
+        var settings = CompleteSettings();
+        settings["Email:Provider"] = "Recording";
+        foreach (var key in settings.Keys.Where(k => k.StartsWith("Email:Gmail:")).ToList())
+            settings.Remove(key);
+        return settings;
     }
 
     [Fact]
@@ -67,8 +81,29 @@ public class SettingsValidationTests
         validate.Should().Throw<OptionsValidationException>().WithMessage($"*{member}*");
     }
 
+    [Fact]
+    public void Startup_RecordingProviderWithoutGmailSettings_PassesValidation()
+    {
+        // Act
+        var validate = ValidateStartup(RecordingSettingsWithoutGmail());
+
+        // Assert - the Gmail settings are required only when Gmail sends
+        validate.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Startup_RecordingProviderInProduction_FailsNamingTheProvider()
+    {
+        // Act
+        var validate = ValidateStartup(RecordingSettingsWithoutGmail(), environment: "Production");
+
+        // Assert - Recording sends no email, so production must never run with it
+        validate.Should().Throw<OptionsValidationException>().WithMessage("*Email:Provider*Production*");
+    }
+
     [Theory]
     [InlineData("Jwt:Secret", "31-characters-is-one-too-short!", "Secret")]
+    [InlineData("Email:SimulatedLatencyMs", "-1", "SimulatedLatencyMs")]
     [InlineData("Email:FromAddress", "not-an-email-address", "FromAddress")]
     [InlineData("Email:Smtp:Port", "70000", "Port")]
     public void Startup_SettingInvalid_FailsNamingTheSetting(string key, string value, string member)
@@ -83,4 +118,12 @@ public class SettingsValidationTests
         // Assert
         validate.Should().Throw<OptionsValidationException>().WithMessage($"*{member}*");
     }
+}
+
+internal sealed class TestHostEnvironment(string environmentName) : IHostEnvironment
+{
+    public string EnvironmentName { get; set; } = environmentName;
+    public string ApplicationName { get; set; } = "WebAPI";
+    public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+    public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 }

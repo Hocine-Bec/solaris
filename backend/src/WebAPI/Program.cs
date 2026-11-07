@@ -2,13 +2,17 @@ using Application;
 using Hangfire;
 using Infrastructure;
 using Infrastructure.Data;
+using Infrastructure.Measurement;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Serilog;
+using System.Text.Json;
 using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
 using WebAPI.Json;
+using WebAPI.Measurement;
 
 // Settings come from appsettings.json (non-secret defaults) and environment variables (secrets), which
 // CreateBuilder reads; the app never loads a .env file itself (docs/operations.md, Configuration).
@@ -50,11 +54,27 @@ builder.Services.AddOpenApi(options =>
         document.Info.Description = "API for managing solar installations, customers, and energy monitoring";
         return Task.CompletedTask;
     });
+
+    // Query parameters bind whatever their case; the reference names them in camelCase, like the JSON bodies
+    // (?page=1&pageSize=20 rather than the C# property names Page and PageSize).
+    options.AddOperationTransformer((operation, _, _) =>
+    {
+        foreach (var parameter in operation.Parameters?.OfType<OpenApiParameter>() ?? [])
+        {
+            if (parameter.In == ParameterLocation.Query && parameter.Name is { } name)
+                parameter.Name = JsonNamingPolicy.CamelCase.ConvertName(name);
+        }
+        return Task.CompletedTask;
+    });
 });
 
 //Services
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// The measurement harness (docs/measurements.md §4) exists in Development only.
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddMeasurementHarness();
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -98,6 +118,8 @@ if (app.Environment.IsDevelopment())
             .WithTheme(ScalarTheme.Kepler)
             .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
     });
+
+    app.MapMeasurementEndpoints();
     
     // Auto-migrate database in development
     using var scope = app.Services.CreateScope();
