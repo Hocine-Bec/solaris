@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Application.Interfaces.Services;
 using Infrastructure.Settings;
 using Microsoft.Extensions.Options;
 

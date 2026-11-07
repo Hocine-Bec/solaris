@@ -104,6 +104,7 @@ public static class DependencyInjection
         
         // Gmail Services
         services.AddSingleton<IGmailAuthService, GmailAuthService>();
+        services.AddScoped<IEmailSender, GmailSmtpEmailSender>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IEmailQueueHandler, EmailQueueHandler>();
         
