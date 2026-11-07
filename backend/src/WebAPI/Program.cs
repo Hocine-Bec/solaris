@@ -12,6 +12,7 @@ using Serilog;
 using System.Text.Json;
 using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
 using WebAPI.Json;
+using WebAPI.Measurement;
 
 // Settings come from appsettings.json (non-secret defaults) and environment variables (secrets), which
 // CreateBuilder reads; the app never loads a .env file itself (docs/operations.md, Configuration).
@@ -117,6 +118,8 @@ if (app.Environment.IsDevelopment())
             .WithTheme(ScalarTheme.Kepler)
             .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
     });
+
+    app.MapMeasurementEndpoints();
     
     // Auto-migrate database in development
     using var scope = app.Services.CreateScope();
