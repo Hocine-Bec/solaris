@@ -3,10 +3,12 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Application.Interfaces.Services;
 using FluentAssertions;
+using Hangfire;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using TestUtilities.Base;
 using TestUtilities.Database;
 using TestUtilities.Fakes;
@@ -39,10 +41,22 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton<IEmailQueueHandler>(Emails);
+                RemoveHangfireServer(services);
                 configureServices?.Invoke(services);
             });
         });
         return _factory.CreateClient();
+    }
+
+    // No test here enqueues a job (the email queue is a fake), and a Hangfire server keeps up to 20 workers polling
+    // the database: with several test classes running at once, PostgreSQL ran out of connections ("53300: sorry,
+    // too many clients already").
+    private static void RemoveHangfireServer(IServiceCollection services)
+    {
+        var server = services.Where(d => d.ServiceType == typeof(IHostedService) &&
+            d.ImplementationFactory?.Method.ReturnType == typeof(BackgroundJobServerHostedService)).ToList();
+        server.Should().ContainSingle("the API registers one Hangfire server, which these tests don't start");
+        services.Remove(server[0]);
     }
 
     public override async ValueTask DisposeAsync()
