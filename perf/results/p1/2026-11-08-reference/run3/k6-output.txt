@@ -1,0 +1,37 @@
+
+
+  █ THRESHOLDS 
+
+    http_req_duration{scenario:measure}
+    ✓ 'p(99)>=0' p(99)=28.88ms
+
+    http_req_failed{scenario:measure}
+    ✓ 'rate>=0' rate=0.00%
+
+    http_reqs{scenario:measure}
+    ✓ 'count>=0' count=1200
+
+
+  █ TOTAL RESULTS 
+
+    HTTP
+    http_req_duration..............: p(50)=15.33ms p(95)=20.78ms p(99)=32.34ms count=1260
+      { expected_response:true }...: p(50)=15.33ms p(95)=20.78ms p(99)=32.34ms count=1260
+      { scenario:measure }.........: p(50)=15.31ms p(95)=20.38ms p(99)=28.88ms count=1200
+    http_req_failed................: 0.00%  0 out of 1260
+      { scenario:measure }.........: 0.00%  0 out of 1200
+    http_reqs......................: 1260   8.399869/s
+      { scenario:measure }.........: 1200   7.999875/s
+
+    EXECUTION
+    iteration_duration.............: p(50)=16.16ms p(95)=21.61ms p(99)=33.08ms count=1262
+    iterations.....................: 1262   8.413202/s
+    vus............................: 0      min=0         max=0 
+    vus_max........................: 60     min=60        max=60
+
+    NETWORK
+    data_received..................: 777 kB 5.2 kB/s
+    data_sent......................: 681 kB 4.5 kB/s
+
+
+

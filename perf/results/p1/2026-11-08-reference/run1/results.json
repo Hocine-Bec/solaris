@@ -1,0 +1,16 @@
+{
+  "run": 1,
+  "label": "reference",
+  "measured_leads": 1200,
+  "deliveries": 2400,
+  "pending_at_cutoff": 0,
+  "time_to_delivery_p50_ms": 64299,
+  "time_to_delivery_p95_ms": 121468,
+  "requests": 1200,
+  "requests_per_second": 10,
+  "p50_ms": 14.1,
+  "p95_ms": 19.1,
+  "p99_ms": 24.9,
+  "failed_requests": 0,
+  "dropped_iterations": 0
+}
