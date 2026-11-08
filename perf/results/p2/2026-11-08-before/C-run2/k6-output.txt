@@ -1,0 +1,27 @@
+time="2026-11-08T08:46:49+01:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:5099/api/leads\": dial tcp 127.0.0.1:5099: connect: connection refused"
+time="2026-11-08T08:46:49+01:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:5099/api/leads\": dial tcp 127.0.0.1:5099: connect: connection refused"
+time="2026-11-08T08:46:49+01:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:5099/api/leads\": dial tcp 127.0.0.1:5099: connect: connection refused"
+time="2026-11-08T08:46:49+01:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:5099/api/leads\": dial tcp 127.0.0.1:5099: connect: connection refused"
+time="2026-11-08T08:46:49+01:00" level=warning msg="Request Failed" error="Post \"http://127.0.0.1:5099/api/leads\": dial tcp 127.0.0.1:5099: connect: connection refused"
+
+
+  █ TOTAL RESULTS 
+
+    HTTP
+    http_req_duration..............: p(50)=17.52ms p(95)=27.05ms p(99)=44.21ms count=500
+      { expected_response:true }...: p(50)=17.6ms  p(95)=27.18ms p(99)=45.46ms count=495
+    http_req_failed................: 1.00%  5 out of 500
+    http_reqs......................: 500    4.999926/s
+
+    EXECUTION
+    iteration_duration.............: p(50)=18.32ms p(95)=28.62ms p(99)=46.02ms count=501
+    iterations.....................: 501    5.009926/s
+    vus............................: 0      min=0        max=0 
+    vus_max........................: 50     min=50       max=50
+
+    NETWORK
+    data_received..................: 302 kB 3.0 kB/s
+    data_sent......................: 265 kB 2.7 kB/s
+
+
+

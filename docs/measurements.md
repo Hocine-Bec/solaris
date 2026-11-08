@@ -220,18 +220,39 @@ delivery.
 `postgres:18` container: the API's Release build in Development, a warm-up of read requests only (so the only leads
 are the 500 counted), the load (`perf/p2/leads.js`), the fault and the crash, the wait, and the counts. It writes
 `results.json`, k6's summary and `env.md` to `perf/results/p2/<date>-<design>/<scenario>-run<N>/`; the API's own log
-(`api.log`) stays out of git. Each scenario runs 3 times; the median run by Lost is reported.
+(`api.log`) stays out of git. Each scenario runs 3 times; the median run by Lost is reported, ties broken by drain
+time.
 
 **Results**
 
 | Scenario | Design | Expected | Delivered | **Lost** | Pending at cutoff | Duplicates | Drain time |
 |---|---|---|---|---|---|---|---|
-| A outage | before | | | | | | |
+| A outage | before | 1000 | 1000 | **0** | 0 | 0 | 794 s |
 | A outage | after | | | | | | |
-| B crash | before | | | | | | |
+| B crash | before | 958 | 958 | **0** | 0 | 0 | 301 s |
 | B crash | after | | | | | | |
-| C both | before | | | | | | |
+| C both | before | 988 | 988 | **0** | 0 | 0 | 807 s |
 | C both | after | | | | | | |
+
+**Before, as measured** (2026-11-08, tag `p2-before`, raw results in `perf/results/p2/2026-11-08-before/`):
+
+- All nine runs (Lost; expected; drain time): A 0, 0, 0 (1000 each; 821, 794, 781 s); B **1**, 0, 0 (952, 956, 958;
+  300, 300, 301 s); C 0, 0, 0 (990, 990, 988; 806, 816, 807 s). No duplicates, nothing pending at the cutoff, and no
+  Hangfire job Failed, in any run.
+- **The one loss** (B, run 1) is the gap between saving a lead and enqueueing its jobs. About 10 s in, the API logged
+  "Queueing email jobs for lead 199" and was killed before "Successfully enqueued": lead 199 was saved, its welcome
+  job had been enqueued and its email was delivered, and its sales alert was never enqueued. Nothing can retry a job
+  that was never stored.
+- **A mail outage loses nothing here,** because the jobs retry 10 times with Hangfire's growing default delays, which
+  outlast a 10-minute outage; the declared 3 retries over 3.5 minutes never applied (the note under the first
+  table). The cost is the drain: the last email of the outage went out 781–821 s after the mail server came back.
+- **B's drain is the 5-minute invisibility timeout:** the jobs a worker was running at the `kill -9` stay Processing
+  until Hangfire hands them to another worker, 300 s later.
+- Expected differs between runs because requests sent while the API was down failed (B: 21–24 of 500; C: 5–6), so
+  those leads never existed and owe no notification.
+- **Environment:** a browser (Brave) was open during all the runs, on kernel 7.0.0-42; `env.md` records both. The
+  drain times follow Hangfire's retry schedule and its invisibility timeout, not the machine's speed. Later runs are on
+  kernel 7.0.0-43.
 
 Duplicates are reported as they are, whatever they are.
 

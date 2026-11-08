@@ -1,0 +1,18 @@
+{
+  "scenario": "B",
+  "run": 2,
+  "design": "before",
+  "leads": 478,
+  "expected": 956,
+  "delivered_unique": 956,
+  "deliveries": 956,
+  "duplicates": 0,
+  "pending_at_cutoff": 0,
+  "failed_jobs": 0,
+  "drain_seconds": 300,
+  "drain_from": "restart",
+  "lost": 0,
+  "requests": 500,
+  "failed_requests": 22,
+  "dropped_iterations": 0
+}
