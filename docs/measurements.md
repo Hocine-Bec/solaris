@@ -85,8 +85,10 @@ have needed its own pacing, percentile and scenario code, itself a possible sour
 These parts exist only to make the measurements possible. They are registered in the Development environment
 only, and measurement runs use the Development environment with a Release build.
 
-- **Synchronous notifications** (`Notifications__Mode=Synchronous`) *(planned)*: the P1 "before". The request sends
-  its emails itself, before answering. The API refuses to start with this mode outside Development.
+- **Synchronous notifications** (`Notifications__Mode=Synchronous`): the P1 "before". The lead request sends its two
+  emails itself, the welcome email and then the sales alert, through the same senders as the Hangfire jobs, and
+  answers only once both are sent. A failed send fails the request with a 500, after the lead is saved. The API
+  refuses to start with this mode outside Development. The default, `Hangfire`, enqueues the two jobs as before.
 - **Email senders:** the provider's sender, chosen by `Email__Provider`, wrapped in two decorators:
 
   | Sender | Role |
@@ -149,6 +151,12 @@ The data is shaped to look real:
 | Reference (optional) | tag `p2-before` | The original Hangfire design, for context |
 | **After** | the outbox | `Notifications__Mode=Outbox` · the same simulated latency, now paid by the dispatcher instead of the request |
 
+The before is the original design: until `5128768` (2025-11-15) moved the emails to Hangfire jobs, `LeadService`
+awaited both of them in the request (`7b98c80`, 2025-10-27). The synchronous mode rebuilds that on today's code, so
+only where the emails are sent differs; the old commits no longer build and have no delivery log. The reference is
+the Hangfire design that replaced it, and the outbox is not expected to beat it on request latency: its gain is
+reliability (P2).
+
 **Steps**
 1. Reset the database; start the API in Release mode.
 2. Warm up: 30 s at 2 req/s.
@@ -159,7 +167,8 @@ The data is shaped to look real:
 
 **Running:** `perf/p1/run.sh <run number> <reference|before|after>` does all of this on a fresh `postgres:18`
 container, with `perf/p1/leads.js`, and writes `results.json`, k6's summary and `env.md` to
-`perf/results/p1/<date>-<label>/run<N>/`. 3 runs; the median run by p95 is reported.
+`perf/results/p1/<date>-<label>/run<N>/`; `before` starts the API with `Notifications__Mode=Synchronous`. 3 runs; the
+median run by p95 is reported.
 
 **Realism check:** one before run at 1 req/s with `Email__Provider=Gmail`, to confirm that the simulated 2 s per
 email is honest. Its result is recorded below.

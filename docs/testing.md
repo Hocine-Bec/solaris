@@ -4,10 +4,10 @@ What is tested, at which level, and how. Business rules (`BR-…`) are defined i
 [functional requirements](functional-requirements.md).
 
 **Status:** today there are 10 unit tests (8 for the `Lead` and `Address` entities, and the architecture test's 2
-cases, one each for `Domain` and `Application`) and 131 integration tests: 113 on PostgreSQL 18 (68 for the
-repositories, 2 for the unit of work, 4 for `LeadService`, 1 for the schema's names, 11 for the email senders and the
-measurement harness, and 27 through the API for error responses, pagination, timestamps and the email fault toggle),
-and 18 for the settings' startup validation, which need no database.
+cases, one each for `Domain` and `Application`) and 138 integration tests: 117 on PostgreSQL 18 (68 for the
+repositories, 2 for the unit of work, 4 for `LeadService`, 1 for the schema's names, 14 for the email senders and the
+measurement harness, and 28 through the API for error responses, pagination, timestamps, the email fault toggle and
+the synchronous notifications), and 21 for the settings' startup validation, which need no database.
 Everything else below is *(planned)*.
 
 ---
@@ -35,7 +35,7 @@ Everything else below is *(planned)*.
 | **Architecture test** | Fails if `Domain` or `Application` reference EF Core, Npgsql, Hangfire or MailKit ([ADR 1](adr/0001-layered-solution.md)) | Reads each project's assembly references |
 | **Schema naming test** | Fails if any table, column, constraint or index in the migrated database isn't snake_case (EF Core's own `__EFMigrationsHistory` table excepted) | Reads PostgreSQL's catalog in a test database |
 | **Settings tests** | Fail if a required setting can be missing or invalid without stopping the API at startup, or if the error doesn't name it ([operations](operations.md#configuration)) | Builds the services from in-memory settings and runs the startup validation |
-| **Measurement harness** | Fail if the delivery log misses an email the mail server accepted, records one it didn't, or merges a re-send into the first row; if the fault lets an email through; or if Development stops wrapping the provider's sender with the logger outermost ([measurements](measurements.md#4-measurement-harness)) | The senders alone and as Development wires them, on the test's database; the current Hangfire jobs called directly |
+| **Measurement harness** | Fail if the delivery log misses an email the mail server accepted, records one it didn't, or merges a re-send into the first row; if the fault lets an email through; or if Development stops wrapping the provider's sender with the logger outermost; if `Notifications:Mode` picks the wrong notifier, or the synchronous mode answers before both emails are sent ([measurements](measurements.md#4-measurement-harness)) | The senders alone and as Development wires them, on the test's database; the current Hangfire jobs called directly; one lead request through the API in the synchronous mode |
 | **Performance and fault** | The four measured problems, P1–P4 | Scripts in `perf/`, run by hand, results committed; not part of CI ([measurements](measurements.md)) |
 
 ---

@@ -3,8 +3,8 @@
 How Solaris is configured, run, observed, built and deployed.
 
 **Status:** most of this is *(planned)*. Built today: typed configuration, the local database in docker compose,
-migrations applied automatically in Development, and the email provider switch: the Gmail settings are required only
-when Gmail sends.
+migrations applied automatically in Development, the email provider switch (the Gmail settings are required only
+when Gmail sends), and the notifications mode.
 
 ---
 
@@ -31,7 +31,7 @@ variables directly, and secrets never go in `appsettings.json`.
 | `Jwt__LifetimeHours` *(planned)* | — | 8 hours |
 | `Admin__Email`, `Admin__Password` *(planned)* | — | The first Admin account, created at startup if none exists |
 | `Cors__AllowedOrigins` *(planned)* | — | The marketing site's URL |
-| `Notifications__Mode` *(planned)* | — | `Outbox` (default) \| `Synchronous` (Development only, for measurements) |
+| `Notifications__Mode` | `appsettings.json` (`Hangfire`) | `Hangfire`: the request enqueues the two lead emails as Hangfire jobs. `Synchronous`: the request sends them itself before it answers; Development only, for measurements, and the API refuses it elsewhere. `Outbox` *(planned)* replaces `Hangfire` as the default |
 | `Email__Provider` | `appsettings.json` (`Gmail`), `appsettings.Development.json` (`Recording`) | `Gmail` sends real email; `Recording` sends nothing, and the API refuses it in Production |
 | `Email__FromName` | `appsettings.json` | The sender name shown on emails: `Solaris` |
 | `Email__FromAddress` | `.env` | The sender's address; sales notifications are sent to it too |
