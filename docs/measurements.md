@@ -45,7 +45,7 @@ Date / time:
 Git tag or commit:
 Machine:        MSI Modern 15 H B13M · i7-13620H (10 cores / 16 threads) · 16 GB RAM · NVMe SSD
 OS / kernel:    `lsb_release -ds` · `uname -r`
-Power profile:  `powerprofilesctl get` ; CPU MHz during the run: `grep MHz /proc/cpuinfo | sort -u | head`
+Power profile:  `powerprofilesctl get` ; on mains power or on battery ; CPU MHz during the run: `grep MHz /proc/cpuinfo | sort -u | head`
 .NET:           `dotnet --version`  (Release build)
 PostgreSQL:     postgres:18 in Docker · `SELECT version()` · configuration changes (if any):
 Dataset:        M / L · row counts
@@ -188,8 +188,8 @@ and none was dropped; p50 16.2, 16.4, 16.3 ms; p95 20.3, 20.5, 20.2 ms; p99 28.9
 emails wait instead. Hangfire runs 20 workers and each email takes 2 s, so they send at most 10 emails a second while
 the load asks for 20 (2 per lead at 10 leads a second), and the queue grows for the whole run.
 
-- **A rerun.** These runs had no browser open and ran on kernel 7.0.0-43, the conditions the before and after runs
-  will use. The first set, kept in `perf/results/p1/2026-11-08-reference/`, ran earlier the same day with a browser
+- **A rerun.** These runs had no browser open, ran on mains power and on kernel 7.0.0-43, the conditions the before
+  and after runs will use. (The power source was noted after the runs: their `env.md` predates that field.) The first set, kept in `perf/results/p1/2026-11-08-reference/`, ran earlier the same day with a browser
   open, on kernel 7.0.0-42: p50 14.1, 15.1, 15.3 ms; p95 19.1, 19.8, 20.4 ms; p99 24.9, 26, 28.9 ms; time to delivery
   p95 121,468, 120,744, 120,674 ms. Its latencies are slightly lower, not higher; three runs per set can't say whether
   the kernel, the browser or chance explains the difference.

@@ -100,6 +100,16 @@ wait_until_drained() {
   done
 }
 
+# On battery, a laptop can run its CPU slower than on mains power.
+power_source() {
+  local mains
+  mains=$(grep -lx Mains /sys/class/power_supply/*/type 2>/dev/null | head -1)
+  if [ -z "$mains" ]; then echo "power source: unknown"
+  elif [ "$(cat "$(dirname "$mains")/online")" = 1 ]; then echo "on mains power"
+  else echo "on battery"
+  fi
+}
+
 cpu_mhz() {
   awk -F: '/MHz/ { printf "%d\n", $2 }' /proc/cpuinfo | sort -n | awk 'NR == 1 { low = $1 } { high = $1 } END { print low "–" high " MHz across the cores" }'
 }
@@ -112,7 +122,7 @@ write_env() {
     echo "Git commit:     $(git -C "$REPO" describe --tags --always --dirty)"
     echo "Machine:        $(cat /sys/class/dmi/id/sys_vendor 2>/dev/null) $(cat /sys/class/dmi/id/product_name 2>/dev/null) · $(lscpu | sed -n 's/^Model name: *//p') ($(nproc) threads) · $(awk '/MemTotal/ { printf "%.1f GiB RAM", $2 / 1048576 }' /proc/meminfo)"
     echo "OS / kernel:    $(lsb_release -ds 2>/dev/null) · $(uname -r)"
-    echo "Power profile:  $(powerprofilesctl get 2>/dev/null || echo unknown) ; CPU MHz during the run: $mhz"
+    echo "Power profile:  $(powerprofilesctl get 2>/dev/null || echo unknown) ; $(power_source) ; CPU MHz during the run: $mhz"
     echo ".NET:           $(dotnet --version) (Release build)"
     echo "PostgreSQL:     postgres:18 in Docker · $(sql 'select version()') · configuration changes: none"
     echo "Dataset:        an empty database; the run creates its own leads"
