@@ -5,6 +5,7 @@ using Application.Interfaces.Services;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Infrastructure.Data;
+using Infrastructure.Measurement;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Settings;
@@ -13,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -37,6 +39,13 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<EmailOptions>, EmailOptionsValidator>();
+        services.AddOptions<NotificationsOptions>()
+            .Bind(configuration.GetSection(NotificationsOptions.SectionName))
+            .Validate<IHostEnvironment>(
+                (options, environment) =>
+                    options.Mode != NotificationsMode.Synchronous || environment.IsDevelopment(),
+                "Notifications:Mode can be Synchronous only in Development: it exists for measurements.")
+            .ValidateOnStart();
 
         services.AddDbContext<AppDbContext>((provider, options) => options
             .UseNpgsql(provider.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Default)
@@ -109,9 +118,19 @@ public static class DependencyInjection
         services.AddScoped<IEmailSender>(CreateProviderSender);
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IEmailQueueHandler, EmailQueueHandler>();
+        services.AddScoped<ILeadNotifier>(CreateLeadNotifier);
 
         return services;
     }
+
+    /// <summary>The notifier of the configured mode (Notifications:Mode).</summary>
+    private static ILeadNotifier CreateLeadNotifier(IServiceProvider provider) =>
+        provider.GetRequiredService<IOptions<NotificationsOptions>>().Value.Mode switch
+        {
+            NotificationsMode.Hangfire => ActivatorUtilities.CreateInstance<HangfireLeadNotifier>(provider),
+            NotificationsMode.Synchronous => ActivatorUtilities.CreateInstance<SynchronousLeadNotifier>(provider),
+            var other => throw new UnreachableException($"No notifier for the notifications mode {other}.")
+        };
 
     /// <summary>The sender of the configured provider, without any wrapper.</summary>
     internal static IEmailSender CreateProviderSender(IServiceProvider provider)

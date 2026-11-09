@@ -17,20 +17,21 @@ namespace IntegrationTests.Api;
 
 /// <summary>
 /// Runs the real API in memory, on this test's own PostgreSQL database, outside Development by default (so errors
-/// look as they do in production). Only the email queue is a fake.
+/// look as they do in production). Only the lead notifier is a fake, unless a test asks for the real one.
 /// </summary>
 public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBase(database)
 {
     private WebApplicationFactory<Program>? _factory;
 
-    protected RecordingEmailQueueHandler Emails { get; } = new();
+    protected RecordingLeadNotifier Notifier { get; } = new();
 
     /// <summary>
     /// A client for the API; <paramref name="configureServices"/> can replace services, <paramref name="environment"/>
-    /// can change the environment and <paramref name="settings"/> can add settings, before the first call only.
+    /// can change the environment, <paramref name="settings"/> can add settings and <paramref name="fakeNotifier"/>
+    /// = false keeps the notifier of the configured mode, before the first call only.
     /// </summary>
     protected HttpClient CreateClient(Action<IServiceCollection>? configureServices = null,
-        string environment = "Testing", IDictionary<string, string>? settings = null)
+        string environment = "Testing", IDictionary<string, string>? settings = null, bool fakeNotifier = true)
     {
         _factory ??= new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -46,7 +47,8 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
                 builder.UseSetting(key, value);
             builder.ConfigureTestServices(services =>
             {
-                services.AddSingleton<IEmailQueueHandler>(Emails);
+                if (fakeNotifier)
+                    services.AddSingleton<ILeadNotifier>(Notifier);
                 RemoveHangfireServer(services);
                 configureServices?.Invoke(services);
             });
@@ -54,9 +56,9 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
         return _factory.CreateClient();
     }
 
-    // No test here enqueues a job (the email queue is a fake), and a Hangfire server keeps up to 20 workers polling
-    // the database: with several test classes running at once, PostgreSQL ran out of connections ("53300: sorry,
-    // too many clients already").
+    // No test here enqueues a job (the notifier is a fake, or synchronous), and a Hangfire server keeps up to 20
+    // workers polling the database: with several test classes running at once, PostgreSQL ran out of connections
+    // ("53300: sorry, too many clients already").
     private static void RemoveHangfireServer(IServiceCollection services)
     {
         var server = services.Where(d => d.ServiceType == typeof(IHostedService) &&

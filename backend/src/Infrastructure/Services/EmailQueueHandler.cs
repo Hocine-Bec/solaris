@@ -47,29 +47,4 @@ public class EmailQueueHandler(IEmailService service, ILogger<EmailQueueHandler>
             throw;
         }
     }
-    
-    public void EnqueueLeadEmails(int leadId, string email, string firstName, string fullName,
-        string phoneNumber, string address)
-    {
-        _ = Task.Run(() =>
-        {
-            try
-            {
-                BackgroundJob.Enqueue<IEmailQueueHandler>(x => 
-                    x.SendLeadWelcomeEmailAsync(leadId, email, firstName, address));
-            
-                BackgroundJob.Enqueue<IEmailQueueHandler>(x => 
-                    x.SendSalesNotificationEmailAsync(leadId, fullName, email, phoneNumber, address));
-            
-                logger.LogInformation("Successfully enqueued email jobs for lead {LeadId}", leadId);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to enqueue email jobs for lead {LeadId}", leadId);
-                // Jobs won't be sent, but API request succeeds
-            }
-        });
-    
-        logger.LogInformation("Queueing email jobs for lead {LeadId}", leadId);
-    }
 }

@@ -17,16 +17,16 @@ public class LeadService : ILeadService
     private readonly IAddressRepo _addressRepo;
     private readonly ICustomerRepo _customerRepo;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IEmailQueueHandler _emailQueueHandler;
+    private readonly ILeadNotifier _notifier;
 
     public LeadService(ILeadRepo repo, IAddressRepo addressRepo, ICustomerRepo customerRepo, IUnitOfWork unitOfWork,
-        IEmailQueueHandler emailQueueHandler)
+        ILeadNotifier notifier)
     {
         _repo = repo;
         _addressRepo = addressRepo;
         _customerRepo = customerRepo;
         _unitOfWork = unitOfWork;
-        _emailQueueHandler = emailQueueHandler;
+        _notifier = notifier;
     }
 
     public async Task<PagedResponse<LeadResponse>> GetPageAsync(PageRequest request)
@@ -64,9 +64,8 @@ public class LeadService : ILeadService
         var fullAddress = $"{address.Street}, {address.State}, {address.ZipCode}, {address.City}, {address.Country}";
         var fullName = $"{lead.FirstName} {lead.LastName}";
 
-        // Enqueue background job
-        _emailQueueHandler.EnqueueLeadEmails(lead.Id, lead.Email, lead.FirstName,
-            fullName, lead.PhoneNumber, fullAddress);
+        await _notifier.NotifyNewLeadAsync(lead.Id, lead.Email, lead.FirstName, fullName, lead.PhoneNumber,
+            fullAddress);
 
         return Result.Success(lead.Adapt<LeadResponse>());
     }

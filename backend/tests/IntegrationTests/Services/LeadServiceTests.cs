@@ -15,7 +15,7 @@ using TestUtilities.Fakes;
 
 namespace IntegrationTests.Services;
 
-// LeadService with the real repositories, unit of work and PostgreSQL; only the email queue is a fake.
+// LeadService with the real repositories, unit of work and PostgreSQL; only the lead notifier is a fake.
 public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(database)
 {
     static LeadServiceTests()
@@ -24,11 +24,11 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         TypeAdapterConfig.GlobalSettings.Scan(typeof(LeadService).Assembly);
     }
 
-    private readonly RecordingEmailQueueHandler _emails = new();
+    private readonly RecordingLeadNotifier _notifier = new();
 
     private LeadService CreateService() => new(
         new LeadRepo(Context), new AddressRepo(Context), new CustomerRepo(Context), new UnitOfWork(Context),
-        _emails);
+        _notifier);
 
     private static CreateLeadRequest ValidRequest(string email = "jane.doe@example.com") => new()
     {
@@ -61,7 +61,7 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         result.Value.FullName.Should().Be("Jane Doe");
         result.Value.Email.Should().Be("jane.doe@example.com");
         result.Value.PropertyAddress.Should().StartWith("100 Congress Ave");
-        _emails.Enqueued.Should().ContainSingle().Which.LeadId.Should().Be(result.Value.Id);
+        _notifier.Notified.Should().ContainSingle().Which.LeadId.Should().Be(result.Value.Id);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         ClearTracking();
         (await Context.Leads.CountAsync(TestContext.Current.CancellationToken)).Should().Be(0);
         (await Context.Addresses.CountAsync(TestContext.Current.CancellationToken)).Should().Be(0);
-        _emails.Enqueued.Should().BeEmpty();
+        _notifier.Notified.Should().BeEmpty();
     }
 
     [Fact]

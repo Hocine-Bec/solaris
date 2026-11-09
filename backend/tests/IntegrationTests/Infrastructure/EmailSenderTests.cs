@@ -185,11 +185,24 @@ public class EmailSenderTests(PostgresFixture database) : IntegrationTestBase(da
             ("SalesNewLeadAlert:123", "sales@example.com"));
     }
 
+    [Theory]
+    [InlineData(null, typeof(HangfireLeadNotifier))]
+    [InlineData("Hangfire", typeof(HangfireLeadNotifier))]
+    [InlineData("Synchronous", typeof(SynchronousLeadNotifier))]
+    public async Task Harness_TheLeadNotifier_IsTheConfiguredModes(string? mode, Type expected)
+    {
+        // Hangfire unless a measurement asks for the P1 "before"
+        await using var services = BuildServices(harness: true, notificationsMode: mode);
+        await using var scope = services.CreateAsyncScope();
+
+        scope.ServiceProvider.GetRequiredService<ILeadNotifier>().Should().BeOfType(expected);
+    }
+
     #endregion
 
-    private ServiceProvider BuildServices(bool harness, string provider = "Recording")
+    private ServiceProvider BuildServices(bool harness, string provider = "Recording", string? notificationsMode = null)
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        var settings = new Dictionary<string, string?>
         {
             ["ConnectionStrings:Default"] = ConnectionString,
             ["Jwt:Secret"] = new string('s', 32),
@@ -204,7 +217,10 @@ public class EmailSenderTests(PostgresFixture database) : IntegrationTestBase(da
             ["Email:Gmail:ClientId"] = "client-id",
             ["Email:Gmail:ClientSecret"] = "client-secret",
             ["Email:Gmail:RefreshToken"] = "refresh-token"
-        }).Build();
+        };
+        if (notificationsMode is not null)
+            settings["Notifications:Mode"] = notificationsMode;
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         var services = new ServiceCollection()
             .AddLogging()
             .AddSingleton<IHostEnvironment>(new TestHostEnvironment("Development"))

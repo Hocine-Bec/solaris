@@ -101,6 +101,36 @@ public class SettingsValidationTests
         validate.Should().Throw<OptionsValidationException>().WithMessage("*Email:Provider*Production*");
     }
 
+    [Fact]
+    public void Startup_SynchronousNotificationsInDevelopment_PassesValidation()
+    {
+        // Arrange
+        var settings = CompleteSettings();
+        settings["Notifications:Mode"] = "Synchronous";
+
+        // Act
+        var validate = ValidateStartup(settings);
+
+        // Assert
+        validate.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("Testing")]
+    [InlineData("Production")]
+    public void Startup_SynchronousNotificationsOutsideDevelopment_FailsNamingTheMode(string environment)
+    {
+        // Arrange
+        var settings = CompleteSettings();
+        settings["Notifications:Mode"] = "Synchronous";
+
+        // Act
+        var validate = ValidateStartup(settings, environment);
+
+        // Assert - every lead request would wait for its emails: a measurement's "before", nothing to deploy
+        validate.Should().Throw<OptionsValidationException>().WithMessage("*Notifications:Mode*Development*");
+    }
+
     [Theory]
     [InlineData("Jwt:Secret", "31-characters-is-one-too-short!", "Secret")]
     [InlineData("Email:SimulatedLatencyMs", "-1", "SimulatedLatencyMs")]
