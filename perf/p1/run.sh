@@ -4,7 +4,8 @@
 #   perf/p1/run.sh <run number> [reference|before|after]
 #
 # The request latencies of the measured phase, then, once every notification has gone, the time to delivery of its
-# leads' emails (sent_at in email_delivery_log − the lead's created_at). Output:
+# leads' emails (sent_at in email_delivery_log − the lead's created_at). "before" runs the API with
+# Notifications__Mode=Synchronous: the request sends its two emails itself. Output:
 # perf/results/p1/<date>-<label>/run<N>/ (or RESULTS_DIR).
 set -euo pipefail
 source "$(dirname "$0")/../lib/common.sh"
@@ -12,6 +13,13 @@ source "$(dirname "$0")/../lib/common.sh"
 RUN=${1:?usage: perf/p1/run.sh <run number> [reference|before|after]}
 LABEL=${2:-reference}
 WAIT_LIMIT_SECONDS=${WAIT_LIMIT_SECONDS:-3600}
+if [ "$LABEL" = before ]; then
+  MODE=Synchronous
+  SETTINGS=(Notifications__Mode=Synchronous)
+else
+  MODE="the default"
+  SETTINGS=()
+fi
 
 OUT="${RESULTS_DIR:-$REPO/perf/results/p1/$(date +%F)-$LABEL}/run$RUN"
 mkdir -p "$OUT"
@@ -19,9 +27,9 @@ trap 'stop_api; stop_database' EXIT
 
 build_api
 start_database
-start_api "$OUT/api.log"
+start_api "$OUT/api.log" "${SETTINGS[@]}"
 
-log "P1 run $RUN ($LABEL): 30 s at 2 req/s, then 2 minutes at 10 req/s"
+log "P1 run $RUN ($LABEL, notifications: $MODE): 30 s at 2 req/s, then 2 minutes at 10 req/s"
 k6 run --quiet --no-color -e BASE_URL="$BASE_URL" --summary-export "$OUT/k6-summary.json" "$REPO/perf/p1/leads.js" \
   >"$OUT/k6-output.txt" 2>&1 &
 k6_pid=$!
@@ -53,5 +61,5 @@ sql "with delivery as (
   }' >"$OUT/results.json"
 
 write_env "$OUT/env.md" "perf/p1/leads.js (30 s at 2 req/s, then 120 s at 10 req/s)" "$mhz" \
-  "Recording sender, 2 s per email. Latencies of the 10 req/s phase only."
+  "Recording sender, 2 s per email; notifications: $MODE. Latencies of the 10 req/s phase only."
 log "done: $(jq -c '{requests_per_second, p50_ms, p95_ms, p99_ms, failed_requests, time_to_delivery_p95_ms}' "$OUT/results.json")"
