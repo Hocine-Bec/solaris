@@ -170,8 +170,12 @@ container, with `perf/p1/leads.js`, and writes `results.json`, k6's summary and 
 `perf/results/p1/<date>-<label>/run<N>/`; `before` starts the API with `Notifications__Mode=Synchronous`. 3 runs; the
 median run by p95 is reported.
 
-**Realism check:** one before run at 1 req/s with `Email__Provider=Gmail`, to confirm that the simulated 2 s per
-email is honest. Its result is recorded below.
+**Realism check:** is the simulated 2 s per email honest? The before again, with `Email__Provider=Gmail`: real emails
+from one Gmail account, the welcome emails to plus-addresses of it, so they all reach one inbox.
+`perf/p1/run.sh 1 realism` sends 5 s, then 30 s, at 1 req/s; `perf/p1/run.sh 1 realism-sequential` sends 1 lead, then
+10 more one at a time, each request starting when the previous one has answered (a closed model, unlike rule 5, so
+that no two emails are ever sent at once). Both read the Gmail settings from the root `.env` and print none of them.
+One run each, since they send real email. The results are recorded below.
 
 **Results**
 
@@ -205,6 +209,27 @@ the load asks for 20 (2 per lead at 10 leads a second), and the queue grows for 
   the API's code was the tag's.
 - The CPU frequency in `env.md` is one sample, taken 90 s in, when the machine was nearly idle: it shows how fast the
   cores ran at that moment, not whether the CPU could reach full speed.
+
+**Realism check, as measured** (2026-11-10, the code of tag `p1-before`; `env.md` says `dirty` because these two
+script options weren't committed yet; raw results in `perf/results/p1/2026-11-10-realism/` and
+`perf/results/p1/2026-11-10-realism-sequential/`). Gmail's SMTP server, each email on its own connection, as
+`GmailSmtpEmailSender` sends:
+
+| Run | p50 | p95 | p99 | Failed requests | Emails accepted |
+|---|---|---|---|---|---|
+| One at a time (10 leads) | 4,193.5 ms | 5,154.9 ms | 5,456.9 ms | 0 | 20 of 20 |
+| 1 req/s (30 leads) | 10,301 ms | 14,607.9 ms | 16,101.3 ms | 7 | 48 of 60 |
+| Before, simulated 2 s per email (for comparison) | 4,025.3 ms | 4,031 ms | 4,046.5 ms | 0 | 2,400 of 2,400 |
+
+- **One send at a time, the simulation is close:** a request with two real emails took 4,193.5 ms at the p50,
+  against 4,025.3 ms simulated; real sends vary more (p95 5,154.9 ms against 4,031 ms).
+- **At 1 req/s, it is optimistic.** One request a second, each taking about 10 s, kept about ten sending at once,
+  and Gmail answered 7 of them "4.3.0 Temporary System Problem. Try again later" after receiving the message (5
+  welcome emails, 2 sales alerts): those requests failed with a 500, and the logged emails match (48 of 60). The simulation has no such
+  limit, so the before measured with it is a lower bound on the real design's latency under load, and the real design
+  would also fail requests.
+- A browser was open during both runs. These differences are seconds; with and without a browser, the reference's
+  p95 differed by at most 1.4 ms.
 
 ---
 

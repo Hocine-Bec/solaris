@@ -1,0 +1,16 @@
+{
+  "run": 1,
+  "label": "realism",
+  "measured_leads": 30,
+  "deliveries": 48,
+  "pending_at_cutoff": 0,
+  "time_to_delivery_p50_ms": 7043,
+  "time_to_delivery_p95_ms": 13381,
+  "requests": 30,
+  "requests_per_second": 1,
+  "p50_ms": 10301,
+  "p95_ms": 14607.9,
+  "p99_ms": 16101.3,
+  "failed_requests": 7,
+  "dropped_iterations": 0
+}
