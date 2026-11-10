@@ -161,9 +161,9 @@ reliability (P2).
 1. Reset the database; start the API in Release mode.
 2. Warm up: 30 s at 2 req/s.
 3. Run `POST /api/leads` at a **constant 10 req/s for 2 minutes**, each request with a unique email and address.
-4. Reference and after: once every notification has gone, also read the *time to delivery* from the database: the
-   p95, over the measured phase's leads, of an email's `sent_at` in `email_delivery_log` minus its lead's
-   `created_at`. The same table for both designs, written by the same code (§4).
+4. Once every notification has gone, also read the *time to delivery* from the database: the p95, over the measured
+   phase's leads, of an email's `sent_at` in `email_delivery_log` minus its lead's `created_at`. The same table for
+   every design, written by the same code (§4).
 
 **Running:** `perf/p1/run.sh <run number> <reference|before|after>` does all of this on a fresh `postgres:18`
 container, with `perf/p1/leads.js`, and writes `results.json`, k6's summary and `env.md` to
@@ -177,9 +177,17 @@ email is honest. Its result is recorded below.
 
 | Run | Req/s achieved | p50 | p95 | p99 | Errors | Time to delivery p95 |
 |---|---|---|---|---|---|---|
-| Before (synchronous) | | | | | | n/a |
+| Before (synchronous) | 10 | 4,025.3 ms | 4,031 ms | 4,046.5 ms | 0 | 4,020 ms |
 | Reference (Hangfire) | 10 | 16.2 ms | 20.3 ms | 28.9 ms | 0 | 121,247 ms |
 | After (outbox) | | | | | | |
+
+**Before, as measured** (2026-11-09, tag `p1-before`, the median run by p95; raw results in
+`perf/results/p1/2026-11-09-before/`): all three runs had 1200 requests in the measured phase, none failed and none
+was dropped; p50 4,026, 4,026.1, 4,025.3 ms; p95 4,031.4, 4,030.7, 4,031 ms; p99 4,046.7, 4,042.8, 4,046.5 ms; time
+to delivery p95 4,020 ms in each. Each request waits for its two emails, so the simulated mail server sets its
+latency: the p50 is 25.3 ms above the 4,000 ms the two sends wait. The emails, though, arrive sooner than with the
+reference: within the request, a time to delivery p95 of 4,020 ms against 121,247 ms, because the reference's queue
+falls behind at this load. On mains power, with no browser open, on kernel 7.0.0-43 (`env.md`).
 
 **Reference, as measured** (2026-11-08, tag `p2-before`, the median run by p95; raw results in
 `perf/results/p1/2026-11-08-reference-rerun/`): all three runs had 1200 requests in the measured phase, none failed
@@ -188,9 +196,9 @@ and none was dropped; p50 16.2, 16.4, 16.3 ms; p95 20.3, 20.5, 20.2 ms; p99 28.9
 emails wait instead. Hangfire runs 20 workers and each email takes 2 s, so they send at most 10 emails a second while
 the load asks for 20 (2 per lead at 10 leads a second), and the queue grows for the whole run.
 
-- **A rerun.** These runs had no browser open, ran on mains power and on kernel 7.0.0-43, the conditions the before
-  and after runs will use. (The power source was noted after the runs: their `env.md` predates that field.) The first set, kept in `perf/results/p1/2026-11-08-reference/`, ran earlier the same day with a browser
-  open, on kernel 7.0.0-42: p50 14.1, 15.1, 15.3 ms; p95 19.1, 19.8, 20.4 ms; p99 24.9, 26, 28.9 ms; time to delivery
+- **A rerun.** These runs had no browser open, ran on mains power and on kernel 7.0.0-43, the conditions of the before
+  and after runs. (The power source was noted after the runs: their `env.md` predates that field.) The first set,
+  kept in `perf/results/p1/2026-11-08-reference/`, ran earlier the same day with a browser open, on kernel 7.0.0-42: p50 14.1, 15.1, 15.3 ms; p95 19.1, 19.8, 20.4 ms; p99 24.9, 26, 28.9 ms; time to delivery
   p95 121,468, 120,744, 120,674 ms. Its latencies are slightly lower, not higher; three runs per set can't say whether
   the kernel, the browser or chance explains the difference.
 - `env.md` says `p2-before-dirty` for the rerun: the working tree had an uncommitted change to this document only, so
