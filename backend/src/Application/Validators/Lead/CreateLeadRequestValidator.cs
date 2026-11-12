@@ -45,6 +45,23 @@ public class CreateLeadRequestValidator : AbstractValidator<CreateLeadRequest>
             .NotEmpty().WithMessage("Zip code is required")
             .Matches(@"^\d{5}(-\d{4})?$").WithMessage("Zip code must be in format 12345 or 12345-6789");
 
+        // Coordinates are optional, but come as a pair
+        RuleFor(x => x.PropertyLatitude)
+            .InclusiveBetween(-90m, 90m).WithMessage("Latitude must be between -90 and 90")
+            .When(x => x.PropertyLatitude.HasValue);
+
+        RuleFor(x => x.PropertyLongitude)
+            .InclusiveBetween(-180m, 180m).WithMessage("Longitude must be between -180 and 180")
+            .When(x => x.PropertyLongitude.HasValue);
+
+        RuleFor(x => x.PropertyLongitude)
+            .NotNull().WithMessage("Longitude is required when Latitude is provided")
+            .When(x => x.PropertyLatitude.HasValue);
+
+        RuleFor(x => x.PropertyLatitude)
+            .NotNull().WithMessage("Latitude is required when Longitude is provided")
+            .When(x => x.PropertyLongitude.HasValue);
+
         RuleFor(x => x.PropertyType)
             .NotEmpty().WithMessage("Property type is required")
             .Must(value => Enum.TryParse<PropertyType>(value, ignoreCase: true, out _))

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace UnitTests.Validators;
 
-// FR-L1: the property's state is a two-letter code.
+// FR-L1: the property's state is a two-letter code. The coordinates come only with a picked address suggestion.
 public class CreateLeadRequestValidatorTests
 {
     private static readonly CreateLeadRequestValidator Validator = new();
@@ -75,5 +75,54 @@ public class CreateLeadRequestValidatorTests
 
         // Assert
         result.Errors.Should().ContainSingle().Which.ErrorMessage.Should().Be("State is required");
+    }
+
+    [Fact]
+    public void Validate_NoCoordinates_IsValid()
+    {
+        // Arrange - a typed address, no suggestion picked
+        var request = ValidRequest();
+        request.PropertyLatitude = null;
+        request.PropertyLongitude = null;
+
+        // Act
+        var result = Validator.Validate(request);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(30.264, null, nameof(CreateLeadRequest.PropertyLongitude))]
+    [InlineData(null, -97.743, nameof(CreateLeadRequest.PropertyLatitude))]
+    public void Validate_OnlyOneCoordinate_FailsOnTheMissingOne(double? latitude, double? longitude, string missing)
+    {
+        // Arrange
+        var request = ValidRequest();
+        request.PropertyLatitude = (decimal?)latitude;
+        request.PropertyLongitude = (decimal?)longitude;
+
+        // Act
+        var result = Validator.Validate(request);
+
+        // Assert
+        result.Errors.Should().ContainSingle().Which.PropertyName.Should().Be(missing);
+    }
+
+    [Theory]
+    [InlineData(90.5, -97.743, nameof(CreateLeadRequest.PropertyLatitude))]
+    [InlineData(30.264, -180.5, nameof(CreateLeadRequest.PropertyLongitude))]
+    public void Validate_CoordinateOutOfRange_FailsOnIt(double latitude, double longitude, string wrong)
+    {
+        // Arrange
+        var request = ValidRequest();
+        request.PropertyLatitude = (decimal)latitude;
+        request.PropertyLongitude = (decimal)longitude;
+
+        // Act
+        var result = Validator.Validate(request);
+
+        // Assert
+        result.Errors.Should().ContainSingle().Which.PropertyName.Should().Be(wrong);
     }
 }

@@ -14,8 +14,9 @@ public class Address
     public string State { get; set; } = string.Empty;
     public string ZipCode { get; set; } = string.Empty;
     public string Country { get; set; } = string.Empty;
-    public decimal Latitude { get; set; }
-    public decimal Longitude { get; set; }
+    /// <summary>Known only when the address came from a picked suggestion; never guessed.</summary>
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
     
     /* --------- natural key to check ---------- */
     public string UniqueAddressHash { get; set; } = string.Empty;
