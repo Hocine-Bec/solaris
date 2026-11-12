@@ -8,7 +8,8 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
 ## Requirements
 
 ### Leads
-- **FR-L1** — The public quote form (three steps: contact, property, qualification) creates a lead.
+- **FR-L1** — The public quote form (three steps: contact, property, qualification) creates a lead. The property
+  is in the United States: its state is one of the 50 states or the District of Columbia, as a two-letter code.
 - **FR-L2** — A duplicate submission doesn't create a second lead or send the emails again (BR-L1).
 - **FR-L3** — Admin can list leads (paginated, filtered by status) and view one.
 - **FR-L4** — Admin can change a lead's status within the allowed transitions (BR-L2).
@@ -26,7 +27,8 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
   the stage's conditions are met (BR-I1).
 - **FR-I3** — Admin can cancel an installation before it is Active, with a reason, and deactivate an Active one
   (BR-I2).
-- **FR-I4** — Admin can record the design: system size (kW), panel count, inverter type.
+- **FR-I4** — Admin can record the design: system size (kW), panel count, inverter type, and confirm the
+  installation's time zone (BR-P4).
 - **FR-I5** — Admin assigns technicians to an installation, each with a role: Surveyor, Installer or Inspector.
 - **FR-I6** — A technician sees the installations they are assigned to and can mark their own assignment complete.
 - **FR-I7** — Activation issues a device API key (shown once) and notifies the customer by email.
@@ -37,7 +39,7 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
   response says how many readings were accepted, how many were duplicates, and which were rejected and why.
 - **FR-T3** — Late readings, up to 30 days old, are accepted and correct the affected days (BR-P3).
 - **FR-P1** — Each installation has one production row per day: actual kWh, expected kWh, health (BR-P1, BR-P2).
-- **FR-P2** — **Fleet dashboard:** for the last complete day, the number of installations per health status,
+- **FR-P2** — **Fleet dashboard:** for the last day that has ended in every time zone the fleet covers, the number of installations per health status,
   plus the 20 worst performers.
 - **FR-P3** — **Month view:** daily actual vs expected production for one installation and one month.
 - **FR-P4** — **Year view:** monthly totals, actual vs expected, for one installation and one year.
@@ -106,16 +108,12 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
   key. Keys are stored hashed. A revoked key stops working immediately.
 
 ### Production and health
-- **BR-P1 Expected production.** Expected daily kWh = system size (kW) × peak sun hours for the month × 0.80.
+- **BR-P1 Expected production.** Expected daily kWh = system size (kW) × peak sun hours for the month in the
+  installation's state × 0.80.
 
-  Peak sun hours in Austin, Texas:
-
-  | Jan | Feb | Mar | Apr | May | Jun | Jul | Aug | Sep | Oct | Nov | Dec |
-  |---|---|---|---|---|---|---|---|---|---|---|---|
-  | 3.9 | 4.5 | 5.2 | 5.7 | 6.0 | 6.5 | 6.6 | 6.3 | 5.7 | 4.9 | 4.1 | 3.7 |
-
-  These are approximate, illustrative values: realistic enough for the model, not engineering data. Weather
-  isn't modelled.
+  The peak sun hours come from a table of monthly averages per state, taken from NREL's published solar data
+  for one representative city per state; the table and its exact source are added with the code that uses it.
+  Weather isn't modelled.
 - **BR-P2 Health.** Ratio = actual ÷ expected for the day.
 
   | Health | Rule |
@@ -127,6 +125,10 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
   | Offline | no readings at all for that day |
 - **BR-P3 Late data.** When readings arrive for a past day, that day's rollup is recalculated. Recalculating the
   same day twice gives the same result.
+- **BR-P4 Local days.** Every installation has a time zone, proposed from its state when it is created and
+  confirmed by Admin until the installation is Active; after that it can't change. Its readings are counted per
+  local day in that zone, so a day has 92, 96 or 100 fifteen-minute slots (daylight-saving changes; zones without
+  daylight saving always have 96). A day is checked for Offline once it has ended in that zone.
 
 ### Notifications
 - **BR-N1 Never lost.** A notification is recorded in the **same database transaction** as the event that causes

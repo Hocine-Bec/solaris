@@ -1,34 +1,4 @@
 @import "tailwindcss";
-
-@theme {
-  --color-primary: #f2b90d;
-  --color-background-light: #f8f8f5;
-  --color-background-dark: #020202;
-  
-  --font-family-sans: "Inter", sans-serif;
-}
-
-body {
-  font-family: var(--font-family-sans);
-}
-
-@keyframes scroll {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(calc(-400px * 10 - 1.5rem * 10));
-  }
-}
-
-.animate-scroll {
-  animation: scroll 60s linear infinite;
-}
-
-.animate-scroll:hover {
-  animation-play-state: paused;
-}
-
-/* Ensure dark mode works */
-@variant dark (&:where(.dark, .dark *)) {
-}
+@import "../../brand/tokens.css";
+@import "../../brand/components.css";
+@import "./styles/site.css";

@@ -7,14 +7,15 @@ public class CreateLeadRequest
     public string Email { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
         
-    // Property Info (from Geoapify)
+    // Property Info. The state is a two-letter code (FR-L1). The coordinates come only with an address picked from
+    // the form's suggestions; a typed address has none.
     public string PropertyStreet { get; set; } = string.Empty;
     public string PropertyCity { get; set; } = string.Empty;
     public string PropertyState { get; set; } = string.Empty;
     public string PropertyZipCode { get; set; } = string.Empty;
     public string PropertyCountry { get; set; } = string.Empty;
-    public decimal PropertyLatitude { get; set; } 
-    public decimal PropertyLongitude { get; set; } 
+    public decimal? PropertyLatitude { get; set; }
+    public decimal? PropertyLongitude { get; set; }
     public string PropertyType { get; set; } = string.Empty;
     public bool IsPropertyOwner { get; set; }
         

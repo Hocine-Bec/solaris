@@ -1,4 +1,5 @@
 using Application.DTOs.Lead;
+using Domain.Common;
 using Domain.Enums;
 using FluentValidation;
 
@@ -36,12 +37,30 @@ public class CreateLeadRequestValidator : AbstractValidator<CreateLeadRequest>
             .MaximumLength(100).WithMessage("City cannot exceed 100 characters");
 
         RuleFor(x => x.PropertyState)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("State is required")
-            .MaximumLength(100).WithMessage("State cannot exceed 100 characters");
+            .Must(UsStates.IsCode).WithMessage("State must be the two-letter code of a US state or DC, such as TX");
 
         RuleFor(x => x.PropertyZipCode)
             .NotEmpty().WithMessage("Zip code is required")
             .Matches(@"^\d{5}(-\d{4})?$").WithMessage("Zip code must be in format 12345 or 12345-6789");
+
+        // Coordinates are optional, but come as a pair
+        RuleFor(x => x.PropertyLatitude)
+            .InclusiveBetween(-90m, 90m).WithMessage("Latitude must be between -90 and 90")
+            .When(x => x.PropertyLatitude.HasValue);
+
+        RuleFor(x => x.PropertyLongitude)
+            .InclusiveBetween(-180m, 180m).WithMessage("Longitude must be between -180 and 180")
+            .When(x => x.PropertyLongitude.HasValue);
+
+        RuleFor(x => x.PropertyLongitude)
+            .NotNull().WithMessage("Longitude is required when Latitude is provided")
+            .When(x => x.PropertyLatitude.HasValue);
+
+        RuleFor(x => x.PropertyLatitude)
+            .NotNull().WithMessage("Latitude is required when Longitude is provided")
+            .When(x => x.PropertyLongitude.HasValue);
 
         RuleFor(x => x.PropertyType)
             .NotEmpty().WithMessage("Property type is required")

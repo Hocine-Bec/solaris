@@ -65,6 +65,25 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
     }
 
     [Fact]
+    public async Task CreateAsync_WithoutCoordinates_StoresTheAddressWithoutThem()
+    {
+        // Arrange - a typed address, no suggestion picked: no coordinates, and none made up
+        var request = ValidRequest();
+        request.PropertyLatitude = null;
+        request.PropertyLongitude = null;
+
+        // Act
+        var result = await CreateService().CreateAsync(request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        ClearTracking();
+        var address = await Context.Addresses.SingleAsync(TestContext.Current.CancellationToken);
+        address.Latitude.Should().BeNull();
+        address.Longitude.Should().BeNull();
+    }
+
+    [Fact]
     public async Task CreateAsync_LeadCannotBeSaved_ThrowsAndStoresNoAddressEither()
     {
         // Arrange - an email longer than its 255-character column makes the save fail

@@ -18,8 +18,9 @@ exists in the code.
                                                    PostgreSQL
 ```
 
-- **Visitors** use the marketing site, whose quote form posts to the public lead endpoint. Its address field
-  gets suggestions from Geoapify, called directly from the browser.
+- **Visitors** use the marketing site, whose quote form posts to the public lead endpoint. Its street field
+  suggests addresses from Geoapify, called directly from the browser. A typed address works too; only a picked one
+  sends its coordinates, so they are never guessed.
 - **Staff** (Admin, Technician) use the API directly, through its API reference (Scalar); there is no staff UI.
 - **Inverter gateways** upload production readings for their own installation *(planned)*.
 - **Gmail** delivers the notification emails over SMTP.
@@ -44,6 +45,7 @@ solaris/
 │   ├── tests/                 unit and integration tests (see testing.md)
 │   └── tools/Solaris.DataGen/ dataset generator for the measurements (planned; see measurements.md)
 ├── frontend/
+│   ├── brand/                 the tokens, the core components' CSS, the fonts and the logo, shared by the frontends
 │   └── marketing/             the marketing site and the quote form
 └── perf/                      load and fault scripts, and their raw results (planned; see measurements.md)
 ```
@@ -83,7 +85,7 @@ feature.
 | **Lead** | A quote request | One open lead per email: `NormalizedEmail` with a partial unique index over the open statuses (BR-L1) *(planned)*; an `xmin` concurrency token *(planned)* |
 | **Address** | A property, stored once | `UniqueAddressHash` with a unique index ([ADR 5](adr/0005-address-natural-key.md)) |
 | **Customer** | A converted lead | Email unique; status derived from its installations (BR-C1) *(planned)* |
-| **Installation** | One project at one address | Its status is its stage; design data (size, panel count, inverter type); an `xmin` concurrency token and the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` *(planned)* |
+| **Installation** | One project at one address | Its status is its stage; design data (size, panel count, inverter type); its time zone (an IANA name, BR-P4); an `xmin` concurrency token and the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` *(planned)* |
 | **InstallationStatusHistory** | One row per status change | From, to, who, when, note; append-only, never updated or deleted |
 | **InstallationTechnician** | A technician's assignment | Role Surveyor, Installer or Inspector (an enum); completion date |
 | **User** | A staff account | BCrypt password hash, role (Admin or Technician), active flag, last login |
@@ -107,8 +109,8 @@ production_dirty_days  installation_id int, day date, PK (installation_id, day)
 readings, the table and its index stay under 1 GB.
 
 Conventions: snake_case names for tables, columns, keys and indexes (a test checks the migrated database), enums
-stored as strings, every timestamp a UTC `timestamptz`. Only the daily rollups use the company's local day
-(America/Chicago).
+stored as strings, every timestamp a UTC `timestamptz`. Only the daily rollups use a local day: the
+installation's own time zone (BR-P4).
 
 ---
 
@@ -250,7 +252,7 @@ simultaneous second conversion fail with 409.
     RETURNING slot_start
   )
   INSERT INTO production_dirty_days (installation_id, day)
-  SELECT DISTINCT @installationId, (slot_start AT TIME ZONE 'America/Chicago')::date FROM inserted
+  SELECT DISTINCT @installationId, (slot_start AT TIME ZONE @timeZone)::date FROM inserted  -- the installation's zone
   ON CONFLICT DO NOTHING;
   ```
 
@@ -263,17 +265,18 @@ simultaneous second conversion fail with 409.
   2. For each installation and day: sum `energy_wh` over that local day (a primary-key range scan), compute
      expected production (BR-P1) and health (BR-P2), and upsert the `EnergyProduction` row.
   3. Commit. If the job crashes, the claimed rows come back; recalculating is idempotent.
-- **`CloseDayJob`** (Hangfire, 01:00 local): every Active installation with no rollup for yesterday gets an
-  **Offline** row (BR-P2), so a dead system doesn't simply disappear from the dashboards.
-- **Local days** follow America/Chicago, so daylight-saving days have 92 or 100 slots: counts use real local-day
-  boundaries, never "96 slots".
+- **`CloseDayJob`** (Hangfire, every hour): every Active installation whose local day ended at least an hour ago,
+  with no rollup for that day, gets an **Offline** row (BR-P2), so a dead system doesn't simply disappear from the
+  dashboards.
+- **Local days** follow each installation's time zone (BR-P4), so daylight-saving days have 92 or 100 slots and
+  zones without daylight saving always 96: counts use real local-day boundaries, never "96 slots".
 
 ### Dashboards
 They read rollups only:
 
 | View | Query |
 |---|---|
-| Fleet (FR-P2) | Count by health for yesterday, plus the 20 lowest actual ÷ expected ratios; indexed on the date |
+| Fleet (FR-P2) | Count by health for the last day ended in every zone, plus the 20 lowest actual ÷ expected ratios; indexed on the date |
 | Month (FR-P3) | One installation's rollups for one month (covered by the unique index) |
 | Year (FR-P4) | One installation's rollups for one year, summed by month |
 

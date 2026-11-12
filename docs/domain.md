@@ -7,9 +7,9 @@ a monitored solar system. The requirements, the architecture and the code all us
 
 ## The business
 
-**Solaris Energy** is a fictional company that sells and installs solar-panel systems on homes and small
-businesses in **Austin, Texas**. Addresses are therefore US addresses, and expected production is based on
-Austin's sunlight.
+**Solaris Energy** is a fictional company, based in Austin, Texas, that sells and installs solar-panel systems on
+homes and small businesses **across the United States**. Addresses are therefore US addresses, expected
+production is based on the sunlight of the installation's state, and each installation keeps its own local time.
 
 A homeowner pays once for a system: panels on the roof, an inverter, sometimes a battery. The system then
 produces electricity for 25 years or more, lowering the homeowner's bill. The company earns from the sale
@@ -41,17 +41,18 @@ Solaris covers all three, deliberately small.
 | **Inverter** | Converts the panels' DC electricity into the home's AC electricity. It is usually the device that reports production data, and the part that fails most often. |
 | **kW (kilowatt)** | Power: how fast electricity is produced at one moment. A system's **size** is its maximum power, e.g. an 8 kW system. |
 | **kWh (kilowatt-hour)** | Energy: the amount produced over time. 8 kW for 1 hour = 8 kWh. Bills and production are counted in kWh. |
-| **Peak sun hours** | The hours per day of "full" sunlight equivalent at a location. Austin averages about 5, more in summer and fewer in winter. |
+| **Peak sun hours** | The hours per day of "full" sunlight equivalent at a location. They vary by state and by month: more in the Southwest and in summer, fewer in the North and in winter. |
 | **Performance ratio** | The share of theoretical output a real system delivers after losses from heat, dust, wiring and the inverter: typically about 0.80. |
 | **Expected production** | What a healthy system should produce: size × peak sun hours × performance ratio. |
 | **Site survey** | A technician's visit to the property: roof condition, orientation, shading, the electrical panel. |
 | **Design** | Engineering the system: how many panels, which inverter, the system size. |
-| **Permit** | The city's approval to install. It can take weeks. |
+| **Permit** | The local authority's (city or county) approval to install. It can take weeks. |
 | **Interconnection** | The utility's approval to connect the system to the grid. |
 | **Inspection** | A city or utility inspector checks that the finished installation is safe and compliant. |
 | **Activation** | Switching the system on and starting monitoring. The installation becomes **Active**. |
 | **Reading** | A data point sent by the inverter's monitoring gateway: the energy produced in one 15-minute slot. |
 | **Rollup** | A pre-computed daily total built from many readings, so dashboards don't add up millions of rows. |
+| **Local day** | A calendar day in the installation's own time zone. Production is counted per local day. |
 | **Health** | A label (Excellent … Offline) comparing a day's actual production with its expected production. |
 
 ---

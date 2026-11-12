@@ -1,0 +1,97 @@
+/*
+ * The UI kit's base and core components, shared by the marketing site and the CRM: text styles, links, buttons,
+ * fields and notices. They read the roles from tokens.css, so they work in both themes. Import after tokens.css.
+ */
+
+/* ===================== Base ===================== */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 400 1rem/1.6 var(--font-sans); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; overflow-x: hidden; transition: background-color var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out); }
+h1, h2, h3, h4, p, figure, ul, ol, dl, dd, fieldset { margin: 0; padding: 0; }
+ul, ol { list-style: none; }
+fieldset { border: 0; min-width: 0; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+::selection { background: var(--color-sun); color: var(--color-night); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+code, pre { font-family: var(--font-mono); }
+.sr { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+[hidden] { display: none !important; }
+
+/* ===================== Icons (Lucide, at a 1.5 line) ===================== */
+.ic { width: 1.25rem; height: 1.25rem; flex: none; display: inline-block; vertical-align: middle; }
+
+/* ===================== Text styles ===================== */
+.label { font: 400 .72rem/1.5 var(--font-mono); letter-spacing: .16em; text-transform: uppercase; }
+.serif { font-family: var(--font-serif); font-style: italic; font-weight: 400; font-stretch: 100%; letter-spacing: -.01em; text-transform: none; }
+.dot { display: inline-block; width: .21em; height: .21em; border-radius: 50%; background: var(--accent-fill); margin-left: .09em; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.a-small { font-size: .8125rem; line-height: 1.45; color: var(--muted); }
+
+/* ===================== Links ===================== */
+.link { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .2em; transition: text-decoration-thickness var(--duration-fast); }
+.link:hover { text-decoration-thickness: 2px; }
+
+/* ===================== Buttons ===================== */
+.btn { --h: 2.5rem; --px: 1.15rem; --r: var(--radius-md); --fs: .7rem;
+  position: relative; isolation: isolate; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: .55rem;
+  height: var(--h); padding: 0 var(--px); border: 0; border-radius: var(--r); background: transparent; color: var(--fg);
+  font: 500 var(--fs)/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; text-decoration: none; cursor: pointer;
+  transition: color var(--duration-base) var(--ease-out), background-color var(--duration-fast), box-shadow var(--duration-fast), scale var(--duration-fast) var(--ease-out); }
+.btn .ic { width: 1rem; height: 1rem; }
+.btn-lg { --h: 3rem; --px: 1.75rem; --r: var(--radius-lg); --fs: .75rem; }
+.btn-sm { --h: 2rem; --px: .8rem; --r: var(--radius-sm); --fs: .66rem; gap: .4rem; }
+.btn-icon { --px: 0; width: var(--h); }
+.btn:active { scale: .985; }
+.btn-primary { background: var(--accent-fill); color: var(--on-accent); box-shadow: inset 0 0 0 1px rgb(11 11 12 / .14), inset 0 1px 0 rgb(255 255 255 / .35); }
+.btn-secondary { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.btn-primary::before, .btn-secondary::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--fg); transform: translateY(101%); transition: transform var(--duration-base) var(--ease-out); }
+.btn-primary:hover, .btn-secondary:hover { color: var(--bg); }
+.btn-primary:hover::before, .btn-secondary:hover::before { transform: none; }
+.btn-quiet { color: var(--muted); }
+.btn-quiet:hover { background: var(--surface); color: var(--fg); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.btn.is-loading { pointer-events: none; }
+.btn.is-loading .btn-text { opacity: .55; }
+.btn .spin { display: none; }
+.btn.is-loading .spin { display: inline-block; }
+.spin { animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===================== Fields ===================== */
+.field { display: grid; gap: .45rem; align-content: start; min-width: 0; }
+.field-label { display: flex; align-items: baseline; gap: .6rem; font: 500 .875rem/1.3 var(--font-sans); color: var(--fg); }
+.opt { font: 400 .62rem/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+.field-help { font-size: .8125rem; line-height: 1.45; color: var(--muted); }
+.field-error { display: flex; gap: .4rem; align-items: flex-start; font-size: .8125rem; line-height: 1.45; color: var(--negative); }
+.field-error .ic { width: 1rem; height: 1rem; margin-top: .1rem; }
+.control { position: relative; display: flex; align-items: center; gap: .55rem; height: 2.5rem; padding: 0 .85rem; border-radius: var(--radius-md); background: var(--bg-field); box-shadow: inset 0 0 0 1px var(--line-strong); transition: box-shadow var(--duration-fast) var(--ease-out); }
+.control-lg { height: 3rem; padding: 0 1rem; border-radius: var(--radius-lg); }
+.control input, .control select, .control textarea { all: unset; flex: 1; min-width: 0; font: 400 1rem/1.4 var(--font-sans); color: var(--fg); }
+.control input::placeholder, .control textarea::placeholder { color: var(--faint); }
+.control:hover { box-shadow: inset 0 0 0 1px var(--fg); }
+.control:focus-within { box-shadow: inset 0 0 0 2px var(--focus); }
+.field.has-error .control { box-shadow: inset 0 0 0 2px var(--negative); }
+.control .ic { width: 1.1rem; height: 1.1rem; color: var(--faint); }
+.control-area { height: auto; align-items: stretch; padding: .65rem .85rem; }
+.control-area textarea { display: block; min-height: 5.5rem; resize: vertical; overflow: auto; white-space: pre-wrap; overflow-wrap: break-word; }
+.control select { cursor: pointer; padding-right: 1.5rem; }
+.control .chev { position: absolute; right: .8rem; pointer-events: none; }
+.control option { color: initial; }
+
+/* ===================== Notices ===================== */
+.tone-info { --tone: var(--info); }
+.tone-positive { --tone: var(--positive); }
+.tone-warning { --tone: var(--warning); }
+.tone-negative { --tone: var(--negative); }
+.notice { display: grid; grid-template-columns: auto 1fr; gap: .2rem .7rem; align-items: start; padding: .8rem .95rem; border-radius: var(--radius-md); background: color-mix(in srgb, var(--tone) 9%, var(--bg-raised)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 35%, transparent); font-size: .875rem; line-height: 1.5; }
+.notice > .ic { color: var(--tone); width: 1.15rem; height: 1.15rem; margin-top: .1rem; grid-column: 1; grid-row: 1; }
+.notice > :not(.ic) { grid-column: 2; }
+.notice-title { font-weight: 600; }
+.notice p { color: var(--fg); }
+.notice ul { margin-top: .2rem; display: grid; gap: .15rem; }
+.notice ul a { color: var(--fg); text-underline-offset: .2em; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

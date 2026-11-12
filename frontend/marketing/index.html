@@ -1,19 +1,29 @@
 <!doctype html>
 <html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
-  <title>Solaris - Smart Solar Solutions</title>
-</head>
-
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
-
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#040405" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!--page-head-->
+    <style>
+      /* The intro's black screen, before the stylesheet loads */
+      .splash { position: fixed; inset: 0; z-index: 200; }
+      .splash::before { content: ""; position: absolute; inset: 0; background: #040405; }
+    </style>
+  </head>
+  <body data-theme="night">
+    <div class="splash" id="splash" aria-hidden="true"><span class="skip-hint">Click or press any key to skip</span></div>
+    <script>
+      // The intro plays on the home page only, and never with reduced motion: elsewhere its black screen goes at once.
+      (() => {
+        const home = location.pathname === '/', calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!home || calm) { document.getElementById('splash').remove(); return; }
+        document.documentElement.classList.add('intro-running');
+        try { history.scrollRestoration = 'manual'; } catch { /* not supported */ }
+      })();
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

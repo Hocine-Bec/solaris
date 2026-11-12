@@ -122,8 +122,8 @@ only, and measurement runs use the Development environment with a Release build.
 
 ## 5. Dataset generator *(planned)*
 
-`backend/tools/Solaris.DataGen` is a console app that creates Active installations (4–12 kW) and writes their readings
-with `COPY` (`NpgsqlBinaryImporter`):
+`backend/tools/Solaris.DataGen` is a console app that creates Active installations (4–12 kW), spread across states
+and time zones, and writes their readings with `COPY` (`NpgsqlBinaryImporter`):
 
 ```
 dotnet run --project backend/tools/Solaris.DataGen -- --installations 1000 --days 120 --seed 42 --schema final
@@ -134,7 +134,7 @@ dotnet run --project backend/tools/Solaris.DataGen -- --installations 1000 --day
 - It writes the installations' device keys to `perf/keys.csv`, for the ingestion runs (Development only).
 
 The data is shaped to look real:
-- a daylight bell curve, wider in summer
+- a daylight bell curve around each installation's local noon, wider in summer
 - a random daily cloud factor (0.3–1.0)
 - per installation: 90% healthy (0.95–1.0 of expected), 7% degraded (0.6–0.8), 3% failing, with some
   zero-reading days

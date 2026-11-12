@@ -7,13 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {
+    "lucide-react": "1.64.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-hot-toast": "^2.6.1",
-    "react-icons": "^5.7.0",
     "react-router-dom": "^7.18.5"
   },
   "devDependencies": {
@@ -31,6 +31,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.72.1",
-    "vite": "^7.3.7"
+    "vite": "^7.3.7",
+    "vitest": "5.0.5"
   }
 }
