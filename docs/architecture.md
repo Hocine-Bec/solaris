@@ -18,8 +18,9 @@ exists in the code.
                                                    PostgreSQL
 ```
 
-- **Visitors** use the marketing site, whose quote form posts to the public lead endpoint. Its address field
-  gets suggestions from Geoapify, called directly from the browser.
+- **Visitors** use the marketing site, whose quote form posts to the public lead endpoint. Its street field
+  suggests addresses from Geoapify, called directly from the browser. A typed address works too; only a picked one
+  sends its coordinates, so they are never guessed.
 - **Staff** (Admin, Technician) use the API directly, through its API reference (Scalar); there is no staff UI.
 - **Inverter gateways** upload production readings for their own installation *(planned)*.
 - **Gmail** delivers the notification emails over SMTP.
@@ -44,6 +45,7 @@ solaris/
 │   ├── tests/                 unit and integration tests (see testing.md)
 │   └── tools/Solaris.DataGen/ dataset generator for the measurements (planned; see measurements.md)
 ├── frontend/
+│   ├── brand/                 the tokens, the core components' CSS, the fonts and the logo, shared by the frontends
 │   └── marketing/             the marketing site and the quote form
 └── perf/                      load and fault scripts, and their raw results (planned; see measurements.md)
 ```
