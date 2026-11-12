@@ -3,9 +3,10 @@
 What is tested, at which level, and how. Business rules (`BR-…`) are defined in
 [functional requirements](functional-requirements.md).
 
-**Status:** today there are 10 unit tests (8 for the `Lead` and `Address` entities, and the architecture test's 2
-cases, one each for `Domain` and `Application`) and 138 integration tests: 117 on PostgreSQL 18 (68 for the
-repositories, 2 for the unit of work, 4 for `LeadService`, 1 for the schema's names, 14 for the email senders and the
+**Status:** today there are 24 unit tests (8 for the `Lead` and `Address` entities, 1 for the list of states, 13 for
+the lead request's state code and coordinates, and the architecture test's 2 cases, one each for `Domain` and
+`Application`) and 139 integration tests: 118 on PostgreSQL 18 (68 for the
+repositories, 2 for the unit of work, 5 for `LeadService`, 1 for the schema's names, 14 for the email senders and the
 measurement harness, and 28 through the API for error responses, pagination, timestamps, the email fault toggle and
 the synchronous notifications), and 21 for the settings' startup validation, which need no database.
 Everything else below is *(planned)*.
