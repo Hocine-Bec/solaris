@@ -1,4 +1,5 @@
 using Application.DTOs.Address;
+using Domain.Common;
 using FluentValidation;
 
 namespace Application.Validators.Address;
@@ -26,9 +27,7 @@ public class UpdateAddressRequestValidator : AbstractValidator<UpdateAddressRequ
 
         // State validation (only if provided)
         RuleFor(x => x.State)
-            .NotEmpty().WithMessage("State cannot be empty")
-            .MaximumLength(100).WithMessage("State cannot exceed 100 characters")
-            .MinimumLength(2).WithMessage("State must be at least 2 characters")
+            .Must(UsStates.IsCode).WithMessage("State must be the two-letter code of a US state or DC, such as TX")
             .When(x => x.State != null);
 
         // ZipCode validation (only if provided)

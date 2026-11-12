@@ -1,4 +1,5 @@
 using Application.DTOs.Address;
+using Domain.Common;
 using FluentValidation;
 
 namespace Application.Validators.Address;
@@ -21,9 +22,9 @@ public class CreateAddressRequestValidator : AbstractValidator<CreateAddressRequ
             .MinimumLength(2).WithMessage("City must be at least 2 characters");
 
         RuleFor(x => x.State)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("State is required")
-            .MaximumLength(100).WithMessage("State cannot exceed 100 characters")
-            .MinimumLength(2).WithMessage("State must be at least 2 characters");
+            .Must(UsStates.IsCode).WithMessage("State must be the two-letter code of a US state or DC, such as TX");
 
         RuleFor(x => x.ZipCode)
             .NotEmpty().WithMessage("ZipCode is required")

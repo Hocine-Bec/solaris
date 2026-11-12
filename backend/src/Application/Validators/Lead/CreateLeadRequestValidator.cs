@@ -1,4 +1,5 @@
 using Application.DTOs.Lead;
+using Domain.Common;
 using Domain.Enums;
 using FluentValidation;
 
@@ -36,8 +37,9 @@ public class CreateLeadRequestValidator : AbstractValidator<CreateLeadRequest>
             .MaximumLength(100).WithMessage("City cannot exceed 100 characters");
 
         RuleFor(x => x.PropertyState)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("State is required")
-            .MaximumLength(100).WithMessage("State cannot exceed 100 characters");
+            .Must(UsStates.IsCode).WithMessage("State must be the two-letter code of a US state or DC, such as TX");
 
         RuleFor(x => x.PropertyZipCode)
             .NotEmpty().WithMessage("Zip code is required")
