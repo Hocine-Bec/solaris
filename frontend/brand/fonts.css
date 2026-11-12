@@ -1,0 +1,10 @@
+/*
+ * The brand's fonts, trimmed to the characters, weights and widths the designs use (see README.md). Import this file
+ * from the app's JavaScript (import '<path>/brand/fonts.css'), not from a stylesheet Tailwind bundles: Tailwind
+ * inlines imported files without rebasing their url()s, and the font files would not be found.
+ */
+
+@font-face { font-family: "Archivo"; src: url("./fonts/archivo-variable.woff2") format("woff2"); font-weight: 400 700; font-stretch: 100% 125%; font-display: swap; }
+@font-face { font-family: "Fraunces"; src: url("./fonts/fraunces-italic.woff2") format("woff2"); font-style: italic; font-weight: 400; font-display: swap; }
+@font-face { font-family: "Solaris Mono"; src: url("./fonts/solaris-mono-regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Solaris Mono"; src: url("./fonts/solaris-mono-medium.woff2") format("woff2"); font-weight: 500; font-display: swap; }
