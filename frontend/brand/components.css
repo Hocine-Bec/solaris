@@ -1,5 +1,5 @@
 /*
- * The UI kit's base and core components, shared by the marketing site and the CRM: text styles, links, buttons,
+ * The UI kit's base and core components, shared by the marketing site and the staff app: text styles, links, buttons,
  * fields and notices. They read the roles from tokens.css, so they work in both themes. Import after tokens.css.
  */
 

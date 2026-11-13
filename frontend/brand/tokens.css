@@ -1,5 +1,5 @@
 /*
- * The Solaris tokens: colour, type, shape and motion, in one place for the marketing site and the CRM.
+ * The Solaris tokens: colour, type, shape and motion, in one place for the marketing site and the staff app.
  * Tailwind CSS 4 reads them (@theme): import this file after "tailwindcss" in an app's main stylesheet. The fonts
  * are in fonts.css, which the app imports from its JavaScript instead, so the font files' paths resolve.
  * Components read the roles (--bg, --fg, --muted, …), which follow the nearest [data-theme="night" | "limestone"].

@@ -40,7 +40,7 @@ const brand = fileURLToPath(new URL('../brand', import.meta.url));
 export default defineConfig({
   plugins: [react(), pageHeads()],
   server: {
-    // The tokens, fonts and logo live in ../brand, shared with the CRM app.
+    // The tokens, fonts and logo live in ../brand, shared with the staff app.
     fs: { allow: [searchForWorkspaceRoot(process.cwd()), brand] },
   },
   test: {
