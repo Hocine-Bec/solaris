@@ -317,5 +317,6 @@ Architecture decisions are recorded as ADRs, one file each, in [`adr/`](adr/):
 | [3](adr/0003-result-objects-for-expected-outcomes.md) | Result objects for expected outcomes, exceptions for the unexpected |
 | [4](adr/0004-postgresql-with-ef-core.md) | PostgreSQL with EF Core, and SQL where it matters |
 | [5](adr/0005-address-natural-key.md) | Addresses deduplicated by a normalized natural key |
+| [6](adr/0006-staff-app-stack.md) | The staff app's stack and its test level |
 
 Decisions for parts not built yet are added as ADRs when those parts are built.
