@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Infrastructure.Settings;
 
-/// <summary>The <c>Jwt</c> section: how the API validates staff tokens.</summary>
+/// <summary>The <c>Jwt</c> section: how the API signs and validates staff session tokens.</summary>
 public sealed class JwtOptions
 {
     public const string SectionName = "Jwt";
@@ -19,4 +19,8 @@ public sealed class JwtOptions
 
     [Required]
     public string Audience { get; set; } = string.Empty;
+
+    /// <summary>How long a session lasts, in hours: a working day (ADR 7). There are no refresh tokens in v1.</summary>
+    [Range(1, 24)]
+    public int LifetimeHours { get; set; } = 8;
 }

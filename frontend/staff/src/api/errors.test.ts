@@ -32,7 +32,7 @@ const CONCURRENT_CHANGE = { title: 'Conflict', status: 409, detail: 'This lead w
 describe('kindOf', () => {
   it.each([
     [400, 'invalid'], [401, 'signedOut'], [403, 'forbidden'], [404, 'notFound'], [409, 'conflict'], [429, 'tooMany'],
-    [500, 'server'], [502, 'server'], [503, 'server'],
+    [500, 'server'], [501, 'server'], [502, 'unreachable'], [503, 'unreachable'], [504, 'unreachable'],
     [405, 'unexpected'], [415, 'unexpected'], [428, 'unexpected'],
   ] as const)('%i is %s', (status, kind) => {
     expect(kindOf(status)).toBe(kind);
@@ -79,9 +79,13 @@ describe('toApiError', () => {
     expect(toApiError(500, { detail: 'NullReferenceException at …', code: 'internal_error' })).toMatchObject({ kind: 'server', message: MESSAGES.server, code: 'internal_error' });
   });
 
+  it("says the server didn't answer when a gateway in front of it says so", () => {
+    expect(toApiError(502, undefined)).toMatchObject({ kind: 'unreachable', status: 502, message: MESSAGES.unreachable });
+  });
+
   it("copes with a body that isn't a ProblemDetails, such as a proxy's page", () => {
-    const error = toApiError(502, undefined);
-    expect(error).toMatchObject({ kind: 'server', status: 502, code: null, traceId: null, message: MESSAGES.server });
+    const error = toApiError(500, undefined);
+    expect(error).toMatchObject({ kind: 'server', status: 500, code: null, traceId: null, message: MESSAGES.server });
     expect(error.fields).toEqual({});
     expect(toApiError(400, { errors: 'not a map' })).toMatchObject({ kind: 'invalid', message: MESSAGES.invalid, fields: {} });
   });

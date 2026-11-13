@@ -13,6 +13,8 @@ using System.Text.Json;
 using SharpGrip.FluentValidation.AutoValidation.Mvc.Extensions;
 using WebAPI.Json;
 using WebAPI.Measurement;
+using WebAPI.Security;
+using WebAPI.Startup;
 
 // Settings come from appsettings.json (non-secret defaults) and environment variables (secrets), which
 // CreateBuilder reads; the app never loads a .env file itself (docs/operations.md, Configuration).
@@ -127,10 +129,15 @@ if (app.Environment.IsDevelopment())
     await context.Database.MigrateAsync();
 }
 
+// The first Admin, from the Admin settings, when no active Admin exists; the API stops if there is neither (FR-U3).
+await FirstAdmin.EnsureAsync(app.Services);
 
 app.UseHttpsRedirection();
 
 app.UseCors();
+
+// A request that changes data with the session cookie, or signs in or out, must come from the API's own site (ADR 7).
+app.UseMiddleware<SameOriginCheck>();
 
 app.UseAuthentication();
 app.UseAuthorization();

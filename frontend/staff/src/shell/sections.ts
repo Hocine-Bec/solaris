@@ -1,4 +1,5 @@
-import { ChartColumn, House, Inbox, Mail, SolarPanel, Users, type LucideIcon } from 'lucide-react';
+import { ChartColumn, ClipboardCheck, House, Inbox, Mail, SolarPanel, Users, type LucideIcon } from 'lucide-react';
+import type { Role } from '../api/auth';
 
 export type Section = {
   path: string;
@@ -12,7 +13,7 @@ export type Section = {
 };
 
 /** The office's sections, in the navigation's order */
-export const SECTIONS: readonly Section[] = [
+export const OFFICE: readonly Section[] = [
   { path: '/leads', label: 'Leads', title: 'Leads', icon: Inbox, holds: 'Every lead, newest first, filtered by status, a page at a time.' },
   { path: '/customers', label: 'Customers', title: 'Customers', icon: House, holds: 'Every customer, searched by name or email.' },
   { path: '/installations', label: 'Installations', title: 'Installations', icon: SolarPanel, holds: 'Every installation, filtered by stage.' },
@@ -21,5 +22,18 @@ export const SECTIONS: readonly Section[] = [
   { path: '/users', label: 'Users', title: 'Users', icon: Users, holds: 'Every staff account, its role, and whether it is active.' },
 ];
 
-/** Where the app opens: an office's day starts with the new leads, as a quick reply wins the customer. */
-export const HOME = '/leads';
+/** A technician's whole app: the installations they are assigned to */
+export const MY_WORK: Section = {
+  path: '/my-work', label: 'My work', title: 'My work', icon: ClipboardCheck,
+  holds: "The installations you're assigned to: the address, your role, and whether your part is done.",
+};
+
+/** The sections an account sees in the navigation. The API checks the role on every request; this only hides links. */
+export const sectionsFor = (role: Role): readonly Section[] => (role === 'Admin' ? OFFICE : [MY_WORK]);
+
+/**
+ * Whether an address belongs to a section this role sees: after a session ends on a shared computer, the next person
+ * to sign in may be someone else, and the page the last one left isn't theirs to return to.
+ */
+export const opensFor = (role: Role, path: string) =>
+  sectionsFor(role).some(s => path === s.path || path.startsWith(`${s.path}/`) || path.startsWith(`${s.path}?`));

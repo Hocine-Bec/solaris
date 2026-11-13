@@ -51,11 +51,12 @@ app keeps them up to date as the visitor moves around.
 
 ## Design
 
-The tokens, the core components' styles, the fonts and the logo come from [`../brand/`](../brand/README.md). Sections
+The tokens, the core components' styles, the fonts, the logo and the line drawings come from
+[`../brand/`](../brand/README.md). Sections
 alternate the Night and Limestone themes. The motion is written by hand, in CSS and a few scroll-driven effects, with
 no animation library: the intro on the home page (the wordmark draws itself, then flies into the header; any click,
-key, scroll or touch skips it), the hero's sun and panel, the pinned how-it-works section, the drawings that draw
-themselves. With the system's reduced-motion setting, nothing moves.
+key, scroll or touch skips it), the hero's sun and panel, the pinned how-it-works section (at switch-on the sun rises and lights the house), the
+drawings that draw themselves. With the system's reduced-motion setting, nothing moves.
 
 ## Running locally
 

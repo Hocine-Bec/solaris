@@ -4,6 +4,7 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Hangfire;
 using Hangfire.PostgreSql;
+using Infrastructure.Auth;
 using Infrastructure.Data;
 using Infrastructure.Measurement;
 using Infrastructure.Repositories;
@@ -34,6 +35,10 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(JwtOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<AdminOptions>()
+            .Bind(configuration.GetSection(AdminOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<AdminOptions>, AdminOptionsValidator>();
         services.AddOptions<EmailOptions>()
             .Bind(configuration.GetSection(EmailOptions.SectionName))
             .ValidateDataAnnotations()
@@ -94,6 +99,8 @@ public static class DependencyInjection
             {
                 var jwt = jwtOptions.Value;
                 options.SaveToken = true;
+                // The claims keep the names the token gives them (sub, email, role), rather than .NET's long URIs.
+                options.MapInboundClaims = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -103,14 +110,34 @@ public static class DependencyInjection
                     ValidAudience = jwt.Audience,
                     ValidIssuer = jwt.Issuer,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret)),
+                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+                    NameClaimType = Session.UserIdClaim,
+                    RoleClaimType = Session.RoleClaim,
                     ClockSkew = TimeSpan.Zero
                 };
+                // The staff app's session travels in a cookie (ADR 7); the API reference, tests and scripts send the
+                // Authorization header, which wins when both are there.
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        if (string.IsNullOrEmpty(context.Request.Headers.Authorization) &&
+                            context.Request.Cookies.TryGetValue(Session.CookieName, out var token))
+                            context.Token = token;
+                        return Task.CompletedTask;
+                    }
+                };
             });
-        
+
+        // Staff accounts: passwords and session tokens
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
+        services.AddSingleton<ISessionTokenIssuer, SessionTokenIssuer>();
+
         //Repositories
         services.AddScoped<IAddressRepo, AddressRepo>();
         services.AddScoped<ICustomerRepo, CustomerRepo>();
         services.AddScoped<ILeadRepo, LeadRepo>();
+        services.AddScoped<IUserRepo, UserRepo>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         
         // Email: the provider's sender (Email:Provider), which the measurement harness wraps in Development

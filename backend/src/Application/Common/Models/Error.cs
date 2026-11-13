@@ -16,5 +16,8 @@ public enum ErrorKind
     NotFound,
 
     /// <summary>The request conflicts with the current state: a duplicate, a final state, or a change made meanwhile.</summary>
-    Conflict
+    Conflict,
+
+    /// <summary>Who is asking isn't known, or no longer may: refused credentials, or an account deactivated since.</summary>
+    Unauthorized
 }

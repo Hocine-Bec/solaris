@@ -6,7 +6,7 @@ import { QuestionList } from '../../components/QuestionList';
 import { QUESTIONS } from '../../content/questions';
 import { STEPS } from '../../content/site';
 import { DrawingSvg } from '../../drawings/DrawingSvg';
-import { figure, house, type FigureName } from '../../drawings/iso';
+import { figure, house, type FigureName } from '../../../../brand/drawings/iso';
 import { drawable, drawOnView } from '../../lib/draw';
 import { addScroller, isWide, prefersReducedMotion, progress } from '../../lib/motion';
 
@@ -39,7 +39,8 @@ export function Idea() {
 
 /**
  * 02 How it works: on wide screens the section holds still for about four screens while the six steps and the house
- * drawing change; the house draws itself when it arrives, then each step draws its own parts. Elsewhere, a list.
+ * drawing change; the house draws itself when it arrives, then each step draws its own parts, and at switch-on the sun
+ * rises and lights the panels, then the windows. Elsewhere, a list, and the house draws itself switched on.
  */
 export function HowItWorks() {
   const sectionRef = useRef<HTMLElement>(null);

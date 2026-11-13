@@ -1,5 +1,5 @@
 import { createElement, type Ref, type SVGProps } from 'react';
-import type { Drawing, Shape } from './iso';
+import type { Drawing, Shape } from '../../../brand/drawings/iso';
 
 const render = (shape: Shape, key: number) => createElement(shape.tag, { key, ...shape.props });
 

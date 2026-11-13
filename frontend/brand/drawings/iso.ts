@@ -1,5 +1,6 @@
-// Isometric line drawings, built from coordinates (as on the brand page): the house in How it works and the four
-// figures in What you get. Pure functions: they return the shapes, and a component renders them.
+// Isometric line drawings, built from coordinates (as on the brand page), shared by the marketing site and the staff
+// app: the house in How it works (and beside the staff app's sign-in), and the four figures in What you get. Pure
+// functions with no imports: they return the shapes, and each app's component renders them.
 
 type Point3 = [x: number, y: number, z?: number];
 
@@ -54,7 +55,12 @@ function iso() {
   return api;
 }
 
-/** The house, with one layer per step: survey, design, permits, panels, inspection, switch-on. */
+/**
+ * The house, with one layer per step: survey, design, permits, panels, inspection, switch-on. The switch-on layer
+ * holds the sun, its rings, its light reaching the roof, the panels lit, and the windows lit from inside (the home on
+ * its own power), which ../drawings.css brings in one after the other. The sun, its rings and the windows are marked
+ * `data-fade`, so the self-drawing helper leaves them to those styles.
+ */
 export function house(): Drawing {
   const d = iso();
   const L = 120, W = 90, H = 52, R = 30, o = 5;
@@ -68,10 +74,13 @@ export function house(): Drawing {
   d.poly([[-o, -o, H - o * R / (W / 2)], [L + o, -o, H - o * R / (W / 2)], [L + o, W / 2, H + R], [-o, W / 2, H + R]], 'f');
   d.poly([[0, W, 0], [L, W, 0], [L, W, H], [0, W, H]], 'f');
   d.poly([[L, 0, 0], [L, W, 0], [L, W, H], [L, W / 2, H + R], [L, 0, H]], 'f');
-  d.poly([[46, W, 0], [62, W, 0], [62, W, 30], [46, W, 30]], 'l2');
-  d.poly([[78, W, 20], [102, W, 20], [102, W, 36], [78, W, 36]], 'l2');
-  d.poly([[14, W, 20], [32, W, 20], [32, W, 36], [14, W, 36]], 'l2');
-  d.poly([[L, 30, 20], [L, 60, 20], [L, 60, 36], [L, 30, 36]], 'l2');
+  const windows: Point3[][] = [
+    [[78, W, 20], [102, W, 20], [102, W, 36], [78, W, 36]],
+    [[14, W, 20], [32, W, 20], [32, W, 36], [14, W, 36]],
+    [[L, 30, 20], [L, 60, 20], [L, 60, 36], [L, 30, 36]],
+  ];
+  d.poly([[46, W, 0], [62, W, 0], [62, W, 30], [46, W, 30]], 'l2');   // the door
+  for (const w of windows) d.poly(w, 'l2');
   d.poly([slope(-o, 0), slope(L + o, 0), slope(L + o, 1), slope(-o, 1)], 'f2');
   // 1 Survey: the roof outlined, and a magnifier
   d.group('L L-survey');
@@ -100,10 +109,16 @@ export function house(): Drawing {
     d.raw('circle', { cx, cy, r: 11, className: 'acc' });
     d.raw('polyline', { points: `${cx - 5},${cy} ${cx - 1.5},${cy + 3.5} ${cx + 5},${cy - 3.5}`, fill: 'none', strokeWidth: 2, style: { stroke: 'var(--on-accent)' } });
   }
-  // 6 Switch-on: the panels lit, the sun up
+  // 6 Switch-on: the sun up, its light on the panels, the panels lit, the windows lit
   d.group('L L-on');
-  for (const q of slots) d.poly(q, 'acc');
-  { const [cx, cy] = d.at([-26, 52, 74]); d.raw('circle', { cx, cy, r: 13, className: 'acc' }); }
+  const [sx, sy] = d.at([-26, 52, 74]);
+  const centre = (q: Point3[]): Point3 => [0, 1, 2].map(k => q.reduce((sum, p) => sum + (p[k] ?? 0), 0) / q.length) as Point3;
+  for (const n of [0, 1]) d.raw('circle', { cx: sx, cy: sy, r: 13, className: 'ring', 'data-fade': '', style: { '--n': n } });
+  for (const q of [slots[0], slots[2], slots[4]]) { const [bx, by] = d.at(centre(q)); d.raw('line', { x1: sx, y1: sy, x2: f(bx), y2: f(by), className: 'beam' }); }
+  // The panels light in a wave from the sun's side: column by column, the lower row just after the upper
+  slots.forEach((q, i) => d.raw('polygon', { points: q.map(c => d.at(c).map(f).join(',')).join(' '), className: 'acc', style: { '--wave': ((i % 5) * .12 + Math.floor(i / 5) * .06).toFixed(2) } }));
+  for (const w of windows) d.raw('polygon', { points: w.map(c => d.at(c).map(f).join(',')).join(' '), className: 'win', 'data-fade': '' });
+  d.raw('circle', { cx: sx, cy: sy, r: 13, className: 'acc sun', 'data-fade': '' });
   return d.done(4);
 }
 

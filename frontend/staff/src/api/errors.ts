@@ -43,6 +43,7 @@ export const MESSAGES: Record<ErrorKind, string> = {
   unexpected: "The server's answer wasn't what the app expected. Try again; if it happens again, report it.",
 };
 
+/** A gateway's 502, 503 or 504 means the API behind it didn't answer: it isn't running, or can't be reached. */
 export function kindOf(status: number): ErrorKind {
   switch (status) {
     case 400: return 'invalid';
@@ -51,6 +52,7 @@ export function kindOf(status: number): ErrorKind {
     case 404: return 'notFound';
     case 409: return 'conflict';
     case 429: return 'tooMany';
+    case 502: case 503: case 504: return 'unreachable';
     default: return status >= 500 ? 'server' : 'unexpected';
   }
 }

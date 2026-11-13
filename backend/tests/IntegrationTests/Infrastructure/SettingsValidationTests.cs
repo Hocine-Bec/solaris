@@ -148,6 +148,76 @@ public class SettingsValidationTests
         // Assert
         validate.Should().Throw<OptionsValidationException>().WithMessage($"*{member}*");
     }
+
+    private static Dictionary<string, string?> WithFirstAdmin(string? name = "Rosa Castillo",
+        string? email = "rosa.castillo@example.com", string? password = "Solaris#2026")
+    {
+        var settings = CompleteSettings();
+        settings["Admin:Name"] = name;
+        settings["Admin:Email"] = email;
+        settings["Admin:Password"] = password;
+        return settings;
+    }
+
+    [Fact]
+    public void Startup_FirstAdminSet_PassesValidation()
+    {
+        // Act
+        var validate = ValidateStartup(WithFirstAdmin());
+
+        // Assert
+        validate.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Startup_FirstAdminOnlyPartlySet_FailsNamingTheMissingSettings()
+    {
+        // Act
+        var validate = ValidateStartup(WithFirstAdmin(name: null, password: null));
+
+        // Assert - all three or none: a half-set first Admin is a mistake, not a choice
+        validate.Should().Throw<OptionsValidationException>()
+            .WithMessage("*Admin:Name is required*").And.Message.Should().Contain("Admin:Password: Password is required");
+    }
+
+    [Theory]
+    [InlineData("solaris#2026", "Admin:Password: Password must contain an uppercase letter")]
+    [InlineData("Solaris2026", "Admin:Password: Password must contain a special character")]
+    [InlineData("Sol#26", "Admin:Password: Password must be at least 8 characters")]
+    public void Startup_FirstAdminPasswordBreakingTheRule_FailsNamingTheProblem(string password, string problem)
+    {
+        // Act
+        var validate = ValidateStartup(WithFirstAdmin(password: password));
+
+        // Assert
+        validate.Should().Throw<OptionsValidationException>().WithMessage($"*{problem}*");
+    }
+
+    [Fact]
+    public void Startup_FirstAdminEmailInvalid_FailsNamingTheEmail()
+    {
+        // Act
+        var validate = ValidateStartup(WithFirstAdmin(email: "rosa.castillo"));
+
+        // Assert
+        validate.Should().Throw<OptionsValidationException>().WithMessage("*Admin:Email must be an email address*");
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("25")]
+    public void Startup_SessionLengthOutOfRange_FailsNamingTheSetting(string hours)
+    {
+        // Arrange
+        var settings = CompleteSettings();
+        settings["Jwt:LifetimeHours"] = hours;
+
+        // Act
+        var validate = ValidateStartup(settings);
+
+        // Assert
+        validate.Should().Throw<OptionsValidationException>().WithMessage("*LifetimeHours*");
+    }
 }
 
 internal sealed class TestHostEnvironment(string environmentName) : IHostEnvironment
