@@ -1,0 +1,54 @@
+/*
+ * The UI kit's components for the staff app, on top of components.css: the app's text scale, the segmented choice,
+ * the menu, tables, and the states a screen shows while loading, empty or failed. Import after components.css.
+ */
+
+/* ===================== App text scale (the staff app's text is 14 px, its fields 16 px) ===================== */
+.a-title { font-weight: 600; font-size: 1.5rem; line-height: 1.2; letter-spacing: -.01em; }
+.a-heading { font-weight: 600; font-size: 1.125rem; line-height: 1.3; letter-spacing: -.005em; }
+.a-body { font-size: .875rem; line-height: 1.5; }
+.a-label { font: 400 .66rem/1.4 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.a-data { font: 400 .8125rem/1.4 var(--font-mono); font-variant-numeric: tabular-nums; }
+.a-stat { font-weight: 600; font-stretch: 118%; font-size: 2.25rem; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+
+/* ===================== Segmented choice ===================== */
+.seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--radius-md); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.seg label { position: relative; display: inline-flex; align-items: center; gap: .4rem; height: 2rem; padding: 0 .75rem; border-radius: calc(var(--radius-md) - 3px); font: 500 .66rem/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); cursor: pointer; transition: background-color var(--duration-fast), color var(--duration-fast); }
+.seg label:hover { color: var(--fg); }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--fg); color: var(--bg); }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.seg .ic { width: .95rem; height: .95rem; }
+
+/* ===================== Menu (a native popover, placed by its button) ===================== */
+.menu[popover] { position: fixed; inset: auto; margin: 0; min-width: 13rem; padding: .35rem; border: 0; border-radius: var(--radius-lg); background: var(--bg-raised); color: var(--fg); box-shadow: var(--shadow-overlay), inset 0 0 0 1px var(--line); }
+.menu[popover]:popover-open { animation: drop var(--duration-fast) var(--ease-out); }
+@keyframes drop { from { opacity: 0; transform: translateY(-4px); } }
+.menu-section { display: grid; gap: .5rem; padding: .5rem .6rem .7rem; }
+.menu [role="menuitem"] { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: .6rem; width: 100%; height: 2.25rem; padding: 0 .7rem; border-radius: var(--radius-sm); font-size: .875rem; cursor: pointer; }
+.menu [role="menuitem"] .ic { width: 1rem; height: 1rem; color: var(--muted); }
+.menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus-visible { background: var(--surface); }
+.menu [role="menuitem"]:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.menu hr { border: 0; height: 1px; background: var(--line); margin: .3rem .2rem; }
+
+/* ===================== Tables ===================== */
+.table-wrap { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-lg); box-shadow: inset 0 0 0 1px var(--line); background: var(--bg-raised); }
+.table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.table th { text-align: left; padding: 0 1rem; height: 2.5rem; font: 400 .66rem/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); white-space: nowrap; border-bottom: 1px solid var(--line); }
+.table td { padding: 0 1rem; height: 3rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.table tbody tr:last-child td { border-bottom: 0; }
+
+/* ===================== States: loading, empty, failed, not found ===================== */
+.state-box { display: grid; place-items: center; min-height: 26rem; }
+.state-box .state { width: min(100%, 30rem); }
+.state { display: grid; justify-items: center; text-align: center; gap: .55rem; padding: 2.25rem 1.25rem; border-radius: var(--radius-lg); box-shadow: inset 0 0 0 1px var(--line); background: var(--bg-raised); }
+.state .ring { width: 2.75rem; height: 2.75rem; border-radius: 50%; display: grid; place-items: center; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); margin-bottom: .2rem; }
+.state .ring .ic { width: 1.3rem; height: 1.3rem; }
+.state.tone-negative .ring { color: var(--negative); }
+.state.tone-warning .ring { color: var(--warning); }
+.state p { max-width: 36ch; font-size: .875rem; color: var(--muted); }
+.state .a-heading { color: var(--fg); }
+.state .a-heading:focus { outline: none; }
+.state .btn { margin-top: .4rem; }
+.skel { display: block; height: .8rem; border-radius: 6px; background: linear-gradient(90deg, var(--surface) 0 40%, color-mix(in srgb, var(--fg) 9%, transparent) 50%, var(--surface) 60% 100%); background-size: 300% 100%; animation: shimmer 1.6s var(--ease-in-out) infinite; }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
