@@ -21,9 +21,10 @@ exists in the code.
 - **Visitors** use the marketing site, whose quote form posts to the public lead endpoint. Its street field
   suggests addresses from Geoapify, called directly from the browser. A typed address works too; only a picked one
   sends its coordinates, so they are never guessed.
-- **Staff** (Admin, Technician) work in the staff app, once signed in *(planned)*. Its frame is built (the navigation,
-  the themes, the states every screen shares and the API client); its screens come with their features, so until
-  then staff use the API directly, through its API reference (Scalar).
+- **Staff** (Admin, Technician) sign in to the staff app with an email and a password; the session is a token in an
+  HttpOnly cookie (§9). The app's frame is built (the navigation by role, the account menu, the themes, the states every
+  screen shares and the API client); its screens come with their features, so until then staff use the API directly,
+  through its API reference (Scalar).
 - **Inverter gateways** upload production readings for their own installation *(planned)*.
 - **Gmail** delivers the notification emails over SMTP.
 - **PostgreSQL** holds all state: the application tables, the outbox *(planned)* and Hangfire's job storage.
@@ -47,7 +48,7 @@ solaris/
 │   ├── tests/                 unit and integration tests (see testing.md)
 │   └── tools/Solaris.DataGen/ dataset generator for the measurements (planned; see measurements.md)
 ├── frontend/
-│   ├── brand/                 the tokens, the core components' CSS, the fonts and the logo, shared by the frontends
+│   ├── brand/                 the tokens, the core components' CSS, the fonts, the logo and the line drawings, shared by the frontends
 │   ├── marketing/             the marketing site and the quote form
 │   └── staff/                 the staff app
 └── perf/                      load and fault scripts, and their raw results (planned; see measurements.md)
@@ -80,7 +81,7 @@ saved, which the outbox replaces (§6).
 
 ## 4. Data model
 
-Today the code has `Lead`, `Address` and `Customer`. The other entities are *(planned)*, each built with its
+Today the code has `Lead`, `Address`, `Customer` and `User`. The other entities are *(planned)*, each built with its
 feature.
 
 | Entity | What it is | Key rules |
@@ -91,7 +92,7 @@ feature.
 | **Installation** | One project at one address | Its status is its stage; design data (size, panel count, inverter type); its time zone (an IANA name, BR-P4); an `xmin` concurrency token and the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` *(planned)* |
 | **InstallationStatusHistory** | One row per status change | From, to, who, when, note; append-only, never updated or deleted |
 | **InstallationTechnician** | A technician's assignment | Role Surveyor, Installer or Inspector (an enum); completion date |
-| **User** | A staff account | BCrypt password hash, role (Admin or Technician), active flag, last login |
+| **User** | A staff account | Name; email, unique whatever its case (`NormalizedEmail`, a unique index); password hash ([ADR 8](adr/0008-password-hashing.md)); role (Admin or Technician); active flag; last sign-in |
 | **EnergyProduction** | The daily production rollup | One row per installation and local day, enforced by a unique index; `ReadingCount` and `ComputedAt` *(planned)* |
 
 Tables for the mechanisms below *(planned)*:
@@ -126,8 +127,8 @@ installation's own time zone (BR-P4).
   index rejected the write).
 - **Outcomes:** expected failures are `Result` values carrying an `Error` (a kind, a stable code and a message);
   unexpected errors are exceptions, handled once by a global handler
-  ([ADR 3](adr/0003-result-objects-for-expected-outcomes.md)). The kinds are `NotFound` (404) and `Conflict`
-  (409); a new kind is added when a service first needs it. Controllers choose the success status (200, 201 with
+  ([ADR 3](adr/0003-result-objects-for-expected-outcomes.md)). The kinds are `NotFound` (404), `Conflict` (409) and
+  `Unauthorized` (401); a new kind is added when a service first needs it. Controllers choose the success status (200, 201 with
   the new resource's URL, 204).
 - **Error responses:** every one is a ProblemDetails (RFC 9457) with a stable `code` and a `traceId`:
 
@@ -138,9 +139,12 @@ installation's own time zone (BR-P4).
   | `lead.concurrent_change`, `address.concurrent_change` | 409 | Someone else changed or deleted the row since it was read |
   | `address.already_exists` | 409 | An address with the same key exists ([ADR 5](adr/0005-address-natural-key.md)) |
   | `customer.email_taken` | 409 | A customer already has this email |
+  | `auth.invalid_credentials` | 401 | A refused sign-in: the same answer for an unknown email, a wrong password or a deactivated account |
+  | `auth.signed_out` | 401 | A valid token whose account was deactivated since, or no longer exists |
+  | `auth.cross_site_request` | 403 | A request that changes data with the session cookie, or signs in or out, from a page on another site (§9) |
   | `validation_failed` | 400 | The request is malformed or fails validation; `errors` lists the fields |
   | `internal_error` | 500 | A bug. Outside Development the body has no exception details; the log line has the same trace id |
-  | The status's name, such as `not_found` or `method_not_allowed` | 4xx | Errors from the framework itself, such as an unknown URL |
+  | The status's name, such as `not_found`, `method_not_allowed` or `unauthorized` | 4xx | Errors from the framework itself, such as an unknown URL, or a request without a session to an endpoint that needs one |
 
 - **Validation:** FluentValidation rejects malformed requests with 400 and the failing fields.
 - **Timestamps:** every timestamp in a request must carry `Z` or an offset (`2026-11-02T10:00:00Z`,
@@ -285,27 +289,45 @@ They read rollups only:
 
 ---
 
-## 9. Security *(planned)*
+## 9. Security
 
-Today no endpoint requires authentication: JWT validation is configured, but no token is ever issued.
+Staff sign-in and sessions are built; the rest of this section is *(planned)*. Today only `GET /api/auth/me`
+requires a session: the other endpoints still answer anyone until the fallback policy below.
 
-- **Closed by default:** the fallback authorization policy requires an authenticated user, so a new endpoint is
-  protected unless it is explicitly marked public. Public on purpose: the lead form, login, health checks.
-- **Staff login:** `POST /api/auth/login` checks the BCrypt hash and issues a JWT (HS256, 8-hour lifetime) with
-  the claims `sub`, `email` and `role`, and updates `LastLoginAt`.
-- **Policies:** `Admin`, `Technician`, and `Staff` (either role).
-- **Technician scoping:** a technician lists and sees only the installations they are assigned to, enforced in
-  the service query.
-- **Admin bootstrap:** at startup, if no Admin exists, one is created from configuration; there are no default
-  credentials in the code.
-- **Devices:** a separate authentication scheme reads `X-Device-Key: <prefix>.<secret>`. The prefix finds the
-  installation; the secret is checked against `DeviceKeyHash` (SHA-256, constant-time comparison), which is
+- **Staff sign-in** (FR-U1): `POST /api/auth/login` looks the account up by its normalized email and checks the
+  password ([ADR 8](adr/0008-password-hashing.md)). Every refusal (an unknown email, a wrong password, a deactivated
+  account) gets the same answer, `401 auth.invalid_credentials`, and takes the same time: an unknown email is checked
+  against a stand-in hash. On success it records `LastLoginAt`, replaces a hash made with weaker settings, and issues
+  a JWT (HS256, `Jwt:LifetimeHours`, 8 hours) with the claims `sub`, `email` and `role`.
+- **The session cookie** ([ADR 7](adr/0007-staff-sessions-in-a-cookie.md)): the token travels in `solaris_session`,
+  `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api`, expiring with the token. The API also reads the
+  `Authorization: Bearer` header, which wins when both are sent (the API reference, tests, scripts).
+  `POST /api/auth/logout` clears the cookie, even when the session had already ended. `GET /api/auth/me` returns the
+  account, read on each request, so a deactivated account stops at its next one (`401 auth.signed_out`).
+- **Requests from another site:** a request that changes data and carries the session cookie, or that signs in or
+  out, is refused with `403 auth.cross_site_request` when its `Origin` isn't the API's own host. A request without
+  `Origin` passes: browsers send it, scripts don't. The public lead form carries no cookie, so it isn't affected.
+- **The password rule**, for every password set: at least 8 characters, with an uppercase letter, a number and a
+  special character (not a letter, a number or a space), at most 128. Signing in checks only that one was given.
+- **The first Admin** (FR-U3): at startup, when no active Admin exists, one is created from the `Admin` settings
+  (name, email, password, checked with the other settings); with neither, the API stops and names the settings. There
+  are no default credentials in the code.
+- **Closed by default** *(planned)*: the fallback authorization policy requires an authenticated user, so a new
+  endpoint is protected unless it is explicitly marked public. Public on purpose: the lead form, sign-in, sign-out,
+  health checks.
+- **Policies** *(planned)*: `Admin`, `Technician`, and `Staff` (either role), reading the `role` claim.
+- **Technician scoping** *(planned)*: a technician lists and sees only the installations they are assigned to,
+  enforced in the service query.
+- **Devices** *(planned)*: a separate authentication scheme reads `X-Device-Key: <prefix>.<secret>`. The prefix finds
+  the installation; the secret is checked against `DeviceKeyHash` (SHA-256, constant-time comparison), which is
   adequate because the secret is 32 random bytes, not a human password. The key is shown once at activation and
   removed on deactivation.
-- **Rate limiting:** the built-in rate limiter, fixed window per client IP: 5 per minute on `POST /api/leads`,
-  10 per minute on login. Behind a proxy, forwarded headers are enabled so the real client IP is used.
-- **Hangfire dashboard:** mounted only in Development.
-- **CORS:** only the configured origins (the marketing site).
+- **Rate limiting** *(planned)*: the built-in rate limiter, fixed window per client IP: 5 per minute on
+  `POST /api/leads`, 10 per minute on sign-in. Behind a proxy, forwarded headers are enabled so the real client IP is
+  used.
+- **Hangfire dashboard** *(planned)*: mounted only in Development.
+- **CORS** *(planned)*: only the configured origins (the marketing site). The staff app needs none: it calls the API
+  on its own site.
 
 ---
 

@@ -28,8 +28,8 @@ variables directly, and secrets never go in `appsettings.json`.
 | `ConnectionStrings__Default` | `.env` | PostgreSQL connection string |
 | `Jwt__Secret` | `.env` | The token signing key, at least 32 characters |
 | `Jwt__Issuer`, `Jwt__Audience` | `appsettings.json` | `solaris-api`, `solaris-staff` |
-| `Jwt__LifetimeHours` *(planned)* | — | 8 hours |
-| `Admin__Email`, `Admin__Password` *(planned)* | — | The first Admin account, created at startup if none exists |
+| `Jwt__LifetimeHours` | `appsettings.json` (`8`) | How long a staff session lasts, 1 to 24 hours |
+| `Admin__Name`, `Admin__Email`, `Admin__Password` | `.env` | The first Admin account, created at startup when no active Admin exists; the API stops if there is neither. All three or none; the password follows the password rule ([architecture](architecture.md#9-security)). Once an Admin exists they can be removed |
 | `Cors__AllowedOrigins` *(planned)* | — | The marketing site's URL |
 | `Notifications__Mode` | `appsettings.json` (`Hangfire`) | `Hangfire`: the request enqueues the two lead emails as Hangfire jobs. `Synchronous`: the request sends them itself before it answers; Development only, for measurements, and the API refuses it elsewhere. `Outbox` *(planned)* replaces `Hangfire` as the default |
 | `Email__Provider` | `appsettings.json` (`Gmail`), `appsettings.Development.json` (`Recording`) | `Gmail` sends real email; `Recording` sends nothing, and the API refuses it in Production |
@@ -47,7 +47,9 @@ variables directly, and secrets never go in `appsettings.json`.
 
 ## Running locally
 
-Prerequisites: the .NET 10 SDK and Docker. Copy `.env.example` to `.env` at the repository root and fill it in.
+Prerequisites: the .NET 10 SDK and Docker. Copy `.env.example` to `.env` at the repository root and fill it in. On
+a database with no Admin yet, the `Admin__…` settings are required: the API creates the first Admin from them, and
+stops if they are missing.
 
 - **The database:** `docker compose up -d` at the repository root starts PostgreSQL 18, with the password from
   `.env` (`POSTGRES_PASSWORD`, which the connection string repeats). It listens on `localhost:5433`, for this
