@@ -202,6 +202,22 @@ public class SettingsValidationTests
         // Assert
         validate.Should().Throw<OptionsValidationException>().WithMessage("*Admin:Email must be an email address*");
     }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("25")]
+    public void Startup_SessionLengthOutOfRange_FailsNamingTheSetting(string hours)
+    {
+        // Arrange
+        var settings = CompleteSettings();
+        settings["Jwt:LifetimeHours"] = hours;
+
+        // Act
+        var validate = ValidateStartup(settings);
+
+        // Assert
+        validate.Should().Throw<OptionsValidationException>().WithMessage("*LifetimeHours*");
+    }
 }
 
 internal sealed class TestHostEnvironment(string environmentName) : IHostEnvironment

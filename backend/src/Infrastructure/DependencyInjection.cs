@@ -99,6 +99,8 @@ public static class DependencyInjection
             {
                 var jwt = jwtOptions.Value;
                 options.SaveToken = true;
+                // The claims keep the names the token gives them (sub, email, role), rather than .NET's long URIs.
+                options.MapInboundClaims = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -108,12 +110,28 @@ public static class DependencyInjection
                     ValidAudience = jwt.Audience,
                     ValidIssuer = jwt.Issuer,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret)),
+                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+                    NameClaimType = Session.UserIdClaim,
+                    RoleClaimType = Session.RoleClaim,
                     ClockSkew = TimeSpan.Zero
+                };
+                // The staff app's session travels in a cookie (ADR 7); the API reference, tests and scripts send the
+                // Authorization header, which wins when both are there.
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        if (string.IsNullOrEmpty(context.Request.Headers.Authorization) &&
+                            context.Request.Cookies.TryGetValue(Session.CookieName, out var token))
+                            context.Token = token;
+                        return Task.CompletedTask;
+                    }
                 };
             });
 
         // Staff accounts: passwords and session tokens
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
+        services.AddSingleton<ISessionTokenIssuer, SessionTokenIssuer>();
 
         //Repositories
         services.AddScoped<IAddressRepo, AddressRepo>();

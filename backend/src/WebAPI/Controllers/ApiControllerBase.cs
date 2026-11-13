@@ -23,6 +23,7 @@ public abstract class ApiControllerBase : ControllerBase
     {
         ErrorKind.NotFound => StatusCodes.Status404NotFound,
         ErrorKind.Conflict => StatusCodes.Status409Conflict,
+        ErrorKind.Unauthorized => StatusCodes.Status401Unauthorized,
         _ => throw new UnreachableException($"No HTTP status for the error kind {kind}.")
     };
 }
