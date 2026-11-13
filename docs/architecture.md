@@ -12,7 +12,7 @@ exists in the code.
 
 ```
  Visitor ──▶ Marketing site (React) ──HTTP──▶ ┌───────────────┐ ──SMTP──▶ Gmail
- Staff ─────────────── HTTP, JWT (planned) ──▶ │  Solaris API  │
+ Staff ──▶ Staff app (React) ──────────HTTP──▶ │  Solaris API  │
  Inverter gateway ── HTTP, API key (planned) ─▶ └───────┬───────┘
                                                         ▼
                                                    PostgreSQL
@@ -21,7 +21,9 @@ exists in the code.
 - **Visitors** use the marketing site, whose quote form posts to the public lead endpoint. Its street field
   suggests addresses from Geoapify, called directly from the browser. A typed address works too; only a picked one
   sends its coordinates, so they are never guessed.
-- **Staff** (Admin, Technician) use the API directly, through its API reference (Scalar); there is no staff UI.
+- **Staff** (Admin, Technician) work in the staff app, once signed in *(planned)*. Its frame is built (the navigation,
+  the themes, the states every screen shares and the API client); its screens come with their features, so until
+  then staff use the API directly, through its API reference (Scalar).
 - **Inverter gateways** upload production readings for their own installation *(planned)*.
 - **Gmail** delivers the notification emails over SMTP.
 - **PostgreSQL** holds all state: the application tables, the outbox *(planned)* and Hangfire's job storage.
@@ -46,7 +48,8 @@ solaris/
 │   └── tools/Solaris.DataGen/ dataset generator for the measurements (planned; see measurements.md)
 ├── frontend/
 │   ├── brand/                 the tokens, the core components' CSS, the fonts and the logo, shared by the frontends
-│   └── marketing/             the marketing site and the quote form
+│   ├── marketing/             the marketing site and the quote form
+│   └── staff/                 the staff app
 └── perf/                      load and fault scripts, and their raw results (planned; see measurements.md)
 ```
 
@@ -317,5 +320,6 @@ Architecture decisions are recorded as ADRs, one file each, in [`adr/`](adr/):
 | [3](adr/0003-result-objects-for-expected-outcomes.md) | Result objects for expected outcomes, exceptions for the unexpected |
 | [4](adr/0004-postgresql-with-ef-core.md) | PostgreSQL with EF Core, and SQL where it matters |
 | [5](adr/0005-address-natural-key.md) | Addresses deduplicated by a normalized natural key |
+| [6](adr/0006-staff-app-stack.md) | The staff app's stack and its test level |
 
 Decisions for parts not built yet are added as ADRs when those parts are built.

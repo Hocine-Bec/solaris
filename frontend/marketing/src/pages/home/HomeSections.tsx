@@ -12,7 +12,7 @@ import { addScroller, isWide, prefersReducedMotion, progress } from '../../lib/m
 
 const IDEA = "Going solar shouldn't feel like a leap of faith. An installation is a project of six steps, and you see each one before it starts: who comes, what they do, and what happens next.";
 
-/** 01 The idea: its words light up as the paragraph crosses the screen; the hero's panel lands in the dock above it. */
+/** 01 The idea: its words light up as the paragraph crosses the screen; on wide screens the hero's panel lies behind it. */
 export function Idea() {
   const leadRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
@@ -27,7 +27,6 @@ export function Idea() {
   return (
     <section className="band idea" data-theme="night" id="idea">
       <div className="wrap">
-        <div className="dock" id="dock" aria-hidden="true" />
         <p className="label eyebrow">01 — The idea</p>
         <p className="lead" ref={leadRef}>
           {IDEA.split(' ').map((word, i) => <span key={i}><span className="w">{word}</span>{' '}</span>)}

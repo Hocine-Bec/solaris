@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Solaris</title>
+    <script>
+      // The theme before the first paint, so a dark system never flashes light first (src/shell/theme.ts does the rest).
+      (() => {
+        let choice = null;
+        try { choice = localStorage.getItem('solaris-staff-theme'); } catch { /* storage blocked: follow the system */ }
+        const dark = choice === 'night' || (choice !== 'limestone' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'night' : 'limestone';
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

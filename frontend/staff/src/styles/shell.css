@@ -1,0 +1,58 @@
+/* The frame around every screen, from the approved staff app design: a side bar, or below 768 px a top bar and a drawer. */
+
+.app { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: 100dvh; font-size: .875rem; }
+
+.skip { position: absolute; left: .75rem; top: .75rem; z-index: 100; padding: .6rem .9rem; border-radius: var(--radius-sm); background: var(--fg); color: var(--bg); font-weight: 500; text-decoration: none; transform: translateY(-200%); }
+.skip:focus { transform: none; }
+
+.logo { display: inline-flex; align-items: baseline; font: 600 1rem/1 var(--font-sans); font-stretch: 125%; text-transform: uppercase; letter-spacing: .005em; white-space: nowrap; text-decoration: none; color: var(--fg); }
+
+/* Side bar */
+.side { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; gap: 1.25rem; padding: 1.1rem .75rem .75rem; background: var(--bg-raised); border-right: 1px solid var(--line); overflow-y: auto; }
+.side .logo { align-self: flex-start; padding: .25rem .6rem; }
+.nav-label { font: 400 .6rem/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); padding: 0 .7rem; margin-bottom: .35rem; }
+.nav { display: grid; gap: .15rem; }
+.nav a { position: relative; display: flex; align-items: center; gap: .7rem; height: 2.4rem; padding: 0 .7rem; border-radius: var(--radius-sm); color: var(--muted); text-decoration: none; font-weight: 500; transition: background-color var(--duration-fast), color var(--duration-fast); }
+.nav a .ic { width: 1.1rem; height: 1.1rem; }
+.nav a:hover { background: var(--surface); color: var(--fg); }
+.nav a[aria-current="page"] { background: var(--surface); color: var(--fg); }
+.nav a[aria-current="page"]::before { content: ""; position: absolute; left: -.75rem; top: .55rem; bottom: .55rem; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent-fill); }
+.nav a[aria-current="page"] .ic { color: var(--accent); }
+
+/* The theme button, where the account button goes with sign-in */
+.theme-btn { margin-top: auto; display: flex; align-items: center; gap: .65rem; width: 100%; padding: .5rem .6rem; border: 0; border-radius: var(--radius-md); background: transparent; cursor: pointer; text-align: left; }
+.theme-btn:hover { background: var(--surface); }
+.theme-btn .badge { width: 2rem; height: 2rem; border-radius: 50%; display: inline-grid; place-items: center; flex: none; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.theme-btn .badge .ic { width: 1rem; height: 1rem; }
+.theme-btn > span:not(.badge) { display: grid; flex: 1; line-height: 1.25; }
+.theme-btn b { font-weight: 500; font-size: .85rem; }
+.theme-btn small { font-size: .75rem; color: var(--muted); }
+.theme-btn .chev { width: 1rem; height: 1rem; color: var(--faint); }
+
+/* Top bar and drawer: phones */
+.top { display: none; }
+.drawer { position: fixed; inset: 0 auto 0 0; width: min(82vw, 20rem); max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; background: transparent; color: var(--fg); }
+.drawer::backdrop { background: var(--backdrop); }
+.drawer[open] { animation: slide-in var(--duration-base) var(--ease-out); }
+@keyframes slide-in { from { transform: translateX(-100%); } }
+.drawer-panel { height: 100%; display: flex; flex-direction: column; gap: 1.1rem; padding: 1rem .75rem; background: var(--bg-raised); box-shadow: 0 0 0 1px var(--line); }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; padding-left: .6rem; }
+.drawer .nav a { height: 2.75rem; }
+
+/* The screen */
+.main { min-width: 0; padding: 1.5rem 1.75rem 2rem; }
+.main:focus, #page-title:focus { outline: none; }
+.page-head { display: grid; gap: .6rem; margin-bottom: 1.25rem; }
+.page-head .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+.page-head h1 { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+
+@media (max-width: 767.98px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  .side { display: none; }
+  .top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: .6rem; padding: .5rem .75rem; background: var(--bg-raised); border-bottom: 1px solid var(--line); }
+  .top .logo { margin-right: auto; }
+  .top .theme-btn { margin: 0; width: auto; padding: .25rem; }
+  .top .theme-btn > span:not(.badge), .top .theme-btn .chev { display: none; }
+  .main { padding: 1.1rem 1rem 1.5rem; }
+  .state-box { min-height: 20rem; }
+}

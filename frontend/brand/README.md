@@ -1,12 +1,13 @@
 # Solaris brand
 
 The design system's code, shared by Solaris's frontends: the tokens, the base styles and core components, the fonts
-and the logo. The [marketing site](../marketing/README.md) uses it.
+and the logo. The [marketing site](../marketing/README.md) and the [staff app](../staff/README.md) use it.
 
 | File | Holds |
 |---|---|
 | `tokens.css` | The palette, the roles each theme gives it, type, space, radii and motion, for Tailwind CSS 4 (`@theme`) |
 | `components.css` | The base styles and the core components: text styles, links, buttons, fields, notices |
+| `app-components.css` | The components for the staff app, on top of `components.css`: the app's text scale, the segmented choice, the menu, tables, and the loading, empty and failed states |
 | `fonts.css`, `fonts/` | The fonts, as WOFF2, with their licences |
 | `logo/` | The wordmark, on dark and on light, and its outlines as JSON |
 
@@ -18,6 +19,7 @@ In the app's main stylesheet, after Tailwind:
 @import "tailwindcss";
 @import "<path>/brand/tokens.css";
 @import "<path>/brand/components.css";
+@import "<path>/brand/app-components.css";   /* the staff app */
 ```
 
 And in the app's entry script: `import '<path>/brand/fonts.css';`. The fonts are imported from JavaScript because

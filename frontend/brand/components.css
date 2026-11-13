@@ -1,5 +1,5 @@
 /*
- * The UI kit's base and core components, shared by the marketing site and the CRM: text styles, links, buttons,
+ * The UI kit's base and core components, shared by the marketing site and the staff app: text styles, links, buttons,
  * fields and notices. They read the roles from tokens.css, so they work in both themes. Import after tokens.css.
  */
 
@@ -91,6 +91,7 @@ code, pre { font-family: var(--font-mono); }
 .notice p { color: var(--fg); }
 .notice ul { margin-top: .2rem; display: grid; gap: .15rem; }
 .notice ul a { color: var(--fg); text-underline-offset: .2em; }
+.notice .actions { margin-top: .5rem; display: flex; gap: .5rem; flex-wrap: wrap; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

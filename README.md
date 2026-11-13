@@ -23,7 +23,7 @@ documentation below. No measurements have been published yet. To run it locally,
 ## Stack
 
 ASP.NET Core (.NET 10) · EF Core · PostgreSQL · Hangfire · MailKit ·
-React + TypeScript + Vite (the marketing site and quote form)
+React + TypeScript + Vite (the marketing site and quote form, and the staff app) · TanStack Query
 
 ## Documentation
 

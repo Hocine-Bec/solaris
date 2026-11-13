@@ -64,6 +64,12 @@ Prerequisites: the .NET 10 SDK and Docker. Copy `.env.example` to `.env` at the 
   ```
 
 - **The API in a container** *(planned)*: comes with the Dockerfile ([Build and CI](#build-and-ci-planned)).
+- **The frontends** (Node.js 22.13+, 24 or 26+): `npm install`, then `npm run dev`, in each app's folder.
+  - `frontend/marketing/`, on `http://localhost:5173`, calls the API at its `VITE_API_BASE_URL`
+    ([configuration](../frontend/marketing/README.md#configuration)).
+  - `frontend/staff/`, on `http://localhost:5174`, calls `/api` on its own address; its development server passes
+    those requests to the API on `http://localhost:5228` (`API_PROXY_TARGET` changes it,
+    [configuration](../frontend/staff/README.md#configuration)).
 
 In Development, the API sends no real email: `Email__Provider` is `Recording`, so the Gmail settings can stay out
 of `.env`. To send real emails locally, set `Email__Provider=Gmail` with the three Gmail secrets. Development also
