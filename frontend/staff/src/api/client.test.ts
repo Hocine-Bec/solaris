@@ -47,8 +47,13 @@ describe('request', () => {
   });
 
   it("copes with an error answer that isn't JSON", async () => {
-    vi.stubGlobal('fetch', answer(new Response('Bad Gateway', { status: 502 })));
-    await expect(request('/leads')).rejects.toMatchObject({ kind: 'server', status: 502, message: MESSAGES.server });
+    vi.stubGlobal('fetch', answer(new Response('Internal Server Error', { status: 500 })));
+    await expect(request('/leads')).rejects.toMatchObject({ kind: 'server', status: 500, message: MESSAGES.server });
+  });
+
+  it("says the server didn't answer when the development server can't reach the API (its 502)", async () => {
+    vi.stubGlobal('fetch', answer(new Response("The API isn't answering at http://localhost:5228.", { status: 502 })));
+    await expect(request('/auth/me')).rejects.toMatchObject({ kind: 'unreachable', status: 502, message: MESSAGES.unreachable });
   });
 
   it('fails as unreachable when no answer comes', async () => {
