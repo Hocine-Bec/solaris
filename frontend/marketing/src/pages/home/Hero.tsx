@@ -6,6 +6,8 @@ import { addScroller, isWideLandscape, prefersReducedMotion } from '../../lib/mo
 const WORDS = ['home', 'shop', 'office', 'roof'];
 const SUN_PERIOD = 24000;
 const CELLS = 60;
+/** The panel's angles in the hero and behind the idea's paragraph: it straightens a little, but keeps a roof's slope */
+const REST = { rx: 50, rz: -32 }, LAND = { rx: 40, rz: -26 };
 
 /** The hero: the sun's day along an arc, the title rising after the intro, a rotating word, and the panel. */
 export function Hero() {
@@ -67,54 +69,79 @@ export function Hero() {
     return () => { alive = false; observer.disconnect(); cancelAnimationFrame(raf); };
   }, []);
 
-  // The panel's flight, on wide landscape screens: it tilts with the pointer, flies to the centre as the page scrolls,
-  // turns to face the visitor and lands above the next section's paragraph. One fixed element, moved by a transform.
+  // The panel's flight, on wide landscape screens: it tilts with the pointer; as the idea section comes up it grows,
+  // keeps its roof angle and dims, then lies behind the paragraph's right side, running off the screen's edge, and rides
+  // up with the section. One fixed layer, under the idea's text and masked to the section; the panel's transform comes
+  // from the scroll position.
   useEffect(() => {
     const slab = slabRef.current!, stage = stageRef.current!, hero = sectionRef.current!;
-    const dock = document.getElementById('dock') as HTMLElement;
-    let flyer: HTMLDivElement | null = null;
-    let start = 0, end = 1, dx = 0, restY = 0, land = 1, tx = 0, ty = 0, gx = 0, gy = 0, raf = 0;
+    const idea = document.getElementById('idea')!, lead = idea.querySelector<HTMLElement>('.lead')!;
+    let layer: HTMLDivElement | null = null, mover: HTMLDivElement | null = null;
+    let start = 0, end = 1, restX = 0, restY = 0, landX = 0, landY = 0, land = 1, ideaTop = 0, ideaBottom = 0;
+    let tx = 0, ty = 0, gx = 0, gy = 0, raf = 0;
     const active = () => isWideLandscape() && !prefersReducedMotion();
+    const angles = (rx: number, rz: number) => {
+      slab.style.setProperty('--rx', `${rx.toFixed(2)}deg`);
+      slab.style.setProperty('--rz', `${rz.toFixed(2)}deg`);
+    };
+    const putBack = () => {
+      if (!layer) return;
+      stage.appendChild(slab); layer.remove(); layer = mover = null; slab.classList.add('floaty');
+      for (const v of ['--rx', '--rz', '--tx', '--ty', '--fade']) slab.style.removeProperty(v);
+    };
     const measure = () => {
-      if (!active()) {
-        dock.style.height = '0px';
-        if (flyer) { stage.appendChild(slab); flyer.remove(); flyer = null; slab.style.transform = ''; slab.classList.add('floaty'); }
-        return;
-      }
-      if (!flyer) {
-        flyer = document.createElement('div');
-        flyer.className = 'flyer';
-        document.body.appendChild(flyer);
-        flyer.appendChild(slab);
+      if (!active()) { putBack(); return; }
+      if (!layer || !mover) {
+        layer = document.createElement('div');
+        layer.className = 'flyer';
+        mover = document.createElement('div');
+        mover.className = 'mover';
+        layer.appendChild(mover);
+        document.body.appendChild(layer);
+        mover.appendChild(slab);
         slab.classList.remove('floaty');
       }
-      const sr = stage.getBoundingClientRect(), w = slab.offsetWidth, h = slab.offsetHeight;
-      const restX = sr.left + sr.width / 2 - w / 2;
+      const w = slab.offsetWidth, h = slab.offsetHeight;
+      // At rest: the centre of the hero's right column (the mover's corner, in page coordinates)
+      const sr = stage.getBoundingClientRect();
+      restX = sr.left + sr.width / 2 - w / 2;
       restY = sr.top + scrollY + sr.height / 2 - h / 2;
-      flyer.style.left = `${restX}px`;
-      flyer.style.top = '0px';
+      // Landed: the panel as seen at its landing angle, at scale 1, with the mover in the screen's corner
+      mover.style.transform = 'none';
+      angles(LAND.rx, LAND.rz);
+      slab.style.setProperty('--tx', '0deg');
+      slab.style.setProperty('--ty', '0deg');
+      const seen = slab.querySelector('.slab-top')!.getBoundingClientRect();
+      const cx = seen.left + seen.width / 2, cy = seen.top + seen.height / 2;
+      // A little taller than the screen, so it reads as part of a roof rather than an object: its left edge behind the
+      // paragraph's last third, the rest running off the right edge; seen through the section, which cuts it at its edges
+      land = innerHeight * 1.1 / seen.height;
+      const lr = lead.getBoundingClientRect();
+      landX = lr.left + lr.width * .62 + seen.width * land / 2 - (w / 2 + (cx - w / 2) * land);
+      landY = innerHeight * .58 - (h / 2 + (cy - h / 2) * land);
+      ideaTop = idea.getBoundingClientRect().top + scrollY;
+      ideaBottom = ideaTop + idea.offsetHeight;
       start = hero.offsetHeight * .14;
-      land = Math.min(1, innerHeight * .56 / h);
-      dock.style.height = `${Math.round(h * land + 32)}px`;
-      const dr = dock.getBoundingClientRect();
-      end = Math.max(start + 1, dr.top + scrollY + dr.height / 2 - innerHeight / 2);
-      dx = innerWidth / 2 - (restX + w / 2);
+      end = Math.max(start + 1, ideaTop - (innerHeight - idea.offsetHeight) / 2);   // it lands with the section centred on screen
     };
     const ease = (t: number) => t < .5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2;
     const frame = () => {
-      if (!flyer) return;
+      if (!layer || !mover) return;
       const p = ease(Math.min(1, Math.max(0, (scrollY - start) / (end - start))));
       const over = Math.max(0, scrollY - end);
-      // At rest the panel scrolls with the hero; it then travels to the viewport's centre and rides up with the page.
-      const yRest = restY - scrollY, yCenter = innerHeight / 2 - slab.offsetHeight / 2;
-      const y = yRest + (yCenter - yRest) * p - over;
-      const scale = p < 1 ? 1 - (1 - land * .9) * p : land * .9 + land * .1 * Math.min(1, over / 220);
-      flyer.style.transform = `translate3d(${(dx * p).toFixed(1)}px, ${y.toFixed(1)}px, 0) scale(${scale.toFixed(3)})`;
-      slab.style.setProperty('--rx', `${(50 - 38 * p).toFixed(2)}deg`);
-      slab.style.setProperty('--rz', `${(-32 + 32 * p).toFixed(2)}deg`);
+      // At rest it scrolls with the hero; it then travels to its landing place and, landed, rides up with the section
+      const yRest = restY - scrollY;
+      const x = restX + (landX - restX) * p, y = yRest + (landY - yRest) * p - over, s = 1 + (land - 1) * p;
+      mover.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) scale(${s.toFixed(3)})`;
+      angles(REST.rx + (LAND.rx - REST.rx) * p, REST.rz + (LAND.rz - REST.rz) * p);
+      slab.style.setProperty('--fade', (1 - p).toFixed(3));
       const k = 1 - p;
       slab.style.setProperty('--tx', `${(tx * k).toFixed(2)}deg`);
       slab.style.setProperty('--ty', `${(ty * k).toFixed(2)}deg`);
+      // Kept to the section: cut at its bottom edge; above its top, faded out over the end of the flight, the last 60 px
+      // easing in so the roof emerges from the section's top rather than being sliced
+      const top = ideaTop - scrollY, bottom = ideaBottom - scrollY, above = Math.min(1, (1 - p) / .4);
+      layer.style.maskImage = `linear-gradient(to bottom, rgb(0 0 0 / ${above.toFixed(3)}) ${top.toFixed(1)}px, #000 ${(top + 60).toFixed(1)}px, #000 ${bottom.toFixed(1)}px, transparent ${bottom.toFixed(1)}px)`;
     };
     const remeasure = () => { measure(); frame(); };
     const scroller = Object.assign(frame, { measure: remeasure });
@@ -136,8 +163,7 @@ export function Hero() {
       removeScroller();
       removeEventListener('pointermove', onMove);
       cancelAnimationFrame(first); cancelAnimationFrame(raf);
-      if (flyer) { stage.appendChild(slab); flyer.remove(); slab.style.transform = ''; slab.classList.add('floaty'); }
-      dock.style.height = '';
+      putBack();
     };
   }, []);
 

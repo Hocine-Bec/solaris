@@ -76,15 +76,20 @@ body { font-size: 1rem; }
 .hero-foot { position: relative; display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 2rem; padding-block: 1.5rem; color: var(--faint); border-top: 1px solid var(--line); margin-top: 2rem; }
 .panel-stage { position: relative; height: clamp(320px, 44vw, 640px); perspective: 1600px; display: grid; place-items: center; }
 @media (min-width: 1024px) { .panel-stage { margin-right: calc(-1 * var(--gutter)); } }
-.flyer { position: fixed; z-index: 30; top: 0; left: 0; perspective: 1500px; pointer-events: none; will-change: transform; }
+/* The flight (wide landscape screens): a fixed layer the size of the screen, under the idea's text, masked to the idea
+   section once the panel lands; the mover inside it carries the panel */
+.flyer { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.mover { position: absolute; top: 0; left: 0; perspective: 1500px; will-change: transform; }
 .slab { --w: clamp(220px, 26vw, 420px); --t: clamp(9px, 1vw, 14px); --rx: 50deg; --rz: -32deg; width: var(--w); aspect-ratio: .6; position: relative; transform-style: preserve-3d; transform: rotateX(calc(var(--rx) + var(--ty, 0deg))) rotateZ(calc(var(--rz) + var(--tx, 0deg))); }
 .slab.floaty { animation: float 7s var(--ease-in-out) infinite alternate; }
 @keyframes float { to { translate: 0 -12px; } }
-/* The panel as a line drawing: a frame, a grid of cells lit by the sun as it passes, and two edges for its thickness */
-.slab-top { position: absolute; inset: 0; transform: translateZ(var(--t)); border-radius: 3px; box-shadow: inset 0 0 0 1.5px rgb(242 242 240 / .85); }
+/* The panel as a line drawing: a frame, a grid of cells lit by the sun as it passes, and two edges for its thickness.
+   --fade goes from 1 in the hero to 0 behind the idea's text: its lines dim to about a quarter and its cells go dark,
+   so the words stay easy to read. */
+.slab-top { position: absolute; inset: 0; transform: translateZ(var(--t)); border-radius: 3px; box-shadow: inset 0 0 0 1.5px rgb(242 242 240 / calc(.22 + .63 * var(--fade, 1))); }
 .cells { position: relative; height: 100%; display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(10, 1fr); padding: 3.5%; overflow: hidden; }
-.cells i { background: rgb(255 194 31 / calc(var(--lit, 0) * .9)); box-shadow: inset 0 0 0 .5px rgb(242 242 240 / .38); }
-.slab-edge { position: absolute; box-shadow: inset 0 0 0 1px rgb(242 242 240 / .5); }
+.cells i { background: rgb(255 194 31 / calc(var(--lit, 0) * .9 * var(--fade, 1))); box-shadow: inset 0 0 0 .5px rgb(242 242 240 / calc(.13 + .25 * var(--fade, 1))); }
+.slab-edge { position: absolute; box-shadow: inset 0 0 0 1px rgb(242 242 240 / calc(.14 + .36 * var(--fade, 1))); }
 .slab-edge.b { left: 0; top: 100%; width: 100%; height: var(--t); transform-origin: top; transform: rotateX(90deg); }
 .slab-edge.l { top: 0; right: 100%; height: 100%; width: var(--t); transform-origin: right; transform: rotateY(90deg); }
 
@@ -133,8 +138,11 @@ html.intro-running .hdr .logo { visibility: hidden; }
 .reveal { opacity: 0; transform: translateY(26px); transition: opacity var(--duration-slow) var(--ease-out), transform var(--duration-slow) var(--ease-out); }
 .reveal.in { opacity: 1; transform: none; }
 
-/* The idea */
-.dock { height: 0; }
+/* The idea. Where the panel flies, its text sits above the landed panel. */
+@media (min-width: 1024px) and (orientation: landscape) and (prefers-reduced-motion: no-preference) {
+  .idea .wrap { position: relative; z-index: 1; }
+  .idea { min-height: 80svh; display: grid; align-content: center; }
+}
 .idea .lead { max-width: 30ch; }
 .idea .lead .w { transition: opacity .25s linear; }
 .idea-foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem 2rem; margin-top: clamp(2.5rem, 7vh, 4.5rem); padding-top: 1.25rem; border-top: 1px solid var(--line); color: var(--faint); }
