@@ -9,7 +9,7 @@ the lead request's state code and coordinates, and the architecture test's 2 cas
 repositories, 2 for the unit of work, 5 for `LeadService`, 1 for the schema's names, 14 for the email senders and the
 measurement harness, and 28 through the API for error responses, pagination, timestamps, the email fault toggle and
 the synchronous notifications), and 21 for the settings' startup validation, which need no database. The marketing
-site has 68 unit tests of its own (below). Everything else below is *(planned)*.
+site has 68 unit tests of its own, and the staff app 48 (below). Everything else below is *(planned)*.
 
 ---
 
@@ -21,6 +21,7 @@ site has 68 unit tests of its own (below). Everything else below is *(planned)*.
 | `backend/tests/IntegrationTests` | Tests against a real PostgreSQL: repositories, services, concurrency, the API |
 | `backend/tests/TestUtilities` | Shared helpers: test-data factories (Bogus) and the PostgreSQL fixture, which gives each test its own database |
 | `frontend/marketing/src/**/*.test.ts` | The marketing site's unit tests, beside the code they test: the quote form's checks and the request it builds (25), how each answer of the API is shown (11), which address suggestions are offered and how the list narrows as the visitor types (27), each page's title and description (5) |
+| `frontend/staff/src/**/*.test.ts` | The staff app's unit tests, beside the code they test: how each answer of the API becomes an error a screen acts on, from answers recorded from the API (22), the requests the client sends and how it checks the answers (8), which failures are retried (10), the theme choice (4), which state a load shows (4) |
 
 ---
 
@@ -38,7 +39,7 @@ site has 68 unit tests of its own (below). Everything else below is *(planned)*.
 | **Schema naming test** | Fails if any table, column, constraint or index in the migrated database isn't snake_case (EF Core's own `__EFMigrationsHistory` table excepted) | Reads PostgreSQL's catalog in a test database |
 | **Settings tests** | Fail if a required setting can be missing or invalid without stopping the API at startup, or if the error doesn't name it ([operations](operations.md#configuration)) | Builds the services from in-memory settings and runs the startup validation |
 | **Measurement harness** | Fail if the delivery log misses an email the mail server accepted, records one it didn't, or merges a re-send into the first row; if the fault lets an email through; or if Development stops wrapping the provider's sender with the logger outermost; if `Notifications:Mode` picks the wrong notifier, or the synchronous mode answers before both emails are sent ([measurements](measurements.md#4-measurement-harness)) | The senders alone and as Development wires them, on the test's database; the current Hangfire jobs called directly; one lead request through the API in the synchronous mode |
-| **Frontend unit** | The marketing site's logic: the quote form's checks, step by step; the request it sends (coordinates only from a picked address, never made up); the API's validation messages linked to their fields, and its other answers; the address suggestions kept (complete US addresses only), when a lookup is made, and how an earlier answer narrows as the visitor types on; each page's head | Vitest, in Node, with no rendering; the API and the address provider are not called |
+| **Frontend unit** | The marketing site's logic: the quote form's checks, step by step; the request it sends (coordinates only from a picked address, never made up); the API's validation messages linked to their fields, and its other answers; the address suggestions kept (complete US addresses only), when a lookup is made, and how an earlier answer narrows as the visitor types on; each page's head. The staff app's logic: how each API answer is classified (kind, message, refused fields, a stale record), what a request sends and how its answer is checked, which failures are retried, which state a load shows, the theme | Vitest, in Node, with no rendering; the API and the address provider are not called. Before a screen is done, it is checked in a browser against the real API ([ADR 6](adr/0006-staff-app-stack.md)) |
 | **Performance and fault** | The four measured problems, P1–P4 | Scripts in `perf/`, run by hand, results committed; not part of CI ([measurements](measurements.md)) |
 
 ---
@@ -60,4 +61,4 @@ site has 68 unit tests of its own (below). Everything else below is *(planned)*.
 Microsoft Testing Platform, which xUnit v3 uses. The integration tests need Docker,
 for the PostgreSQL container. CI will run the same command on every pull request *(planned)* ([operations](operations.md)).
 
-`npm test` in `frontend/marketing/` runs the marketing site's tests.
+`npm test` in `frontend/marketing/` and in `frontend/staff/` runs each app's tests.
