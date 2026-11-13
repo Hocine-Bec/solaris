@@ -1,7 +1,7 @@
 # Solaris brand
 
-The design system's code, shared by Solaris's frontends: the tokens, the base styles and core components, the fonts
-and the logo. The [marketing site](../marketing/README.md) and the [staff app](../staff/README.md) use it.
+The design system's code, shared by Solaris's frontends: the tokens, the base styles and core components, the fonts,
+the logo and the line drawings. The [marketing site](../marketing/README.md) and the [staff app](../staff/README.md) use it.
 
 | File | Holds |
 |---|---|
@@ -10,6 +10,9 @@ and the logo. The [marketing site](../marketing/README.md) and the [staff app](.
 | `app-components.css` | The components for the staff app, on top of `components.css`: the app's text scale, the segmented choice, the menu, avatars, tables, and the loading, empty and failed states |
 | `fonts.css`, `fonts/` | The fonts, as WOFF2, with their licences |
 | `logo/` | The wordmark, on dark and on light, and its outlines as JSON |
+| `drawings/iso.ts` | The line drawings, in isometric projection, as data: the house with one layer per step, and the figures (a panel, the inverter, the paperwork, someone watching) |
+| `drawings/drawable.ts` | Prepares a drawing's SVG to draw itself, each line from its own length |
+| `drawings.css` | The drawings' shapes and ink in each theme, the house's steps, drawing itself, and its switch-on (the sun rising, the panels lighting up, the windows glowing) |
 
 ## Using it
 
@@ -19,12 +22,16 @@ In the app's main stylesheet, after Tailwind:
 @import "tailwindcss";
 @import "<path>/brand/tokens.css";
 @import "<path>/brand/components.css";
+@import "<path>/brand/drawings.css";         /* an app that shows the line drawings */
 @import "<path>/brand/app-components.css";   /* the staff app */
 ```
 
 And in the app's entry script: `import '<path>/brand/fonts.css';`. The fonts are imported from JavaScript because
 Tailwind inlines the stylesheets it imports without rebasing their `url()`s; imported by Vite, the font files are
 found and bundled. Vite's development server must be allowed to read this folder (`server.fs.allow`).
+
+The drawings are data and plain functions, with no packages: this folder has no `node_modules`, so it can't import
+React. Each app turns a drawing into an SVG with its own small `DrawingSvg` component, and sizes and places it.
 
 ## Themes
 

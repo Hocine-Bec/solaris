@@ -1,0 +1,57 @@
+/*
+ * The brand's line drawings (drawings/iso.ts), shared by the marketing site and the staff app: the shapes' classes, the
+ * ink each theme gives them, and the house's steps, drawing themselves (drawings/drawable.ts adds .draw, .drawn and
+ * .no-anim), and its switch-on. Each app sizes and places its drawings itself. Import after components.css.
+ */
+
+.fig svg * , .house svg * { vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.f { fill: var(--bg); stroke: var(--ln1); stroke-width: 1.15; }
+.f2 { fill: var(--bg-raised); stroke: var(--ln1); stroke-width: 1.15; }
+.l2 { fill: none; stroke: var(--ln2); stroke-width: 1; }
+.l3 { fill: none; stroke: var(--ln3); stroke-width: 1; }
+.dash { fill: none; stroke: var(--ln3); stroke-width: 1; stroke-dasharray: 3 4; }
+.dash-acc { fill: none; stroke: var(--accent); stroke-width: 1.3; stroke-dasharray: 4 4; }
+.acc { fill: var(--accent-fill); stroke: var(--accent); stroke-width: 1.15; }
+.accline { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+svg text { font: 400 6.4px var(--font-mono); letter-spacing: .14em; fill: var(--faint); }
+svg text.hot { fill: var(--accent); }
+.house, .fig { --ln1: color-mix(in srgb, var(--fg) 72%, transparent); --ln2: color-mix(in srgb, var(--fg) 40%, transparent); --ln3: color-mix(in srgb, var(--fg) 22%, transparent); }
+
+/* The house: one layer per step, shown at its step */
+.house .L { opacity: 0; transition: opacity .5s var(--ease-out); }
+.house[data-step="0"] .L-survey, .house[data-step="1"] .L-design, .house[data-step="2"] .L-permits,
+.house[data-step="3"] .L-panels, .house[data-step="4"] .L-panels, .house[data-step="5"] .L-panels,
+.house[data-step="4"] .L-inspect, .house[data-step="5"] .L-on { opacity: 1; }
+
+/* Drawing itself: the house first, then each step's own parts; leaving a step undraws them quickly */
+.house.draw svg > [data-d] { stroke-dasharray: var(--len); stroke-dashoffset: var(--len); fill-opacity: 0; transition: stroke-dashoffset 1.5s var(--ease-out) var(--dl), fill-opacity .8s var(--ease-out) calc(var(--dl) + .75s); }
+.house.draw svg > [data-fade] { opacity: 0; transition: opacity .9s var(--ease-out) var(--dl); }
+.house.draw.drawn svg > [data-d] { stroke-dashoffset: 0; fill-opacity: 1; }
+.house.draw.drawn svg > [data-fade] { opacity: 1; }
+.house.draw .L [data-d] { stroke-dasharray: var(--len); stroke-dashoffset: var(--len); fill-opacity: 0; transition: stroke-dashoffset .45s var(--ease-in-out), fill-opacity .3s; }
+.house.draw.drawn[data-step="0"] .L-survey [data-d],
+.house.draw.drawn[data-step="1"] .L-design [data-d],
+.house.draw.drawn[data-step="2"] .L-permits [data-d],
+.house.draw.drawn[data-step="3"] .L-panels [data-d],
+.house.draw.drawn[data-step="4"] .L-panels [data-d],
+.house.draw.drawn[data-step="5"] .L-panels [data-d],
+.house.draw.drawn[data-step="4"] .L-inspect [data-d],
+.house.draw.drawn[data-step="5"] .L-on [data-d] { stroke-dashoffset: 0; fill-opacity: 1; transition: stroke-dashoffset 1.1s var(--ease-out) var(--dl), fill-opacity .6s var(--ease-out) calc(var(--dl) + .45s); }
+.house.draw.no-anim [data-d], .house.draw.no-anim [data-fade] { transition: none !important; }
+
+/* Switch-on: the sun rises beside the roof, its light reaches the panels, they light up in a wave from its side, then
+   the windows glow (the home on its own power); while the house holds, the sun gives off slow rings. --on-at delays
+   it all, where the house draws itself already switched on. Not drawing itself (reduced motion): the house switched
+   on, still, without the rings. */
+.house .beam { fill: none; stroke: var(--accent); stroke-width: 1; stroke-opacity: .55; }
+.house .win { fill: var(--accent-fill); fill-opacity: .6; stroke: none; }
+.house .ring { fill: none; stroke: var(--accent); stroke-width: .8; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.house .sun { transform-box: fill-box; transform-origin: center; }
+.house.draw .L-on .sun { opacity: 0; transform: translate(-30px, 42px) scale(.55); transition: opacity .4s var(--ease-out), transform .4s var(--ease-out); }
+.house.draw.drawn[data-step="5"] .L-on .sun { opacity: 1; transform: none; transition: opacity .8s var(--ease-out) var(--on-at, 0s), transform 1.4s var(--ease-in-out) var(--on-at, 0s); }
+.house.draw.drawn[data-step="5"] .L-on .beam { transition-duration: .6s, .3s; transition-delay: calc(var(--on-at, 0s) + .9s), calc(var(--on-at, 0s) + .9s); }
+.house.draw.drawn[data-step="5"] .L-on .acc:not(.sun) { transition-delay: calc(var(--on-at, 0s) + 1.15s + var(--wave) * 1s), calc(var(--on-at, 0s) + 1.45s + var(--wave) * 1s); }
+.house.draw .L-on .win { fill-opacity: 0; transition: fill-opacity .4s var(--ease-out); }
+.house.draw.drawn[data-step="5"] .L-on .win { fill-opacity: .6; transition: fill-opacity .8s var(--ease-out) calc(var(--on-at, 0s) + 2.1s); }
+.house.draw.drawn[data-step="5"] .L-on .ring { animation: sun-ring 2.6s var(--ease-out) calc(var(--on-at, 0s) + 1.5s + var(--n) * 1.3s) infinite; }
+@keyframes sun-ring { from { opacity: .5; transform: scale(1); } to { opacity: 0; transform: scale(3.2); } }
