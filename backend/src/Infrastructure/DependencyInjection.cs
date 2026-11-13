@@ -111,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped<IAddressRepo, AddressRepo>();
         services.AddScoped<ICustomerRepo, CustomerRepo>();
         services.AddScoped<ILeadRepo, LeadRepo>();
+        services.AddScoped<IUserRepo, UserRepo>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         
         // Email: the provider's sender (Email:Provider), which the measurement harness wraps in Development
