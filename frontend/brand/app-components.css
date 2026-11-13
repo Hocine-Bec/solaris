@@ -1,6 +1,6 @@
 /*
  * The UI kit's components for the staff app, on top of components.css: the app's text scale, the segmented choice,
- * the menu, tables, and the states a screen shows while loading, empty or failed. Import after components.css.
+ * the menu, avatars, tables, and the states a screen shows while loading, empty or failed. Import after components.css.
  */
 
 /* ===================== App text scale (the staff app's text is 14 px, its fields 16 px) ===================== */
@@ -25,11 +25,14 @@
 .menu[popover]:popover-open { animation: drop var(--duration-fast) var(--ease-out); }
 @keyframes drop { from { opacity: 0; transform: translateY(-4px); } }
 .menu-section { display: grid; gap: .5rem; padding: .5rem .6rem .7rem; }
-.menu [role="menuitem"] { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: .6rem; width: 100%; height: 2.25rem; padding: 0 .7rem; border-radius: var(--radius-sm); font-size: .875rem; cursor: pointer; }
-.menu [role="menuitem"] .ic { width: 1rem; height: 1rem; color: var(--muted); }
-.menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus-visible { background: var(--surface); }
-.menu [role="menuitem"]:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.menu [role="menuitem"], .menu .menu-item { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: .6rem; width: 100%; height: 2.25rem; padding: 0 .7rem; border-radius: var(--radius-sm); font-size: .875rem; cursor: pointer; }
+.menu [role="menuitem"] .ic, .menu .menu-item .ic { width: 1rem; height: 1rem; color: var(--muted); }
+.menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus-visible, .menu .menu-item:hover, .menu .menu-item:focus-visible { background: var(--surface); }
+.menu [role="menuitem"]:focus-visible, .menu .menu-item:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .menu hr { border: 0; height: 1px; background: var(--line); margin: .3rem .2rem; }
+
+/* ===================== Avatar: a person's initials ===================== */
+.avatar { --s: 2rem; width: var(--s); height: var(--s); border-radius: 50%; display: inline-grid; place-items: center; flex: none; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong); font: 500 calc(var(--s) * .33)/1 var(--font-mono); letter-spacing: .04em; color: var(--fg); }
 
 /* ===================== Tables ===================== */
 .table-wrap { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-lg); box-shadow: inset 0 0 0 1px var(--line); background: var(--bg-raised); }
