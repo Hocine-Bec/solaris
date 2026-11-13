@@ -321,5 +321,7 @@ Architecture decisions are recorded as ADRs, one file each, in [`adr/`](adr/):
 | [4](adr/0004-postgresql-with-ef-core.md) | PostgreSQL with EF Core, and SQL where it matters |
 | [5](adr/0005-address-natural-key.md) | Addresses deduplicated by a normalized natural key |
 | [6](adr/0006-staff-app-stack.md) | The staff app's stack and its test level |
+| [7](adr/0007-staff-sessions-in-a-cookie.md) | Staff sessions: the token in an HttpOnly cookie |
+| [8](adr/0008-password-hashing.md) | Passwords hashed with PBKDF2-HMAC-SHA512 |
 
 Decisions for parts not built yet are added as ADRs when those parts are built.
