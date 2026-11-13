@@ -10,6 +10,8 @@ import { landingFor, REASON_KEY, safeReturnTo, SESSION_KEY, useSession, type Sig
 import { opensFor } from '../shell/sections';
 import { noticeFor, signInSchema, type Notice, type SignInValues } from './form';
 import { PasswordField } from './PasswordField';
+import { StepsDrawing } from './StepsDrawing';
+import { useMediaQuery } from '../lib/useMediaQuery';
 
 const NOTICES: Record<Exclude<Notice['kind'], 'error'>, { tone: string; icon: LucideIcon; title?: string; text: string }> = {
   ended: { tone: 'info', icon: LogIn, title: 'Your session ended', text: "Sign in again to go back to the page you were on. Anything you hadn't saved is lost." },
@@ -33,8 +35,9 @@ function SignInNotice({ notice }: { notice: Notice }) {
 }
 
 /**
- * The sign-in page, from the approved design: one card, in the chosen theme. After a refusal the email stays, the
- * password is cleared and hidden, and focus moves to it. Signing in goes back to the page the session ended on, or to
+ * The sign-in page, from the approved design: one card, in the chosen theme, and on large screens the house drawing
+ * itself through the six steps beside it. After a refusal the email stays, the password is cleared and hidden, and
+ * focus moves to it. Signing in goes back to the page the session ended on, or to
  * the account's landing page.
  */
 export function SignInPage() {
@@ -46,6 +49,8 @@ export function SignInPage() {
   const [notice, setNotice] = useState<Notice | null>(reason ? { kind: reason } : null);
   const [passwordShown, setPasswordShown] = useState(false);
   const sending = useRef(false);
+  // The drawing beside the card, where the screen has room for it (wide, in landscape)
+  const wide = useMediaQuery('(min-width: 1024px) and (orientation: landscape)');
   const { register, handleSubmit, setValue, setFocus, formState: { errors, isSubmitting } } = useForm<SignInValues>({
     resolver: zodResolver(signInSchema),
     defaultValues: { email: '', password: '' },
@@ -83,7 +88,7 @@ export function SignInPage() {
     }
   };
 
-  return (
+  const page = (
     <main className="login-page">
       <div className="signin">
         <span className="logo">Solaris<i className="dot" aria-hidden="true" /></span>
@@ -118,4 +123,5 @@ export function SignInPage() {
       </div>
     </main>
   );
+  return wide ? <div className="signin-split">{page}<StepsDrawing /></div> : page;
 }

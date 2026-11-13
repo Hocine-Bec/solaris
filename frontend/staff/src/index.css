@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "../../brand/tokens.css";
 @import "../../brand/components.css";
+@import "../../brand/drawings.css";
 @import "../../brand/app-components.css";
 @import "./styles/shell.css";
 @import "./styles/signin.css";
