@@ -25,6 +25,14 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
 
     protected RecordingLeadNotifier Notifier { get; } = new();
 
+    /// <summary>The first Admin, created when the API starts on this test's empty database (FR-U3).</summary>
+    protected static class TestAdmin
+    {
+        public const string Name = "Rosa Castillo";
+        public const string Email = "rosa.castillo@solaris.test";
+        public const string Password = "Solaris#2026";
+    }
+
     /// <summary>
     /// A client for the API; <paramref name="configureServices"/> can replace services, <paramref name="environment"/>
     /// can change the environment, <paramref name="settings"/> can add settings and <paramref name="fakeNotifier"/>
@@ -43,6 +51,9 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
             builder.UseSetting("Email:Gmail:ClientSecret", "test-client-secret");
             builder.UseSetting("Email:Gmail:RefreshToken", "test-refresh-token");
             builder.UseSetting("Serilog:MinimumLevel", "Warning");
+            builder.UseSetting("Admin:Name", TestAdmin.Name);
+            builder.UseSetting("Admin:Email", TestAdmin.Email);
+            builder.UseSetting("Admin:Password", TestAdmin.Password);
             foreach (var (key, value) in settings ?? new Dictionary<string, string>())
                 builder.UseSetting(key, value);
             builder.ConfigureTestServices(services =>

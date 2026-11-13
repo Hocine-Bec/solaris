@@ -4,6 +4,7 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Hangfire;
 using Hangfire.PostgreSql;
+using Infrastructure.Auth;
 using Infrastructure.Data;
 using Infrastructure.Measurement;
 using Infrastructure.Repositories;
@@ -34,6 +35,10 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(JwtOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<AdminOptions>()
+            .Bind(configuration.GetSection(AdminOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<AdminOptions>, AdminOptionsValidator>();
         services.AddOptions<EmailOptions>()
             .Bind(configuration.GetSection(EmailOptions.SectionName))
             .ValidateDataAnnotations()
@@ -106,7 +111,10 @@ public static class DependencyInjection
                     ClockSkew = TimeSpan.Zero
                 };
             });
-        
+
+        // Staff accounts: passwords and session tokens
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
+
         //Repositories
         services.AddScoped<IAddressRepo, AddressRepo>();
         services.AddScoped<ICustomerRepo, CustomerRepo>();
