@@ -8,6 +8,9 @@ public interface IUserRepo : IGenericRepo<User>
     /// <summary>The account with this email, compared as <see cref="User.NormalizeEmail"/> does.</summary>
     Task<User?> GetByEmailAsync(string email);
 
+    /// <summary>One page of accounts, active ones first, then by name and ID, and the number of accounts.</summary>
+    Task<(IReadOnlyList<User> Items, int TotalCount)> GetPageAsync(int skip, int take);
+
     /// <summary>Whether an active Admin exists.</summary>
     Task<bool> AnyActiveAdminAsync();
 

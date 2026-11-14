@@ -10,4 +10,10 @@ public interface IAuthService
 
     /// <summary>The account a session belongs to, if it still exists and is active.</summary>
     Task<Result<CurrentUserResponse>> GetCurrentUserAsync(int userId);
+
+    /// <summary>
+    /// Changes the signed-in account's password, given its current one, and ends its other sessions; returns a new
+    /// session for this one.
+    /// </summary>
+    Task<Result<SignedIn>> ChangePasswordAsync(int userId, ChangePasswordRequest request);
 }

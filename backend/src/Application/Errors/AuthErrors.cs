@@ -14,4 +14,10 @@ public static class AuthErrors
     /// <summary>A valid token whose account no longer exists or was deactivated.</summary>
     public static readonly Error SignedOut =
         new(ErrorKind.Unauthorized, "auth.signed_out", "Your session has ended. Sign in again.");
+
+    /// <summary>
+    /// Changing your password with a wrong current one: a field to fix, not a sign-in refused, so the session goes on.
+    /// </summary>
+    public static readonly Error CurrentPasswordIncorrect =
+        new(ErrorKind.Invalid, "validation_failed", "The current password is incorrect.", "CurrentPassword");
 }

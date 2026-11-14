@@ -131,6 +131,48 @@ public class UserRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     }
 
     [Fact]
+    public async Task GetPageAsync_ActiveFirstThenByNameThenId()
+    {
+        // Arrange - two people with the same name, saved one after the other so their IDs are in that order
+        await SeedAsync(
+            Named("Diego Ruiz", "diego@example.com", isActive: false),
+            Named("Lena Park", "lena@example.com"),
+            Named("Ava Stone", "ava@example.com", isActive: false));
+        await SeedAsync(Named("Jamal Ortiz", "jamal.2@example.com"));
+        await SeedAsync(Named("Jamal Ortiz", "jamal.1@example.com"));
+
+        // Act
+        var (items, totalCount) = await Repo.GetPageAsync(0, 10);
+
+        // Assert
+        totalCount.Should().Be(5);
+        items.Select(u => u.Email).Should().Equal(
+            "jamal.2@example.com", "jamal.1@example.com", "lena@example.com", "ava@example.com", "diego@example.com");
+    }
+
+    [Fact]
+    public async Task GetPageAsync_SecondPage_SkipsTheFirst()
+    {
+        // Arrange
+        await SeedAsync(Named("Ava Stone", "ava@example.com"), Named("Ben Hale", "ben@example.com"),
+            Named("Cleo Diaz", "cleo@example.com"));
+
+        // Act
+        var (items, totalCount) = await Repo.GetPageAsync(2, 2);
+
+        // Assert
+        totalCount.Should().Be(3);
+        items.Should().ContainSingle().Which.Name.Should().Be("Cleo Diaz");
+    }
+
+    private static User Named(string name, string email, bool isActive = true)
+    {
+        var user = NewUser(email, UserRole.Technician, isActive);
+        user.Name = name;
+        return user;
+    }
+
+    [Fact]
     public async Task Save_TwoAccountsDifferingOnlyByCase_IsADuplicate()
     {
         // Arrange

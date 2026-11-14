@@ -15,6 +15,16 @@ public class UserRepo(AppDbContext context) : GenericRepo<User>(context), IUserR
         return Context.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalized);
     }
 
+    public Task<(IReadOnlyList<User> Items, int TotalCount)> GetPageAsync(int skip, int take)
+    {
+        var query = Context.Users
+            .AsNoTracking()
+            .OrderByDescending(u => u.IsActive)
+            .ThenBy(u => u.Name)
+            .ThenBy(u => u.Id);
+        return ToPageAsync(query, skip, take);
+    }
+
     public Task<bool> AnyActiveAdminAsync() =>
         Context.Users.AnyAsync(u => u.Role == UserRole.Admin && u.IsActive);
 

@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Globalization;
 using Application.Common.Models;
+using Infrastructure.Auth;
 using Microsoft.AspNetCore.Mvc;
 
 namespace WebAPI.Controllers;
@@ -11,13 +13,29 @@ namespace WebAPI.Controllers;
 [ApiController]
 public abstract class ApiControllerBase : ControllerBase
 {
-    /// <summary>The ProblemDetails response for an expected failure: the status from its kind, plus its stable code.</summary>
+    /// <summary>
+    /// The ProblemDetails response for an expected failure: the status from its kind, plus its stable code. An invalid
+    /// field is answered as validation answers one: 400 <c>validation_failed</c>, with the message under the field.
+    /// </summary>
     protected ObjectResult Problem(Error error)
     {
+        if (error.Kind == ErrorKind.Invalid)
+        {
+            ModelState.AddModelError(error.Field ?? string.Empty, error.Message);
+            return (ObjectResult)ValidationProblem(modelStateDictionary: ModelState);
+        }
+
         var result = Problem(detail: error.Message, statusCode: StatusCodeFor(error.Kind));
         ((ProblemDetails)result.Value!).Extensions["code"] = error.Code;
         return result;
     }
+
+    /// <summary>The signed-in account's ID, from its session token; null if the token has none.</summary>
+    protected int? CurrentUserId =>
+        int.TryParse(User.FindFirst(Session.UserIdClaim)?.Value, NumberStyles.None, CultureInfo.InvariantCulture,
+            out var id)
+            ? id
+            : null;
 
     private static int StatusCodeFor(ErrorKind kind) => kind switch
     {

@@ -11,6 +11,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using TestUtilities.Base;
@@ -97,6 +98,11 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
+
+    /// <summary>The ID of the account with this email, read from this test's database.</summary>
+    protected Task<int> IdOfAsync(string email) =>
+        Context.Users.Where(u => u.NormalizedEmail == User.NormalizeEmail(email)).Select(u => u.Id)
+            .SingleAsync(TestContext.Current.CancellationToken);
 
     private static async Task<User> AddTechnicianAsync(IServiceProvider services)
     {

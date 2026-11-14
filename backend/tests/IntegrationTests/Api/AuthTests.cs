@@ -66,7 +66,7 @@ public class AuthTests(PostgresFixture database) : ApiTestBase(database)
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await response.Content.ReadFromJsonAsync<CurrentUserResponse>(Ct))
-            .Should().Be(new CurrentUserResponse(TestAdmin.Name, TestAdmin.Email, "Admin"));
+            .Should().Be(new CurrentUserResponse(await IdOfAsync(TestAdmin.Email), TestAdmin.Name, TestAdmin.Email, "Admin"));
 
         var cookie = SessionCookie(response).ToLowerInvariant();
         cookie.Should().Contain("httponly").And.Contain("secure").And.Contain("samesite=strict").And.Contain("path=/api");
@@ -177,7 +177,7 @@ public class AuthTests(PostgresFixture database) : ApiTestBase(database)
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await response.Content.ReadFromJsonAsync<CurrentUserResponse>(Ct))
-            .Should().Be(new CurrentUserResponse(TestAdmin.Name, TestAdmin.Email, "Admin"));
+            .Should().Be(new CurrentUserResponse(await IdOfAsync(TestAdmin.Email), TestAdmin.Name, TestAdmin.Email, "Admin"));
     }
 
     [Fact]
