@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun } from 'lucide-react';
+import { ChevronsUpDown, KeyRound, LogOut, Monitor, Moon, Sun } from 'lucide-react';
 import type { CurrentUser } from '../api/auth';
 import { Icon } from '../components/Icon';
 import { initials } from '../session/session';
@@ -17,6 +17,7 @@ type Props = {
   user: CurrentUser;
   theme: ThemeChoice;
   onTheme: (choice: ThemeChoice) => void;
+  onChangePassword: () => void;
   onSignOut: () => void;
   /** Initials only, for the phone's top bar */
   compact?: boolean;
@@ -24,9 +25,9 @@ type Props = {
 
 /**
  * The account button of the approved shell (initials, name, role) and its menu, a native popover placed by the
- * button: the email, so a shared computer shows whose session it is, the theme, and Sign out.
+ * button: the email, so a shared computer shows whose session it is, the theme, Change password and Sign out.
  */
-export function AccountMenu({ id, user, theme, onTheme, onSignOut, compact = false }: Props) {
+export function AccountMenu({ id, user, theme, onTheme, onChangePassword, onSignOut, compact = false }: Props) {
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const short = initials(user.name);
@@ -67,6 +68,9 @@ export function AccountMenu({ id, user, theme, onTheme, onSignOut, compact = fal
           </fieldset>
         </div>
         <hr />
+        <button className="menu-item" type="button" onClick={() => { menu.current?.hidePopover(); onChangePassword(); }}>
+          <Icon icon={KeyRound} />Change password
+        </button>
         <button className="menu-item" type="button" onClick={() => { menu.current?.hidePopover(); onSignOut(); }}>
           <Icon icon={LogOut} />Sign out
         </button>

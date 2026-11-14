@@ -16,12 +16,14 @@ describe('opensFor', () => {
     expect(opensFor('Admin', '/leads')).toBe(true);
     expect(opensFor('Admin', '/installations/12/production?month=2026-10')).toBe(true);
     expect(opensFor('Admin', '/production?x=1')).toBe(true);
+    expect(opensFor('Admin', '/users/7')).toBe(true);
   });
 
   it("doesn't open another role's pages", () => {
     expect(opensFor('Technician', '/production?x=1')).toBe(false);
     expect(opensFor('Technician', '/my-work/12')).toBe(true);
     expect(opensFor('Admin', '/my-work')).toBe(false);
+    expect(opensFor('Technician', '/users/7')).toBe(false);
   });
 
   it('matches whole sections, not prefixes of their names', () => {

@@ -7,6 +7,7 @@ export type Role = (typeof ROLES)[number];
 
 /** Who is signed in, as the API describes the account (GET /api/auth/me, and the answer to signing in) */
 export const currentUserSchema = z.object({
+  id: z.number().int(),
   name: z.string(),
   email: z.string(),
   role: z.enum(ROLES),
@@ -16,6 +17,13 @@ export type CurrentUser = z.infer<typeof currentUserSchema>;
 /** Checks the email and password; the API answers with the account and sets the session cookie. */
 export const signIn = (email: string, password: string) =>
   request('/auth/login', { method: 'POST', body: { email, password }, schema: currentUserSchema });
+
+/**
+ * Changes your own password, given the current one. The API ends your other sessions and sets a new session cookie
+ * for this one; a wrong current password is a 400 on `currentPassword`, so the session goes on.
+ */
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  request('/auth/password', { method: 'PUT', body: { currentPassword, newPassword } });
 
 /** Clears the session cookie; the API answers 204 even when the session had already ended. */
 export const signOut = () => request('/auth/logout', { method: 'POST' });

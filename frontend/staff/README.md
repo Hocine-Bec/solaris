@@ -3,9 +3,9 @@
 The app [Solaris](../../README.md)'s staff work in: the office (Admin) runs leads, customers, installations,
 production, failed notifications and accounts; technicians see the installations they're assigned to.
 
-**Status:** signing in and the app's frame are built: the session, the navigation by role, the account menu, the
-themes, the states every screen shares, and the client that talks to the API. The other screens come with their
-features; until then each section shows what it will hold.
+**Status:** signing in, the app's frame and the Users screens are built: the session, the navigation by role, the
+account menu, the themes, the states every screen shares, the client that talks to the API, and the staff accounts.
+The other screens come with their features; until then each section shows what it will hold.
 
 ## Pages
 
@@ -14,6 +14,7 @@ features; until then each section shows what it will hold.
 | `/login` | Signing in (`?returnTo=` remembers the page to come back to) |
 | `/` | Opens the account's landing page: Leads for the office, My work for technicians |
 | `/leads`, `/customers`, `/installations`, `/production`, `/notifications`, `/users` | The office's six sections, in the side bar; a technician who opens one sees Not allowed |
+| `/users`, `/users/:id` | The staff accounts, and one account (see Users below) |
 | `/my-work` | A technician's work; an Admin who opens it sees Not allowed |
 | Any other | Page not found, inside the frame |
 
@@ -42,6 +43,29 @@ Every page but `/login` needs a session: without one, the sign-in page opens and
 - **Signing out:** from the account menu, at once. The API clears the cookie and the sign-in page says "You're signed
   out." If the API doesn't answer, the person stays signed in, as the cookie can only be cleared by the API.
 
+## Users
+
+The Admin's screens for staff accounts (FR-U2, FR-U4), from the approved Users design.
+
+- **The list** (`/users`, `?page=` past the first 20): every account, active ones first, by name, with its email,
+  role, status (Active or Deactivated) and when it last signed in ("Never" before the first time); your own row says
+  You. Only you: "No technicians yet". Below 768 px the rows become cards.
+- **New technician:** name, email and a password; Generate fills in a strong one (14 characters, made in the browser
+  with `crypto.getRandomValues`) and shows it. The form checks that the fields are filled and the email looks like
+  one; the password rule is the API's, whose answer shows under the field. Once created, the dialog shows the email
+  and the password this once, to give to the person in person, with Copy the password and Open their page.
+- **One account** (`/users/:id`): its email, role, creation day and last sign-in. For someone else: Edit (name and
+  email), Set a new password (which signs them out everywhere) and Deactivate (asked first); a deactivated account
+  shows why it can't sign in and Reactivate. A saved change says so beside the buttons. Your own page has only Change
+  password, so the office can't lock itself out. A technician's assignments are marked as not built yet: they come
+  with the installations.
+- **Change password,** in the account menu for everyone: the current password and a new one. A wrong current one
+  shows under its field and the session goes on; on success the dialog says so, you stay signed in here, and your
+  other sessions end. It shares sign-in's limit of 10 password checks a minute; beyond it, the dialog asks to wait a
+  minute.
+- **The dialogs** are native modal `<dialog>`s: focus goes to the first field (or Cancel), Escape closes them and
+  focus goes back to the button that opened them; a click outside doesn't close a form.
+
 ## The frame
 
 - **A side bar** with the account's sections (the office's six, or My work for a technician); below 768 px, a top bar
@@ -49,11 +73,12 @@ Every page but `/login` needs a session: without one, the sign-in page opens and
   The navigation only hides links: the API checks the role on every request, and another role's page, opened from
   its address, shows Not allowed.
 - **The account menu,** from the account button at the bottom of the side bar (initials, name and role), or from the
-  initials in the phone's top bar: the email, the theme, and Sign out, in a native popover.
+  initials in the phone's top bar: the email, the theme, Change password and Sign out, in a native popover.
 - **Themes:** Light, Dark or System, chosen in the account menu, and kept in the browser for the next visit. System
   follows the device, as it changes. A script in `index.html` sets the theme before the first paint, so a dark device
   never flashes light first, the sign-in page included.
-- **Focus:** after moving to a new screen, focus goes to its title, so a screen reader announces where you are. A
+- **Focus:** after moving to a new screen, focus goes to its title, so a screen reader announces where you are; on
+  a screen that loads its data first, when the title appears, unless focus has already moved into the screen. A
   "Skip to the content" link comes first.
 - **Each page's title** shows in the browser's tab ("Leads · Solaris").
 
@@ -90,8 +115,9 @@ sign-in page.
 ## Design
 
 From the approved staff app design. The tokens, the core components, the app's components (text scale, segmented
-choice, menu, tables, states) and the fonts come from [`../brand/`](../brand/README.md); the frame's layout is in
-`src/styles/shell.css`. Icons are Lucide, at a 1.5 line.
+choice, menu, status chips, tables and their pager, key-value lists, dialogs, states) and the fonts come from
+[`../brand/`](../brand/README.md); the frame's layout is in `src/styles/shell.css`, the Users screens' in
+`src/styles/users.css`. Icons are Lucide, at a 1.5 line (2 in the small status chips).
 
 ## Running locally
 
