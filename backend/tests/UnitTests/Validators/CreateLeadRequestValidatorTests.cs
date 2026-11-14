@@ -4,7 +4,8 @@ using FluentAssertions;
 
 namespace UnitTests.Validators;
 
-// FR-L1: the property's state is a two-letter code. The coordinates come only with a picked address suggestion.
+// FR-L1: the property's state is a two-letter code. The coordinates come only with a picked address suggestion. The
+// fields the welcome email repeats can't hold a web or email address.
 public class CreateLeadRequestValidatorTests
 {
     private static readonly CreateLeadRequestValidator Validator = new();
@@ -124,5 +125,51 @@ public class CreateLeadRequestValidatorTests
 
         // Assert
         result.Errors.Should().ContainSingle().Which.PropertyName.Should().Be(wrong);
+    }
+
+    [Theory]
+    [InlineData("FirstName", "Visit evil.example", "First name")]
+    [InlineData("FirstName", "Jane https://x", "First name")]
+    [InlineData("LastName", "Doe at verify@evil.example", "Last name")]
+    [InlineData("PropertyStreet", "Log in at evil.co/verify", "Street")]
+    [InlineData("PropertyCity", "evil\uFF0Ecom", "City")]
+    [InlineData("MonthlyBillRange", "see evil.io", "Monthly bill range")]
+    public void Validate_RepeatedFieldHoldingAWebAddress_IsRefused(string field, string value, string label)
+    {
+        // Arrange - the welcome email repeats these fields to an address nobody has confirmed
+        var request = ValidRequest();
+        typeof(CreateLeadRequest).GetProperty(field)!.SetValue(request, System.Text.RegularExpressions.Regex.Unescape(value));
+
+        // Act
+        var result = Validator.Validate(request);
+
+        // Assert
+        result.Errors.Should().ContainSingle().Which.ErrorMessage.Should().Be($"{label} can't contain a web or email address");
+    }
+
+    [Theory]
+    [InlineData("FirstName", "J. R.")]
+    [InlineData("LastName", "O'Brien-Smith")]
+    [InlineData("PropertyStreet", "1600 N.W. 3rd Ave, Apt 4.5")]
+    [InlineData("PropertyStreet", "12 St. John St #3")]
+    [InlineData("PropertyCity", "St. Louis")]
+    [InlineData("MonthlyBillRange", "$100-$200")]
+    public void Validate_RepeatedFieldWithDotsThatAreNotAnAddress_IsValid(string field, string value)
+    {
+        // A dot followed by a space, a single letter or a number isn't the end of a domain
+        var request = ValidRequest();
+        typeof(CreateLeadRequest).GetProperty(field)!.SetValue(request, value);
+
+        Validator.Validate(request).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_NoteHoldingAWebAddress_IsValid()
+    {
+        // Only the office's alert shows the note
+        var request = ValidRequest();
+        request.Notes = "Photos of the roof: https://photos.example/roof";
+
+        Validator.Validate(request).IsValid.Should().BeTrue();
     }
 }

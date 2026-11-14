@@ -57,12 +57,15 @@ public class LeadEmailsTests
     }
 
     [Fact]
-    public void Welcome_NoteOnSeveralLines_KeepsItsLineBreaks()
+    public void Welcome_WithANote_SaysItReachedTheOfficeWithoutRepeatingIt()
     {
-        var email = LeadEmails.Welcome(Maya(), SiteUrl);
+        // The email goes to an address nobody has confirmed: free text from the form isn't sent on to it
+        var email = LeadEmails.Welcome(Maya(l => l.Notes = "Your account is locked: verify at evil.example"), SiteUrl);
 
-        email.Html.Should().Contain("Two big oaks shade the south side.<br>Call after 9.");
-        email.Text.Should().Contain("Your note:     Two big oaks shade the south side.\n               Call after 9.");
+        email.Html.Should().Contain("Your note").And.Contain("Sent to the office with your request.")
+            .And.NotContain("evil.example").And.NotContain("verify");
+        email.Text.Should().Contain("Your note:     Sent to the office with your request.")
+            .And.NotContain("evil.example");
     }
 
     [Fact]

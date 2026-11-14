@@ -28,7 +28,14 @@ public static partial class LeadEmails
 
     private static readonly string[] Steps = ["Survey", "Design", "Permits", "Installation", "Inspection", "Switch-on"];
 
-    /// <summary>To the person: what happens next, the six steps, and what they sent.</summary>
+    private const string NoteReceived = "Sent to the office with your request.";
+
+    /// <summary>
+    /// To the person: what happens next, the six steps, and what they sent. It goes to an address nobody has confirmed,
+    /// so it doesn't repeat the note: free text that an email app could show as a link would make the site a way to
+    /// send anyone a message from Solaris. It says the note reached the office instead. The other fields it repeats
+    /// can't hold a web or email address (the lead request's validation).
+    /// </summary>
     public static RenderedEmail Welcome(Lead lead, string siteUrl)
     {
         var call = CallTime(lead.BestTimeToContact);
@@ -47,7 +54,7 @@ public static partial class LeadEmails
             ("We call", E($"{lead.PhoneNumber}, {call}")),
         };
         if (hasNote)
-            details.Add(("Your note", Lines(lead.Notes!)));
+            details.Add(("Your note", E(NoteReceived)));
 
         var steps = string.Join("&nbsp;&nbsp; ", Steps.Select((step, i) => i == 0
             ? $"<span style=\"color:{Ink};border-bottom:2px solid {Sun};white-space:nowrap;\">01&nbsp;{step}</span>"
@@ -96,7 +103,7 @@ public static partial class LeadEmails
             Property:      {AddressLine(lead.Address)}
             Type:          {type}
             Monthly bill:  {bill}
-            We call:       {lead.PhoneNumber}, {call}{(hasNote ? $"\nYour note:     {Indent(lead.Notes!, 15)}" : "")}
+            We call:       {lead.PhoneNumber}, {call}{(hasNote ? $"\nYour note:     {NoteReceived}" : "")}
 
             Something wrong? Reply to this email and we'll correct it.
 
@@ -216,8 +223,6 @@ public static partial class LeadEmails
 
     /// <summary>A multi-line value, encoded, its line breaks kept.</summary>
     private static string Lines(string value) => LineBreaks().Replace(E(value.Trim()), "<br>");
-
-    private static string Indent(string value, int by) => LineBreaks().Replace(value.Trim(), "\n" + new string(' ', by));
 
     private static string Label(string text, string color = Faint) =>
         $"<p style=\"margin:0 0 12px;font:400 11px/1.4 {Mono};letter-spacing:2px;text-transform:uppercase;color:{color};\">{text}</p>";

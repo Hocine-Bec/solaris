@@ -1,10 +1,15 @@
 using Application.DTOs.Lead;
+using Application.Validators.Common;
 using Domain.Common;
 using Domain.Enums;
 using FluentValidation;
 
 namespace Application.Validators.Lead;
 
+/// <summary>
+/// The quote form's request. The fields the welcome email repeats (names, street, city, bill) can't hold a web or email
+/// address (<see cref="WebAddressRule"/>); the note isn't repeated there, so it may.
+/// </summary>
 public class CreateLeadRequestValidator : AbstractValidator<CreateLeadRequest>
 {
     public CreateLeadRequestValidator()
@@ -12,12 +17,14 @@ public class CreateLeadRequestValidator : AbstractValidator<CreateLeadRequest>
         RuleFor(x => x.FirstName)
             .NotEmpty().WithMessage("First name is required")
             .MaximumLength(100).WithMessage("First name cannot exceed 100 characters")
-            .MinimumLength(2).WithMessage("First name must be at least 2 characters");
+            .MinimumLength(2).WithMessage("First name must be at least 2 characters")
+            .HasNoWebAddress("First name");
 
         RuleFor(x => x.LastName)
             .NotEmpty().WithMessage("Last name is required")
             .MaximumLength(100).WithMessage("Last name cannot exceed 100 characters")
-            .MinimumLength(2).WithMessage("Last name must be at least 2 characters");
+            .MinimumLength(2).WithMessage("Last name must be at least 2 characters")
+            .HasNoWebAddress("Last name");
 
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email is required")
@@ -30,11 +37,13 @@ public class CreateLeadRequestValidator : AbstractValidator<CreateLeadRequest>
 
         RuleFor(x => x.PropertyStreet)
             .NotEmpty().WithMessage("Property street is required")
-            .MaximumLength(255).WithMessage("Street cannot exceed 255 characters");
+            .MaximumLength(255).WithMessage("Street cannot exceed 255 characters")
+            .HasNoWebAddress("Street");
 
         RuleFor(x => x.PropertyCity)
             .NotEmpty().WithMessage("City is required")
-            .MaximumLength(100).WithMessage("City cannot exceed 100 characters");
+            .MaximumLength(100).WithMessage("City cannot exceed 100 characters")
+            .HasNoWebAddress("City");
 
         RuleFor(x => x.PropertyState)
             .Cascade(CascadeMode.Stop)
@@ -72,7 +81,8 @@ public class CreateLeadRequestValidator : AbstractValidator<CreateLeadRequest>
             .When(x => x.PropertyType != "Commercial");
 
         RuleFor(x => x.MonthlyBillRange)
-            .NotEmpty().WithMessage("Monthly bill range is required");
+            .NotEmpty().WithMessage("Monthly bill range is required")
+            .HasNoWebAddress("Monthly bill range");
 
         RuleFor(x => x.BestTimeToContact)
             .NotEmpty().WithMessage("Best time to contact is required")
