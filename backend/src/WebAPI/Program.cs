@@ -86,16 +86,8 @@ builder.Services.AddInfrastructure(builder.Configuration);
 if (builder.Environment.IsDevelopment())
     builder.Services.AddMeasurementHarness();
 
-// Add CORS
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
-});
+// Other sites' pages may send the quote form, from the origins in Cors:AllowedOrigins, and call nothing else (BR-S2)
+builder.Services.AddCrossSiteCalls(builder.Configuration);
 
 var app = builder.Build();
 
@@ -117,8 +109,6 @@ if (!app.Environment.IsDevelopment())
 // Responses that end with an error status and no body (an unknown URL, a wrong method) get a ProblemDetails body too.
 app.UseStatusCodePages();
 
-app.UseHangfireDashboard();
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -134,6 +124,10 @@ if (app.Environment.IsDevelopment())
     }).AllowAnonymous();
 
     app.MapMeasurementEndpoints();
+
+    // The background jobs' dashboard (BR-S2): Development only, open there like the API reference, and answering only
+    // requests from this machine (Hangfire's own check)
+    app.MapHangfireDashboard().AllowAnonymous();
     
     // Auto-migrate database in development
     using var scope = app.Services.CreateScope();
@@ -146,6 +140,8 @@ await FirstAdmin.EnsureAsync(app.Services);
 
 app.UseHttpsRedirection();
 
+// No default policy: only the endpoints that name one (the quote form) answer other sites, and its preflight
+// requests are answered here, before the session checks.
 app.UseCors();
 
 // A request that changes data with the session cookie, or signs in or out, must come from the API's own site (ADR 7).

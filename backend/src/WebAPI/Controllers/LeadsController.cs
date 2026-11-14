@@ -2,6 +2,7 @@ using Application.DTOs.Common;
 using Application.DTOs.Lead;
 using Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using WebAPI.Security;
@@ -32,6 +33,7 @@ public class LeadsController(ILeadService service) : ApiControllerBase
 
     [HttpPost]
     [AllowAnonymous]
+    [EnableCors(CrossSiteCalls.QuoteForm)]
     [EnableRateLimiting(RateLimits.QuoteForm)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
