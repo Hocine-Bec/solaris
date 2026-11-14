@@ -11,57 +11,13 @@ using WebAPI.Security;
 
 namespace IntegrationTests.Api;
 
-// Who may call what (ADR 9): every endpoint needs a signed-in account unless it is open to anyone, the leads are the
-// office's, and a session ends with its account (ADR 7).
+// Who may call what, beyond the table of every endpoint (EndpointAccessTests): creating a lead signed out, a session
+// that ends with its account (ADR 7), the removed and unknown addresses, the Development-only ones, and each policy.
 public class AuthorizationTests(PostgresFixture database) : ApiTestBase(database)
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    /// <summary>The lead endpoints only the office may call.</summary>
-    public static TheoryData<string, string> OfficeLeadEndpoints => new()
-    {
-        { "GET", "/api/leads" },
-        { "GET", "/api/leads/1" },
-        { "PUT", "/api/leads/1/status" },
-        { "POST", "/api/leads/convert" },
-    };
-
-    private static HttpRequestMessage Request(string method, string url) => new(new HttpMethod(method), url)
-    {
-        Content = method is "PUT" or "POST" ? JsonContent.Create(new { }) : null
-    };
-
     #region The leads
-
-    [Theory]
-    [MemberData(nameof(OfficeLeadEndpoints))]
-    public async Task OfficeLeadEndpoint_SignedOut_Returns401(string method, string url)
-    {
-        var response = await CreateClient().SendAsync(Request(method, url), Ct);
-
-        await ShouldBeProblemAsync(response, HttpStatusCode.Unauthorized, "unauthorized");
-    }
-
-    [Theory]
-    [MemberData(nameof(OfficeLeadEndpoints))]
-    public async Task OfficeLeadEndpoint_Technician_Returns403(string method, string url)
-    {
-        var client = await CreateClientAsAsync(UserRole.Technician);
-
-        var response = await client.SendAsync(Request(method, url), Ct);
-
-        await ShouldBeProblemAsync(response, HttpStatusCode.Forbidden, "forbidden");
-    }
-
-    [Fact]
-    public async Task LeadList_Admin_Returns200()
-    {
-        var client = await CreateClientAsAsync(UserRole.Admin);
-
-        var response = await client.GetAsync("/api/leads", Ct);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
 
     [Fact]
     public async Task QuoteForm_SignedOut_CreatesTheLead()
