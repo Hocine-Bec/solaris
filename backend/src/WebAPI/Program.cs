@@ -27,6 +27,9 @@ builder.Host.UseSerilog((context, configuration) =>
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter()));
 
+// Every endpoint needs a signed-in account unless it allows anonymous callers; policies narrow it to a role (ADR 9)
+builder.Services.AddStaffPolicies();
+
 // Every error response is a ProblemDetails (RFC 9457) with a stable code (ADR 3). An expected failure sets its own
 // (ApiControllerBase.Problem); the others get one here: validation_failed, internal_error, or the status's name.
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
@@ -111,7 +114,8 @@ app.UseHangfireDashboard();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    // Development only, so open to anyone there: the API reference loads without signing in
+    app.MapOpenApi().AllowAnonymous();
 
     app.MapScalarApiReference(options =>
     {
@@ -119,7 +123,7 @@ if (app.Environment.IsDevelopment())
             .WithTitle("Solar CRM API")
             .WithTheme(ScalarTheme.Kepler)
             .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
-    });
+    }).AllowAnonymous();
 
     app.MapMeasurementEndpoints();
     

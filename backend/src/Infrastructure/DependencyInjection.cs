@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using Application.Errors;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Hangfire;
@@ -11,6 +12,8 @@ using Infrastructure.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -24,6 +27,9 @@ namespace Infrastructure;
 
 public static class DependencyInjection
 {
+    /// <summary>Marks a request whose token was valid but whose account is deactivated or gone.</summary>
+    private const string SignedOutKey = "solaris.signed_out";
+
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         // Typed settings, validated when the host starts: a missing or invalid one stops the API and names the key.
@@ -125,6 +131,33 @@ public static class DependencyInjection
                             context.Request.Cookies.TryGetValue(Session.CookieName, out var token))
                             context.Token = token;
                         return Task.CompletedTask;
+                    },
+                    // A valid token isn't enough: the account must still exist and be active, so deactivating an
+                    // account ends its sessions at their next request (ADR 7).
+                    OnTokenValidated = async context =>
+                    {
+                        var users = context.HttpContext.RequestServices.GetRequiredService<IUserRepo>();
+                        var id = context.Principal?.FindFirst(Session.UserIdClaim)?.Value;
+                        if (int.TryParse(id, out var userId) && await users.IsActiveAsync(userId))
+                            return;
+                        context.HttpContext.Items[SignedOutKey] = true;
+                        context.Fail("The account was deactivated or no longer exists.");
+                    },
+                    // That case answers auth.signed_out, as /me does; any other 401 keeps the framework's answer.
+                    OnChallenge = async context =>
+                    {
+                        if (!context.HttpContext.Items.ContainsKey(SignedOutKey))
+                            return;
+                        context.HandleResponse();
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        var problem = new ProblemDetails
+                        {
+                            Status = StatusCodes.Status401Unauthorized,
+                            Detail = AuthErrors.SignedOut.Message,
+                            Extensions = { ["code"] = AuthErrors.SignedOut.Code }
+                        };
+                        await context.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>()
+                            .WriteAsync(new ProblemDetailsContext { HttpContext = context.HttpContext, ProblemDetails = problem });
                     }
                 };
             });

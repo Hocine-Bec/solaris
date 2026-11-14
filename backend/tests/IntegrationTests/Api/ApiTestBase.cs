@@ -1,7 +1,11 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
+using Domain.Entities;
+using Domain.Enums;
 using FluentAssertions;
 using Hangfire;
 using Microsoft.AspNetCore.Hosting;
@@ -66,6 +70,45 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
             });
         });
         return _factory.CreateClient();
+    }
+
+    /// <summary>A technician's account, added to this test's database by <see cref="CreateClientAsAsync"/>.</summary>
+    protected static class TestTechnician
+    {
+        public const string Name = "Jamal Ortiz";
+        public const string Email = "jamal.ortiz@solaris.test";
+    }
+
+    /// <summary>
+    /// A client signed in as the test Admin, or as a technician added here, its session's token in the Authorization
+    /// header, as the API reference and scripts send it. The token is issued directly, without signing in, so no
+    /// password is hashed. The other parameters are <see cref="CreateClient"/>'s.
+    /// </summary>
+    protected async Task<HttpClient> CreateClientAsAsync(UserRole role,
+        Action<IServiceCollection>? configureServices = null, string environment = "Testing")
+    {
+        var client = CreateClient(configureServices, environment);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<IUserRepo>();
+        var user = role == UserRole.Admin
+            ? await users.GetByEmailAsync(TestAdmin.Email)
+            : await users.GetByEmailAsync(TestTechnician.Email) ?? await AddTechnicianAsync(scope.ServiceProvider);
+        var (token, _) = scope.ServiceProvider.GetRequiredService<ISessionTokenIssuer>().Issue(user!);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
+
+    private static async Task<User> AddTechnicianAsync(IServiceProvider services)
+    {
+        var technician = new User
+        {
+            Name = TestTechnician.Name, Email = TestTechnician.Email,
+            NormalizedEmail = User.NormalizeEmail(TestTechnician.Email), PasswordHash = "not used: no test signs in with it",
+            Role = UserRole.Technician, IsActive = true, CreatedAt = DateTime.UtcNow
+        };
+        services.GetRequiredService<IUserRepo>().Add(technician);
+        await services.GetRequiredService<IUnitOfWork>().SaveAsync();
+        return technician;
     }
 
     // No test here enqueues a job (the notifier is a fake, or synchronous), and a Hangfire server keeps up to 20

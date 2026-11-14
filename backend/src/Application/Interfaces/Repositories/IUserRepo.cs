@@ -10,4 +10,7 @@ public interface IUserRepo : IGenericRepo<User>
 
     /// <summary>Whether an active Admin exists.</summary>
     Task<bool> AnyActiveAdminAsync();
+
+    /// <summary>Whether the account with this ID exists and is active: every signed-in request asks (ADR 7).</summary>
+    Task<bool> IsActiveAsync(int id);
 }

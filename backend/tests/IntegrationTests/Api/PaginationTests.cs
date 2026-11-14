@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Application.DTOs.Common;
 using Application.DTOs.Lead;
 using Domain.Entities;
+using Domain.Enums;
 using FluentAssertions;
 using TestUtilities.Database;
 using TestUtilities.Factories;
@@ -19,7 +20,7 @@ public class PaginationTests(PostgresFixture database) : ApiTestBase(database)
     {
         await SeedLeadsAsync(25);
 
-        var page = await CreateClient().GetFromJsonAsync<PagedResponse<LeadResponse>>("/api/leads", Ct);
+        var page = await (await CreateClientAsAsync(UserRole.Admin)).GetFromJsonAsync<PagedResponse<LeadResponse>>("/api/leads", Ct);
 
         page!.Page.Should().Be(1);
         page.PageSize.Should().Be(20);
@@ -32,7 +33,7 @@ public class PaginationTests(PostgresFixture database) : ApiTestBase(database)
     {
         await SeedLeadsAsync(25);
 
-        var page = await CreateClient().GetFromJsonAsync<PagedResponse<LeadResponse>>(
+        var page = await (await CreateClientAsAsync(UserRole.Admin)).GetFromJsonAsync<PagedResponse<LeadResponse>>(
             "/api/leads?page=2&pageSize=20", Ct);
 
         page!.Items.Select(l => l.Id).Should().Equal(5, 4, 3, 2, 1);
@@ -44,7 +45,7 @@ public class PaginationTests(PostgresFixture database) : ApiTestBase(database)
     {
         await SeedLeadsAsync(3);
 
-        var page = await CreateClient().GetFromJsonAsync<PagedResponse<LeadResponse>>("/api/leads?page=5", Ct);
+        var page = await (await CreateClientAsAsync(UserRole.Admin)).GetFromJsonAsync<PagedResponse<LeadResponse>>("/api/leads?page=5", Ct);
 
         page!.Items.Should().BeEmpty();
         page.TotalCount.Should().Be(3);
@@ -57,7 +58,7 @@ public class PaginationTests(PostgresFixture database) : ApiTestBase(database)
     [InlineData("page=2147483647&pageSize=100", "Page")]
     public async Task GetLeads_PageOutOfRange_Returns400ValidationFailed(string query, string field)
     {
-        var response = await CreateClient().GetAsync($"/api/leads?{query}", Ct);
+        var response = await (await CreateClientAsAsync(UserRole.Admin)).GetAsync($"/api/leads?{query}", Ct);
 
         var body = await ShouldBeProblemAsync(response, HttpStatusCode.BadRequest, "validation_failed");
         body.GetProperty("errors").TryGetProperty(field, out _).Should().BeTrue();

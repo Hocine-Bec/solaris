@@ -42,7 +42,7 @@ public class ErrorResponseTests(PostgresFixture database) : ApiTestBase(database
     [Fact]
     public async Task GetLead_UnknownId_Returns404LeadNotFound()
     {
-        var response = await CreateClient().GetAsync("/api/leads/999", Ct);
+        var response = await (await CreateClientAsAsync(UserRole.Admin)).GetAsync("/api/leads/999", Ct);
 
         var body = await ShouldBeProblemAsync(response, HttpStatusCode.NotFound, "lead.not_found");
         body.GetProperty("detail").GetString().Should().Be("Lead with ID 999 not found.");
@@ -72,7 +72,7 @@ public class ErrorResponseTests(PostgresFixture database) : ApiTestBase(database
     [Fact]
     public async Task ConvertLead_AlreadyConverted_Returns409LeadAlreadyConverted()
     {
-        var client = CreateClient();
+        var client = await CreateClientAsAsync(UserRole.Admin);
         await SeedLeadAsync(LeadStatus.Contacted);
         (await client.PostAsJsonAsync("/api/leads/convert", new ConvertLeadRequest { LeadId = 1 }, Ct))
             .StatusCode.Should().Be(HttpStatusCode.OK);
@@ -95,7 +95,7 @@ public class ErrorResponseTests(PostgresFixture database) : ApiTestBase(database
             ContactAddressId = 1
         });
 
-        var response = await CreateClient().PostAsJsonAsync("/api/leads/convert",
+        var response = await (await CreateClientAsAsync(UserRole.Admin)).PostAsJsonAsync("/api/leads/convert",
             new ConvertLeadRequest { LeadId = 1 }, Ct);
 
         await ShouldBeProblemAsync(response, HttpStatusCode.Conflict, "customer.email_taken");
@@ -128,7 +128,7 @@ public class ErrorResponseTests(PostgresFixture database) : ApiTestBase(database
         // Regression: an unknown status name reached Enum.Parse in the service and answered 500.
         await SeedLeadAsync(LeadStatus.New);
 
-        var response = await CreateClient().PutAsJsonAsync("/api/leads/1/status",
+        var response = await (await CreateClientAsAsync(UserRole.Admin)).PutAsJsonAsync("/api/leads/1/status",
             new UpdateLeadStatusRequest { Status = "Foo" }, Ct);
 
         var body = await ShouldBeProblemAsync(response, HttpStatusCode.BadRequest, "validation_failed");
@@ -136,9 +136,10 @@ public class ErrorResponseTests(PostgresFixture database) : ApiTestBase(database
     }
 
     [Fact]
-    public async Task UnknownUrl_Returns404WithAProblemBody()
+    public async Task UnknownUrl_SignedIn_Returns404WithAProblemBody()
     {
-        var response = await CreateClient().GetAsync("/api/nope", Ct);
+        // Signed out, an unknown URL answers 401 instead (AuthorizationTests)
+        var response = await (await CreateClientAsAsync(UserRole.Admin)).GetAsync("/api/nope", Ct);
 
         await ShouldBeProblemAsync(response, HttpStatusCode.NotFound, "not_found");
     }
@@ -146,7 +147,8 @@ public class ErrorResponseTests(PostgresFixture database) : ApiTestBase(database
     [Fact]
     public async Task UnhandledException_Returns500InternalErrorWithoutTheExceptionDetails()
     {
-        var client = CreateClient(services => services.AddScoped<ILeadService, ThrowingLeadService>());
+        var client = await CreateClientAsAsync(UserRole.Admin,
+            services => services.AddScoped<ILeadService, ThrowingLeadService>());
 
         var response = await client.GetAsync("/api/leads/1", Ct);
 
