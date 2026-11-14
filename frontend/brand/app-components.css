@@ -1,6 +1,7 @@
 /*
  * The UI kit's components for the staff app, on top of components.css: the app's text scale, the segmented choice,
- * the menu, avatars, tables, and the states a screen shows while loading, empty or failed. Import after components.css.
+ * the menu, avatars, status chips, tables and their pager, key-value lists, dialogs, and the states a screen shows
+ * while loading, empty or failed. Import after components.css.
  */
 
 /* ===================== App text scale (the staff app's text is 14 px, its fields 16 px) ===================== */
@@ -34,12 +35,49 @@
 /* ===================== Avatar: a person's initials ===================== */
 .avatar { --s: 2rem; width: var(--s); height: var(--s); border-radius: 50%; display: inline-grid; place-items: center; flex: none; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong); font: 500 calc(var(--s) * .33)/1 var(--font-mono); letter-spacing: .04em; color: var(--fg); }
 
+/* ===================== Status chips =====================
+ * The status's colour on a light wash of itself, so it reads as that colour at a glance. Each tone's text keeps at
+ * least 4.5:1 against its own wash in both themes (the lowest: 4.67:1, the closed grey on Night's raised surface). */
+.tone-neutral { --tone: var(--muted); }
+.tone-closed { --tone: var(--faint); }
+.chip { display: inline-flex; align-items: center; gap: .35rem; height: 1.5rem; padding: 0 .6rem 0 .45rem; border-radius: var(--radius-full); color: var(--tone); background: color-mix(in srgb, var(--tone) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 50%, transparent); font: 500 .66rem/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
+.chip .ic { width: .85rem; height: .85rem; }
+
+/* ===================== Key-value list ===================== */
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .55rem 1.5rem; font-size: .875rem; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+
+/* ===================== Saved: beside the action that saved ===================== */
+.saved { display: inline-flex; align-items: center; gap: .35rem; font-size: .8125rem; color: var(--positive); }
+.saved .ic { width: 1rem; height: 1rem; }
+
 /* ===================== Tables ===================== */
 .table-wrap { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-lg); box-shadow: inset 0 0 0 1px var(--line); background: var(--bg-raised); }
 .table { width: 100%; border-collapse: collapse; font-size: .875rem; }
 .table th { text-align: left; padding: 0 1rem; height: 2.5rem; font: 400 .66rem/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); white-space: nowrap; border-bottom: 1px solid var(--line); }
 .table td { padding: 0 1rem; height: 3rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .table tbody tr:last-child td { border-bottom: 0; }
+.table th.r, .table td.r { text-align: right; }
+.table tbody tr { transition: background-color var(--duration-fast); }
+.table tbody tr:hover { background: var(--surface); }
+.table td.dim { color: var(--muted); }
+.table td.num { font-size: .8125rem; color: var(--muted); }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: .9rem; flex-wrap: wrap; }
+.pager .a-data { color: var(--muted); }
+.pager div { display: flex; gap: .5rem; }
+
+/* ===================== Dialog (a native <dialog>) ===================== */
+.dialog { width: min(100% - 2rem, 30rem); max-height: calc(100dvh - 2rem); margin: auto; padding: 0; border: 0; border-radius: var(--radius-xl); background: var(--bg-raised); color: var(--fg); box-shadow: var(--shadow-overlay), inset 0 0 0 1px var(--line); }
+.dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
+.dialog[open] { animation: pop var(--duration-base) var(--ease-out); }
+@keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.dialog form, .dialog .dialog-body { display: grid; gap: 1.1rem; padding: 1.5rem; }
+.dialog .a-heading { padding-right: 2rem; }
+.dialog .a-heading:focus { outline: none; }
+.dialog-body > p, .dialog form > p { font-size: .875rem; color: var(--muted); }
+.dialog .close { position: absolute; top: .9rem; right: .9rem; }
+.dialog .actions { display: flex; justify-content: flex-end; gap: .5rem; flex-wrap: wrap; margin-top: .25rem; }
 
 /* ===================== States: loading, empty, failed, not found ===================== */
 .state-box { display: grid; place-items: center; min-height: 26rem; }

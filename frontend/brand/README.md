@@ -6,8 +6,8 @@ the logo and the line drawings. The [marketing site](../marketing/README.md) and
 | File | Holds |
 |---|---|
 | `tokens.css` | The palette, the roles each theme gives it, type, space, radii and motion, for Tailwind CSS 4 (`@theme`) |
-| `components.css` | The base styles and the core components: text styles, links, buttons, fields, notices |
-| `app-components.css` | The components for the staff app, on top of `components.css`: the app's text scale, the segmented choice, the menu, avatars, tables, and the loading, empty and failed states |
+| `components.css` | The base styles and the core components: text styles, links, buttons (danger ones included), fields, notices |
+| `app-components.css` | The components for the staff app, on top of `components.css`: the app's text scale, the segmented choice, the menu, avatars, status chips, tables and their pager, key-value lists, dialogs, and the loading, empty and failed states |
 | `fonts.css`, `fonts/` | The fonts, as WOFF2, with their licences |
 | `logo/` | The wordmark, on dark and on light, and its outlines as JSON |
 | `drawings/iso.ts` | The line drawings, in isometric projection, as data: the house with one layer per step, and the figures (a panel, the inverter, the paperwork, someone watching) |
@@ -38,7 +38,10 @@ React. Each app turns a drawing into an SVG with its own small `DrawingSvg` comp
 Two themes, set on any element with `data-theme`: `night` (Night background, white text, the yellow as accent) and
 `limestone` (Limestone background, near-black text, a deep yellow for text and lines on it). Components use the
 roles (`--bg`, `--fg`, `--muted`, `--faint`, `--line`, `--accent`, `--accent-fill`, …), never the palette directly.
-The yellow never means a status: info, positive, warning and negative have their own colours.
+The yellow never means a status: info, positive, warning and negative have their own colours. A status chip shows
+its colour as text and outline on a light wash of itself (10%); every tone's text keeps at least 4.5:1 against its
+wash in both themes (the lowest, 4.67:1, is Deactivated's grey on Night's raised surface; Limestone's positive,
+`#0f6f35`, is 4.87:1 on the page).
 
 ## Fonts
 
