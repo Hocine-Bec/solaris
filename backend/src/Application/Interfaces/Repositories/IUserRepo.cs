@@ -11,6 +11,9 @@ public interface IUserRepo : IGenericRepo<User>
     /// <summary>Whether an active Admin exists.</summary>
     Task<bool> AnyActiveAdminAsync();
 
-    /// <summary>Whether the account with this ID exists and is active: every signed-in request asks (ADR 7).</summary>
-    Task<bool> IsActiveAsync(int id);
+    /// <summary>
+    /// Whether a session of this account, started at <paramref name="issuedAt"/>, may go on: the account exists, is
+    /// active, and its password hasn't been replaced since. Every signed-in request asks (ADR 7).
+    /// </summary>
+    Task<bool> AcceptsSessionAsync(int id, DateTime issuedAt);
 }

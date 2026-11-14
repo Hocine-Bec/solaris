@@ -80,33 +80,54 @@ public class UserRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         any.Should().BeTrue();
     }
 
+    private static readonly DateTime Now = new(2026, 11, 14, 9, 30, 15, DateTimeKind.Utc);
+
     [Theory]
     [InlineData(true, true)]
     [InlineData(false, false)]
-    public async Task IsActiveAsync_ExistingAccount_ReturnsWhetherItIsActive(bool isActive, bool expected)
+    public async Task AcceptsSessionAsync_PasswordNeverReplaced_ReturnsWhetherItIsActive(bool isActive, bool expected)
     {
         // Arrange
         var user = NewUser(isActive: isActive);
         await SeedAsync(user);
 
         // Act
-        var active = await Repo.IsActiveAsync(user.Id);
+        var accepted = await Repo.AcceptsSessionAsync(user.Id, Now);
 
         // Assert
-        active.Should().Be(expected);
+        accepted.Should().Be(expected);
     }
 
     [Fact]
-    public async Task IsActiveAsync_UnknownId_ReturnsFalse()
+    public async Task AcceptsSessionAsync_UnknownId_ReturnsFalse()
     {
         // Arrange
         await SeedAsync(NewUser());
 
         // Act
-        var active = await Repo.IsActiveAsync(404);
+        var accepted = await Repo.AcceptsSessionAsync(404, Now);
 
         // Assert
-        active.Should().BeFalse();
+        accepted.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(-1, false)]   // started the second before the new password
+    [InlineData(0, true)]     // in the same second: the session that changed its own password keeps its new token
+    [InlineData(5, true)]
+    public async Task AcceptsSessionAsync_PasswordReplaced_AcceptsOnlySessionsFromThatSecondOn(int startedSecondsAfter,
+        bool expected)
+    {
+        // Arrange - the password replaced at 09:30:15.700: sessions are valid from 09:30:15
+        var user = NewUser();
+        user.SetPassword("another-hash", Now.AddMilliseconds(700));
+        await SeedAsync(user);
+
+        // Act
+        var accepted = await Repo.AcceptsSessionAsync(user.Id, Now.AddSeconds(startedSecondsAfter));
+
+        // Assert
+        accepted.Should().Be(expected);
     }
 
     [Fact]

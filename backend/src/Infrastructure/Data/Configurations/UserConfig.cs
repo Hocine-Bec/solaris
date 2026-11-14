@@ -53,6 +53,9 @@ public class UserConfig : IEntityTypeConfiguration<User>
         builder.Property(u => u.LastLoginAt)
             .HasColumnName("last_login_at");
 
+        builder.Property(u => u.SessionsValidFrom)
+            .HasColumnName("sessions_valid_from");
+
         // One account per email, whatever its case: sign-in looks it up by this column.
         builder.HasIndex(u => u.NormalizedEmail)
             .IsUnique()

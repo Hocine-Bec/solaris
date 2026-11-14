@@ -317,6 +317,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("role");
 
+                    b.Property<DateTime?>("SessionsValidFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sessions_valid_from");
+
                     b.HasKey("Id")
                         .HasName("pk_users");
 
