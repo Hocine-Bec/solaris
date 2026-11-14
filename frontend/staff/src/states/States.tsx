@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, CircleAlert, CloudOff, LoaderCircle, RefreshCw, SearchX, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, CircleAlert, ClipboardCheck, CloudOff, Inbox, LoaderCircle, Lock, RefreshCw, SearchX, type LucideIcon } from 'lucide-react';
 import { ApiError, MESSAGES } from '../api/errors';
 import { Icon } from '../components/Icon';
+import { landingFor, useCurrentUser } from '../session/session';
 
 /*
  * The states every screen shares, from the approved staff app design. Each screen supplies only its own words: what
- * it loads, its empty message, the noun of its record. Signed out comes with signing in, Not allowed with the
- * roles.
+ * it loads, its empty message, the noun of its record. Signed out is the sign-in page.
  */
 
 const SKELETON_WIDTHS = [8, 6.5, 7.5, 5.5, 7];
@@ -88,6 +88,26 @@ export function NotFound({ noun = 'page', back }: NotFoundProps) {
     <StateBox icon={SearchX} heading={`This ${noun} doesn't exist`} headingId="page-title">
       <p>The link may be wrong, or the {noun} was removed.</p>
       <Link className="btn btn-secondary btn-sm" to={back.to}><Icon icon={ArrowLeft} />{back.label}</Link>
+    </StateBox>
+  );
+}
+
+/**
+ * Another role's page, opened from a typed or shared address, or data the API refused (403): says whose page it is
+ * and leads to the account's own work. The navigation only hides links; the API checks the role on every request.
+ * Its heading is the page's title, where focus goes.
+ */
+export function NotAllowed() {
+  const { role } = useCurrentUser();
+  return role === 'Admin' ? (
+    <StateBox icon={Lock} tone="warning" heading="This page is for technicians" headingId="page-title">
+      <p>You're signed in as an Admin. The office's work starts in Leads.</p>
+      <Link className="btn btn-secondary btn-sm" to={landingFor(role)}><Icon icon={Inbox} />Go to Leads</Link>
+    </StateBox>
+  ) : (
+    <StateBox icon={Lock} tone="warning" heading="This page is for the office" headingId="page-title">
+      <p>You're signed in as a technician. Your installations are in My work.</p>
+      <Link className="btn btn-secondary btn-sm" to={landingFor(role)}><Icon icon={ClipboardCheck} />Go to My work</Link>
     </StateBox>
   );
 }

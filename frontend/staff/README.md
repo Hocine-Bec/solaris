@@ -13,8 +13,8 @@ features; until then each section shows what it will hold.
 |---|---|
 | `/login` | Signing in (`?returnTo=` remembers the page to come back to) |
 | `/` | Opens the account's landing page: Leads for the office, My work for technicians |
-| `/leads`, `/customers`, `/installations`, `/production`, `/notifications`, `/users` | The office's six sections, in the side bar |
-| `/my-work` | A technician's work |
+| `/leads`, `/customers`, `/installations`, `/production`, `/notifications`, `/users` | The office's six sections, in the side bar; a technician who opens one sees Not allowed |
+| `/my-work` | A technician's work; an Admin who opens it sees Not allowed |
 | Any other | Page not found, inside the frame |
 
 Every page but `/login` needs a session: without one, the sign-in page opens and remembers the address.
@@ -46,7 +46,8 @@ Every page but `/login` needs a session: without one, the sign-in page opens and
 
 - **A side bar** with the account's sections (the office's six, or My work for a technician); below 768 px, a top bar
   whose menu button opens the same navigation in a drawer (a native `<dialog>`: Escape or a click outside closes it).
-  The navigation only hides links: the API checks the role on every request.
+  The navigation only hides links: the API checks the role on every request, and another role's page, opened from
+  its address, shows Not allowed.
 - **The account menu,** from the account button at the bottom of the side bar (initials, name and role), or from the
   initials in the phone's top bar: the email, the theme, and Sign out, in a native popover.
 - **Themes:** Light, Dark or System, chosen in the account menu, and kept in the browser for the next visit. System
@@ -66,10 +67,11 @@ Built once in `src/states/`; each screen gives only its own words:
 | Empty | The list has nothing; the screen says why and what fills it |
 | Failed | The network or the server failed; Try again keeps the screen's filters. A later refresh that fails leaves the data shown |
 | Not found | A wrong link, or a record that no longer exists (404) |
+| Not allowed | Another role's page, opened from a typed or shared address (a technician on an office page, an Admin on My work), or data the API refused (403): says whose page it is, with the way to the account's own work |
 | Changed by someone else | A 409 because the record changed since it was read: nothing is overwritten, and Reload shows the latest |
 
 `QueryView` picks the state for a load (TanStack Query), so a screen draws only its data. Signed out is the
-sign-in page; Not allowed comes with the roles' checks in the API.
+sign-in page.
 
 ## Talking to the API
 

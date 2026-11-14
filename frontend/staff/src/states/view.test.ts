@@ -4,6 +4,7 @@ import { viewOf } from './view';
 
 const notFound = new ApiError('notFound', MESSAGES.notFound, { status: 404 });
 const unreachable = new ApiError('unreachable', MESSAGES.unreachable);
+const forbidden = new ApiError('forbidden', MESSAGES.forbidden, { status: 403 });
 const isEmpty = (rows: string[]) => rows.length === 0;
 
 describe('viewOf', () => {
@@ -17,8 +18,9 @@ describe('viewOf', () => {
     expect(viewOf({ status: 'success', error: null, data: [] })).toBe('ready');
   });
 
-  it('is not found for a 404, failed for anything else', () => {
+  it('is not found for a 404, not allowed for a 403, failed for anything else', () => {
     expect(viewOf({ status: 'error', error: notFound, data: undefined })).toBe('notFound');
+    expect(viewOf({ status: 'error', error: forbidden, data: undefined })).toBe('forbidden');
     expect(viewOf({ status: 'error', error: unreachable, data: undefined })).toBe('failed');
     expect(viewOf({ status: 'error', error: new TypeError('x is undefined'), data: undefined })).toBe('failed');
   });
