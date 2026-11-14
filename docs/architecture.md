@@ -345,5 +345,6 @@ Architecture decisions are recorded as ADRs, one file each, in [`adr/`](adr/):
 | [6](adr/0006-staff-app-stack.md) | The staff app's stack and its test level |
 | [7](adr/0007-staff-sessions-in-a-cookie.md) | Staff sessions: the token in an HttpOnly cookie |
 | [8](adr/0008-password-hashing.md) | Passwords hashed with PBKDF2-HMAC-SHA512 |
+| [9](adr/0009-closed-by-default.md) | Closed by default: every endpoint needs a signed-in account unless it opens itself |
 
 Decisions for parts not built yet are added as ADRs when those parts are built.
