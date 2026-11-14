@@ -277,7 +277,11 @@ delivery.
 
 **Running:** `perf/p2/run.sh <A|B|C> <run number> <before|after>` runs one scenario end to end on a fresh
 `postgres:18` container: the API's Release build in Development, a warm-up of read requests only (so the only leads
-are the 500 counted), the load (`perf/p2/leads.js`), the fault and the crash, the wait, and the counts. It writes
+are the 500 counted), the load (`perf/p2/leads.js`), the fault and the crash, the wait, and the counts. Since the lead
+list became the office's (2026-11-14), the warm-up signs in once as the run's own Admin and sends the token with each
+read, and its second read is `GET /api/leads/999` (a 404) instead of the removed `GET /api/addresses/999`; the
+measured requests, the quote form's `POST /api/leads`, are sent signed out as before. The "before" runs of
+2026-11-08 used the earlier warm-up. It writes
 `results.json`, k6's summary and `env.md` to `perf/results/p2/<date>-<design>/<scenario>-run<N>/`; the API's own log
 (`api.log`) stays out of git. Each scenario runs 3 times; the median run by Lost is reported, ties broken by drain
 time.

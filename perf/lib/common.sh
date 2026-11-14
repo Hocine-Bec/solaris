@@ -9,6 +9,9 @@ DB_PORT=${DB_PORT:-55440}
 API_PORT=${API_PORT:-5099}
 BASE_URL="http://127.0.0.1:$API_PORT"
 CONNECTION="Host=127.0.0.1;Port=$DB_PORT;Database=solaris;Username=postgres;Password=perf"
+# The run's own first Admin, on its empty database (the API needs one to start): throwaway, like the database
+PERF_ADMIN_EMAIL=perf.admin@example.test
+PERF_ADMIN_PASSWORD='Perf#2026'
 API_PID=""
 
 log() { printf '%s %s\n' "$(date +%T)" "$*"; }
@@ -34,17 +37,19 @@ stop_database() { docker rm -f "$DB_CONTAINER" >/dev/null 2>&1 || true; }
 build_api() { dotnet build "$API_DIR/WebAPI.csproj" -c Release -nologo -v q >/dev/null; }
 
 # start_api <log file> [NAME=value ...]: the Release build in Development (so the measurement harness is there and the
-# migrations run), with Recording at 2 s per email, in the background; returns once it answers.
+# migrations run), with Recording at 2 s per email, in the background; returns once it answers. The harness's email
+# fault switch is the address it waits on: open in Development, and answering only once startup is complete.
 start_api() {
   local log_file=$1
   shift
   (cd "$API_DIR" && exec env ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS="$BASE_URL" \
     ConnectionStrings__Default="$CONNECTION" Jwt__Secret=perf-secret-perf-secret-perf-secret-perf \
     Email__FromAddress=sales@example.test Email__Provider=Recording Email__SimulatedLatencyMs=2000 \
+    Admin__Name="Perf Admin" Admin__Email="$PERF_ADMIN_EMAIL" Admin__Password="$PERF_ADMIN_PASSWORD" \
     "$@" dotnet bin/Release/net10.0/WebAPI.dll) >>"$log_file" 2>&1 &
   API_PID=$!
   for _ in $(seq 1 240); do
-    curl -sf -o /dev/null "$BASE_URL/api/leads?pageSize=1" && return 0
+    curl -sf -o /dev/null "$BASE_URL/api/dev/email-fault" && return 0
     kill -0 "$API_PID" 2>/dev/null || { echo "The API exited; see $log_file" >&2; return 1; }
     sleep 0.25
   done
@@ -68,11 +73,17 @@ crash_api() {
   API_PID=""
 }
 
-# Reads only, so the leads a run counts are only its own.
+# Reads only, so the leads a run counts are only its own. The lead endpoints are the office's, so it signs in once as
+# the run's Admin and sends the session's token in the Authorization header.
 warm_up() {
+  local token
+  token=$(curl -s -D - -o /dev/null -H 'Content-Type: application/json' \
+    --data "{\"email\":\"$PERF_ADMIN_EMAIL\",\"password\":\"$PERF_ADMIN_PASSWORD\"}" "$BASE_URL/api/auth/login" |
+    sed -n 's/^[Ss]et-[Cc]ookie: solaris_session=\([^;]*\).*/\1/p' | tr -d '\r')
+  [ -n "$token" ] || { echo "The warm-up couldn't sign in." >&2; return 1; }
   for _ in $(seq 1 30); do
-    curl -s -o /dev/null "$BASE_URL/api/leads?pageSize=5"
-    curl -s -o /dev/null "$BASE_URL/api/addresses/999"
+    curl -s -o /dev/null -H "Authorization: Bearer $token" "$BASE_URL/api/leads?pageSize=5"
+    curl -s -o /dev/null -H "Authorization: Bearer $token" "$BASE_URL/api/leads/999"
   done
 }
 
