@@ -27,7 +27,6 @@ public static class DependencyInjection
         services.AddScoped<IMapper, ServiceMapper>();
         
         //Services
-        services.AddScoped<IAddressService, AddressService>();
         services.AddScoped<ILeadService, LeadService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();

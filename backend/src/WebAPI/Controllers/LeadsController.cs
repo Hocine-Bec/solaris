@@ -48,14 +48,6 @@ public class LeadsController(ILeadService service) : ApiControllerBase
         return result.IsSuccess ? NoContent() : Problem(result.Error);
     }
 
-    [HttpDelete("{id:int}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> Delete(int id)
-    {
-        await service.DeleteAsync(id);
-        return NoContent();
-    }
-
     [HttpPost("convert")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

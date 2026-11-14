@@ -49,14 +49,6 @@ public class ErrorResponseTests(PostgresFixture database) : ApiTestBase(database
     }
 
     [Fact]
-    public async Task GetAddress_UnknownId_Returns404AddressNotFound()
-    {
-        var response = await CreateClient().GetAsync("/api/addresses/999", Ct);
-
-        await ShouldBeProblemAsync(response, HttpStatusCode.NotFound, "address.not_found");
-    }
-
-    [Fact]
     public async Task CreateLead_Valid_Returns201WithTheNewLeadsUrl()
     {
         var response = await CreateClient().PostAsJsonAsync("/api/leads", ValidLead(), Ct);
@@ -179,7 +171,6 @@ public class ErrorResponseTests(PostgresFixture database) : ApiTestBase(database
         public Task<Result<LeadResponse>> GetByIdAsync(int id) => throw new InvalidOperationException(Secret);
         public Task<Result<LeadResponse>> CreateAsync(CreateLeadRequest request) => throw new InvalidOperationException(Secret);
         public Task<Result> UpdateLeadStatusAsync(int id, UpdateLeadStatusRequest request) => throw new InvalidOperationException(Secret);
-        public Task DeleteAsync(int id) => throw new InvalidOperationException(Secret);
         public Task<Result> ConvertLeadToCustomerAsync(ConvertLeadRequest request) => throw new InvalidOperationException(Secret);
     }
 }

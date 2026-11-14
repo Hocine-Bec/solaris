@@ -89,18 +89,6 @@ public class LeadService : ILeadService
             : Result.Failure(LeadErrors.ConcurrentChange);
     }
 
-    public async Task DeleteAsync(int id)
-    {
-        var lead = await _repo.GetByIdAsync(id);
-        if (lead is null)
-            return;
-
-        _repo.Remove(lead);
-
-        // A conflict here means another request already deleted it, which is the outcome asked for.
-        await _unitOfWork.SaveAsync();
-    }
-
     public async Task<Result> ConvertLeadToCustomerAsync(ConvertLeadRequest request)
     {
         var lead = await _repo.GetByIdAsync(request.LeadId);

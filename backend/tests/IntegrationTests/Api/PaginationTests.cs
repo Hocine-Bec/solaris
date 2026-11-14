@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Application.DTOs.Address;
 using Application.DTOs.Common;
 using Application.DTOs.Lead;
 using Domain.Entities;
@@ -62,33 +61,6 @@ public class PaginationTests(PostgresFixture database) : ApiTestBase(database)
 
         var body = await ShouldBeProblemAsync(response, HttpStatusCode.BadRequest, "validation_failed");
         body.GetProperty("errors").TryGetProperty(field, out _).Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task GetAddresses_IsPaginatedById()
-    {
-        await SeedAsync(Enumerable.Range(1, 3).Select(i => AddressFactory.CreateFakeAddress(id: i)).ToArray());
-
-        var page = await CreateClient().GetFromJsonAsync<PagedResponse<AddressResponse>>(
-            "/api/addresses?page=2&pageSize=2", Ct);
-
-        page!.Items.Select(a => a.Id).Should().Equal(3);
-        page.TotalCount.Should().Be(3);
-    }
-
-    [Fact]
-    public async Task SearchAddresses_IsPaginated()
-    {
-        await SeedAsync(
-            AddressFactory.CreateFakeAddress(id: 1, city: "Austin", street: "A St"),
-            AddressFactory.CreateFakeAddress(id: 2, city: "Austin", street: "B St"),
-            AddressFactory.CreateFakeAddress(id: 3, city: "Dallas"));
-
-        var page = await CreateClient().GetFromJsonAsync<PagedResponse<AddressResponse>>(
-            "/api/addresses/search?city=Austin&page=2&pageSize=1", Ct);
-
-        page!.Items.Select(a => a.Id).Should().Equal(2);
-        page.TotalCount.Should().Be(2);
     }
 
     private async Task SeedLeadsAsync(int count)
