@@ -19,6 +19,7 @@ public class SettingsValidationTests
         ["Jwt:Audience"] = "solaris-staff",
         ["Email:FromName"] = "Solaris",
         ["Email:FromAddress"] = "sender@example.com",
+        ["Email:SiteUrl"] = "https://solaris.example",
         ["Email:Smtp:Host"] = "smtp.example.com",
         ["Email:Smtp:Port"] = "587",
         ["Email:Gmail:ClientId"] = "client-id",
@@ -63,6 +64,7 @@ public class SettingsValidationTests
     [InlineData("Jwt:Audience", "Audience")]
     [InlineData("Email:FromName", "FromName")]
     [InlineData("Email:FromAddress", "FromAddress")]
+    [InlineData("Email:SiteUrl", "SiteUrl")]
     [InlineData("Email:Smtp:Host", "Host")]
     [InlineData("Email:Smtp:Port", "Port")]
     [InlineData("Email:Gmail:ClientId", "ClientId")]
@@ -135,6 +137,7 @@ public class SettingsValidationTests
     [InlineData("Jwt:Secret", "31-characters-is-one-too-short!", "Secret")]
     [InlineData("Email:SimulatedLatencyMs", "-1", "SimulatedLatencyMs")]
     [InlineData("Email:FromAddress", "not-an-email-address", "FromAddress")]
+    [InlineData("Email:SiteUrl", "solaris.example", "SiteUrl")]
     [InlineData("Email:Smtp:Port", "70000", "Port")]
     public void Startup_SettingInvalid_FailsNamingTheSetting(string key, string value, string member)
     {

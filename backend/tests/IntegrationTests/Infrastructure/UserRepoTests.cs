@@ -80,6 +80,35 @@ public class UserRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         any.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task IsActiveAsync_ExistingAccount_ReturnsWhetherItIsActive(bool isActive, bool expected)
+    {
+        // Arrange
+        var user = NewUser(isActive: isActive);
+        await SeedAsync(user);
+
+        // Act
+        var active = await Repo.IsActiveAsync(user.Id);
+
+        // Assert
+        active.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task IsActiveAsync_UnknownId_ReturnsFalse()
+    {
+        // Arrange
+        await SeedAsync(NewUser());
+
+        // Act
+        var active = await Repo.IsActiveAsync(404);
+
+        // Assert
+        active.Should().BeFalse();
+    }
+
     [Fact]
     public async Task Save_TwoAccountsDifferingOnlyByCase_IsADuplicate()
     {

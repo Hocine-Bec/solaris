@@ -1,11 +1,15 @@
 using Application.DTOs.Common;
 using Application.DTOs.Lead;
 using Application.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebAPI.Security;
 
 namespace WebAPI.Controllers;
 
+/// <summary>Leads: the office's (Admin), except sending a new one, which the website's quote form does for anyone.</summary>
 [Route("api/leads")]
+[Authorize(Policy = Policies.Admin)]
 public class LeadsController(ILeadService service) : ApiControllerBase
 {
     [HttpGet]
@@ -26,6 +30,7 @@ public class LeadsController(ILeadService service) : ApiControllerBase
     }
 
     [HttpPost]
+    [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -46,14 +51,6 @@ public class LeadsController(ILeadService service) : ApiControllerBase
     {
         var result = await service.UpdateLeadStatusAsync(id, request);
         return result.IsSuccess ? NoContent() : Problem(result.Error);
-    }
-
-    [HttpDelete("{id:int}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> Delete(int id)
-    {
-        await service.DeleteAsync(id);
-        return NoContent();
     }
 
     [HttpPost("convert")]

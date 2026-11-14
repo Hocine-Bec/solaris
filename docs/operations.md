@@ -35,6 +35,7 @@ variables directly, and secrets never go in `appsettings.json`.
 | `Email__Provider` | `appsettings.json` (`Gmail`), `appsettings.Development.json` (`Recording`) | `Gmail` sends real email; `Recording` sends nothing, and the API refuses it in Production |
 | `Email__FromName` | `appsettings.json` | The sender name shown on emails: `Solaris` |
 | `Email__FromAddress` | `.env` | The sender's address; sales notifications are sent to it too |
+| `Email__SiteUrl` | `appsettings.Development.json` (`http://localhost:5173`); the environment outside Development | The marketing site's address, for the links in emails (the welcome email links to its How it works page); required, absolute |
 | `Email__SimulatedLatencyMs` | `appsettings.json` | `Recording` only: how long each email takes, 2000 ms by default |
 | `Email__Smtp__Host`, `Email__Smtp__Port` | `appsettings.json` | `smtp.gmail.com`, 587 |
 | `Email__Gmail__ClientId`, `Email__Gmail__ClientSecret`, `Email__Gmail__RefreshToken` | `.env` | Required only when `Email__Provider=Gmail` |
@@ -65,7 +66,7 @@ stops if they are missing.
   cd backend/src/WebAPI && dotnet run
   ```
 
-- **The API in a container** *(planned)*: comes with the Dockerfile ([Build and CI](#build-and-ci-planned)).
+- **The API in a container** *(planned)*: comes with the Dockerfile ([Build and CI](#build-and-ci)).
 - **The frontends** (Node.js 22.13+, 24 or 26+): `npm install`, then `npm run dev`, in each app's folder.
   - `frontend/marketing/`, on `http://localhost:5173`, calls the API at its `VITE_API_BASE_URL`
     ([configuration](../frontend/marketing/README.md#configuration)).
@@ -112,12 +113,18 @@ dotnet ef database update --project backend/src/Infrastructure --startup-project
 
 ---
 
-## Build and CI *(planned)*
+## Build and CI
 
-- **Docker image:** a multi-stage `Dockerfile`, building with `dotnet/sdk:10.0` and running on `dotnet/aspnet:10.0`;
-  docker compose gains an `api` service built from it, next to the database.
-- **CI:** GitHub Actions on every pull request and on `main`: set up .NET 10 → restore → build → unit and
-  integration tests. Testcontainers runs on the hosted Ubuntu runners.
+- **Docker image** *(planned)*: a multi-stage `Dockerfile`, building with `dotnet/sdk:10.0` and running on
+  `dotnet/aspnet:10.0`; docker compose gains an `api` service built from it, next to the database.
+- **CI:** GitHub Actions ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)), on every pull request and on
+  `main` after each merge, on GitHub's hosted Ubuntu runners. Three jobs run side by side:
+  - **API:** .NET 10 → restore → build (warnings are errors) → unit and integration tests. Testcontainers starts
+    PostgreSQL 18 in the runner's Docker.
+  - **Marketing site** and **Staff app:** Node.js 26 → `npm ci` → lint → tests → build.
+
+  The actions are pinned to a commit, with their release in a comment. The workflow can only read the repository.
+  A newer push to the same branch cancels the run it replaces.
 
 ---
 

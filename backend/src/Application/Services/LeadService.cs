@@ -61,11 +61,7 @@ public class LeadService : ILeadService
         if (await _unitOfWork.SaveAsync() == SaveOutcome.Duplicate)
             return Result.Failure<LeadResponse>(AddressErrors.AlreadyExists);
 
-        var fullAddress = $"{address.Street}, {address.State}, {address.ZipCode}, {address.City}, {address.Country}";
-        var fullName = $"{lead.FirstName} {lead.LastName}";
-
-        await _notifier.NotifyNewLeadAsync(lead.Id, lead.Email, lead.FirstName, fullName, lead.PhoneNumber,
-            fullAddress);
+        await _notifier.NotifyNewLeadAsync(lead);
 
         return Result.Success(lead.Adapt<LeadResponse>());
     }
@@ -87,18 +83,6 @@ public class LeadService : ILeadService
         return await _unitOfWork.SaveAsync() == SaveOutcome.Saved
             ? Result.Success()
             : Result.Failure(LeadErrors.ConcurrentChange);
-    }
-
-    public async Task DeleteAsync(int id)
-    {
-        var lead = await _repo.GetByIdAsync(id);
-        if (lead is null)
-            return;
-
-        _repo.Remove(lead);
-
-        // A conflict here means another request already deleted it, which is the outcome asked for.
-        await _unitOfWork.SaveAsync();
     }
 
     public async Task<Result> ConvertLeadToCustomerAsync(ConvertLeadRequest request)

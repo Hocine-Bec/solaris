@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { Failed, Loading } from './States';
+import { Failed, Loading, NotAllowed } from './States';
 import { viewOf } from './view';
 
 type Props<T> = {
@@ -23,6 +23,7 @@ export function QueryView<T>({ query, what, note, isEmpty, empty, notFound, chil
     case 'loading': return <Loading />;
     case 'failed': return <Failed what={what} error={query.error} note={note} retrying={query.isFetching} onRetry={() => void query.refetch()} />;
     case 'notFound': return notFound;
+    case 'forbidden': return <NotAllowed />;
     case 'empty': return empty;
     case 'ready': return children(query.data as T);
   }

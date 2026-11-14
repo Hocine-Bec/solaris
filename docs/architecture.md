@@ -35,6 +35,7 @@ exists in the code.
 
 ```
 solaris/
+├── .github/workflows/ci.yml   CI: builds and tests the API and both frontends on every pull request
 ├── global.json                .NET SDK version and test runner
 ├── backend/
 │   ├── Solaris.slnx
@@ -75,7 +76,9 @@ they do.
 One API process holds everything. Several instances can run side by side: the dispatcher and the rollup job
 claim their work with `FOR UPDATE SKIP LOCKED`, and Hangfire coordinates its own jobs. The dispatcher and the
 three jobs are *(planned)*; today, the two new-lead emails are sent by Hangfire jobs enqueued after the lead is
-saved, which the outbox replaces (§6).
+saved, which the outbox replaces (§6). Each job carries the lead's id only and reads the lead when it runs, so no
+personal details are copied into Hangfire's tables. The emails are rendered from the lead in `Infrastructure`: an HTML
+part and a plain-text part, every value from the form HTML-encoded, and the wordmark sent inside the email.
 
 ---
 
@@ -134,9 +137,9 @@ installation's own time zone (BR-P4).
 
   | Code | Status | When |
   |---|---|---|
-  | `lead.not_found`, `address.not_found` | 404 | No lead or address has this ID |
+  | `lead.not_found` | 404 | No lead has this ID |
   | `lead.already_converted` | 409 | The lead is already converted |
-  | `lead.concurrent_change`, `address.concurrent_change` | 409 | Someone else changed or deleted the row since it was read |
+  | `lead.concurrent_change` | 409 | Someone else changed the lead since it was read |
   | `address.already_exists` | 409 | An address with the same key exists ([ADR 5](adr/0005-address-natural-key.md)) |
   | `customer.email_taken` | 409 | A customer already has this email |
   | `auth.invalid_credentials` | 401 | A refused sign-in: the same answer for an unknown email, a wrong password or a deactivated account |
@@ -144,7 +147,7 @@ installation's own time zone (BR-P4).
   | `auth.cross_site_request` | 403 | A request that changes data with the session cookie, or signs in or out, from a page on another site (§9) |
   | `validation_failed` | 400 | The request is malformed or fails validation; `errors` lists the fields |
   | `internal_error` | 500 | A bug. Outside Development the body has no exception details; the log line has the same trace id |
-  | The status's name, such as `not_found`, `method_not_allowed` or `unauthorized` | 4xx | Errors from the framework itself, such as an unknown URL, or a request without a session to an endpoint that needs one |
+  | The status's name, such as `not_found`, `method_not_allowed`, `unauthorized` or `forbidden` | 4xx | Errors from the framework itself, such as an unknown URL, a request without a session to an endpoint that needs one, or a role the endpoint doesn't allow |
 
 - **Validation:** FluentValidation rejects malformed requests with 400 and the failing fields.
 - **Timestamps:** every timestamp in a request must carry `Z` or an offset (`2026-11-02T10:00:00Z`,
@@ -152,7 +155,7 @@ installation's own time zone (BR-P4).
   be UTC or local time. Responses are always UTC, with `Z`.
 - **Pagination:** every list takes `?page=1&pageSize=20` (maximum 100) and returns
   `{ items, page, pageSize, totalCount }`. Each list has a total order, ending with the ID, so no row moves between
-  pages: leads newest first, addresses by ID, address search by city, then street.
+  pages: leads newest first.
 - **Cancellation:** every async path takes a `CancellationToken` *(planned)*.
 
 ---
@@ -291,8 +294,7 @@ They read rollups only:
 
 ## 9. Security
 
-Staff sign-in and sessions are built; the rest of this section is *(planned)*. Today only `GET /api/auth/me`
-requires a session: the other endpoints still answer anyone until the fallback policy below.
+Staff sign-in, sessions and the roles' checks are built; the parts marked *(planned)* aren't.
 
 - **Staff sign-in** (FR-U1): `POST /api/auth/login` looks the account up by its normalized email and checks the
   password ([ADR 8](adr/0008-password-hashing.md)). Every refusal (an unknown email, a wrong password, a deactivated
@@ -303,7 +305,8 @@ requires a session: the other endpoints still answer anyone until the fallback p
   `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api`, expiring with the token. The API also reads the
   `Authorization: Bearer` header, which wins when both are sent (the API reference, tests, scripts).
   `POST /api/auth/logout` clears the cookie, even when the session had already ended. `GET /api/auth/me` returns the
-  account, read on each request, so a deactivated account stops at its next one (`401 auth.signed_out`).
+  account. A valid token isn't enough on its own: every request that carries one also reads the account, so a
+  deactivated or deleted account stops at its next request (`401 auth.signed_out`).
 - **Requests from another site:** a request that changes data and carries the session cookie, or that signs in or
   out, is refused with `403 auth.cross_site_request` when its `Origin` isn't the API's own host. A request without
   `Origin` passes: browsers send it, scripts don't. The public lead form carries no cookie, so it isn't affected.
@@ -312,10 +315,14 @@ requires a session: the other endpoints still answer anyone until the fallback p
 - **The first Admin** (FR-U3): at startup, when no active Admin exists, one is created from the `Admin` settings
   (name, email, password, checked with the other settings); with neither, the API stops and names the settings. There
   are no default credentials in the code.
-- **Closed by default** *(planned)*: the fallback authorization policy requires an authenticated user, so a new
-  endpoint is protected unless it is explicitly marked public. Public on purpose: the lead form, sign-in, sign-out,
-  health checks.
-- **Policies** *(planned)*: `Admin`, `Technician`, and `Staff` (either role), reading the `role` claim.
+- **Closed by default** ([ADR 9](adr/0009-closed-by-default.md)): the fallback authorization policy requires a
+  signed-in account, so a new endpoint is protected unless it is marked `[AllowAnonymous]`. Open on purpose: the quote
+  form (`POST /api/leads`), sign-in and sign-out, and the health checks when they come *(planned)*; in Development
+  only, the API reference (`/scalar`, `/openapi/v1.json`) and the measurement harness's email fault switch. Signed
+  out, an address that doesn't exist answers `401`, like one that does.
+- **Policies:** `Admin`, `Technician`, and `Staff` (either role), reading the `role` claim. The leads are `Admin`
+  (the quote form excepted); a technician calling them gets `403 forbidden`. The staff app shows a "Not allowed"
+  screen for another role's page, and the API refuses the data anyway.
 - **Technician scoping** *(planned)*: a technician lists and sees only the installations they are assigned to,
   enforced in the service query.
 - **Devices** *(planned)*: a separate authentication scheme reads `X-Device-Key: <prefix>.<secret>`. The prefix finds
@@ -345,5 +352,6 @@ Architecture decisions are recorded as ADRs, one file each, in [`adr/`](adr/):
 | [6](adr/0006-staff-app-stack.md) | The staff app's stack and its test level |
 | [7](adr/0007-staff-sessions-in-a-cookie.md) | Staff sessions: the token in an HttpOnly cookie |
 | [8](adr/0008-password-hashing.md) | Passwords hashed with PBKDF2-HMAC-SHA512 |
+| [9](adr/0009-closed-by-default.md) | Closed by default: every endpoint needs a signed-in account unless it opens itself |
 
 Decisions for parts not built yet are added as ADRs when those parts are built.

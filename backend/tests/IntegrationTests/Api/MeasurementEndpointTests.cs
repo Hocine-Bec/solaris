@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Domain.Enums;
 using FluentAssertions;
 using TestUtilities.Database;
 
@@ -41,7 +42,10 @@ public class MeasurementEndpointTests(PostgresFixture database) : ApiTestBase(da
     [Fact]
     public async Task EmailFault_OutsideDevelopment_DoesNotExist()
     {
-        var response = await CreateClient().GetAsync("/api/dev/email-fault", Ct);
+        // Signed in, as a signed-out caller gets 401 for any address, existing or not
+        var client = await CreateClientAsAsync(UserRole.Admin);
+
+        var response = await client.GetAsync("/api/dev/email-fault", Ct);
 
         await ShouldBeProblemAsync(response, HttpStatusCode.NotFound, "not_found");
     }

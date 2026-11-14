@@ -45,7 +45,7 @@ public class TimestampTests(PostgresFixture database) : ApiTestBase(database)
     }
 
     private async Task<HttpResponseMessage> PutStatusAsync(string json) =>
-        await CreateClient().PutAsync("/api/leads/1/status",
+        await (await CreateClientAsAsync(UserRole.Admin)).PutAsync("/api/leads/1/status",
             new StringContent(json, System.Text.Encoding.UTF8, "application/json"), Ct);
 
     private async Task SeedLeadAsync()

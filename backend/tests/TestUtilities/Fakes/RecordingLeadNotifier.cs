@@ -1,4 +1,5 @@
 using Application.Interfaces.Services;
+using Domain.Entities;
 
 namespace TestUtilities.Fakes;
 
@@ -7,10 +8,9 @@ public sealed class RecordingLeadNotifier : ILeadNotifier
 {
     public List<NotifiedLead> Notified { get; } = [];
 
-    public Task NotifyNewLeadAsync(int leadId, string email, string firstName, string fullName, string phoneNumber,
-        string address)
+    public Task NotifyNewLeadAsync(Lead lead)
     {
-        Notified.Add(new NotifiedLead(leadId, email));
+        Notified.Add(new NotifiedLead(lead.Id, lead.Email));
         return Task.CompletedTask;
     }
 }

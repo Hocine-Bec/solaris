@@ -1,4 +1,5 @@
 using Application.Interfaces.Services;
+using Domain.Entities;
 using Hangfire;
 using Microsoft.Extensions.Logging;
 
@@ -6,22 +7,20 @@ namespace Infrastructure.Services;
 
 /// <summary>
 /// The default mode (<c>Notifications:Mode=Hangfire</c>): enqueues one Hangfire job per email, fire-and-forget, and
-/// returns at once; <see cref="EmailQueueHandler"/> sends them in the background.
+/// returns at once; <see cref="EmailQueueHandler"/> sends them in the background. Each job carries the lead's id only.
 /// </summary>
 public class HangfireLeadNotifier(ILogger<HangfireLeadNotifier> logger) : ILeadNotifier
 {
-    public Task NotifyNewLeadAsync(int leadId, string email, string firstName, string fullName,
-        string phoneNumber, string address)
+    public Task NotifyNewLeadAsync(Lead lead)
     {
+        var leadId = lead.Id;
         _ = Task.Run(() =>
         {
             try
             {
-                BackgroundJob.Enqueue<IEmailQueueHandler>(x =>
-                    x.SendLeadWelcomeEmailAsync(leadId, email, firstName, address));
+                BackgroundJob.Enqueue<IEmailQueueHandler>(x => x.SendLeadWelcomeEmailAsync(leadId));
 
-                BackgroundJob.Enqueue<IEmailQueueHandler>(x =>
-                    x.SendSalesNotificationEmailAsync(leadId, fullName, email, phoneNumber, address));
+                BackgroundJob.Enqueue<IEmailQueueHandler>(x => x.SendSalesNotificationEmailAsync(leadId));
 
                 logger.LogInformation("Successfully enqueued email jobs for lead {LeadId}", leadId);
             }
