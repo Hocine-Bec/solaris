@@ -84,12 +84,6 @@ namespace Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_addresses_unique_address_hash");
 
-                    b.HasIndex("ZipCode")
-                        .HasDatabaseName("ix_addresses_zip_code");
-
-                    b.HasIndex("City", "State")
-                        .HasDatabaseName("ix_addresses_city_state");
-
                     b.ToTable("addresses", (string)null);
                 });
 
@@ -316,6 +310,10 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("role");
+
+                    b.Property<DateTime?>("SessionsValidFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sessions_valid_from");
 
                     b.HasKey("Id")
                         .HasName("pk_users");

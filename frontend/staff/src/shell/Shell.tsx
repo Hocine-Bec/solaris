@@ -1,16 +1,37 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, NavLink, Outlet, ScrollRestoration, useLocation, useMatches } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { signOut } from '../api/auth';
 import { Icon } from '../components/Icon';
 import { landingFor, REASON_KEY, SESSION_KEY, useCurrentUser } from '../session/session';
+import { ChangePasswordDialog } from '../users/AccountDialogs';
 import { AccountMenu } from './AccountMenu';
 import { sectionsFor, type Section } from './sections';
 import { useTheme } from './theme';
 
 /** What a route tells the shell: the page's title, for the browser's tab */
 export type RouteHandle = { title: string };
+
+/**
+ * Focuses the new screen's title (`#page-title`), now or, for a screen that loads its data first, when it appears.
+ * Once the person has moved focus into the screen themselves, it is left where they put it. Returns the cleanup.
+ */
+function focusTitleWhenShown(): (() => void) | undefined {
+  const focus = () => {
+    const title = document.getElementById('page-title');
+    if (!title) return false;
+    const active = document.activeElement;
+    const main = document.getElementById('main');
+    if (!active || active === document.body || active === main || !main?.contains(active)) title.focus({ preventScroll: true });
+    return true;
+  };
+  const main = document.getElementById('main');
+  if (focus() || !main) return undefined;
+  const observer = new MutationObserver(() => { if (focus()) observer.disconnect(); });
+  observer.observe(main, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}
 
 function Logo({ to }: { to: string }) {
   return <Link className="logo" to={to}>Solaris<i className="dot" aria-hidden="true" /></Link>;
@@ -42,6 +63,7 @@ export function Shell() {
   const matches = useMatches();
   const drawer = useRef<HTMLDialogElement>(null);
   const shown = useRef(pathname);
+  const [changingPassword, setChangingPassword] = useState(false);
   const title = (matches.at(-1)?.handle as RouteHandle | undefined)?.title;
   const sections = sectionsFor(user.role);
   const home = landingFor(user.role);
@@ -53,7 +75,7 @@ export function Shell() {
     if (shown.current === pathname) return;   // the first screen keeps the browser's own focus
     shown.current = pathname;
     drawer.current?.close();
-    document.getElementById('page-title')?.focus({ preventScroll: true });
+    return focusTitleWhenShown();
   }, [pathname]);
 
   const closeDrawer = () => drawer.current?.close();
@@ -69,7 +91,10 @@ export function Shell() {
   };
 
   const account = (id: string, compact?: boolean) => (
-    <AccountMenu id={id} user={user} theme={theme} onTheme={chooseTheme} onSignOut={() => void signOutNow()} compact={compact} />
+    <AccountMenu
+      id={id} user={user} theme={theme} onTheme={chooseTheme} compact={compact}
+      onChangePassword={() => setChangingPassword(true)} onSignOut={() => void signOutNow()}
+    />
   );
 
   return (
@@ -104,6 +129,7 @@ export function Shell() {
       <main id="main" className="main" tabIndex={-1}>
         <Outlet />
       </main>
+      {changingPassword && <ChangePasswordDialog onClose={() => setChangingPassword(false)} />}
       <ScrollRestoration />
     </div>
   );

@@ -1,0 +1,39 @@
+/* The Users screens and the account dialogs, from the approved Users design. */
+
+/* The list: a table, or below 768 px a card per account */
+.users-table .who { display: grid; line-height: 1.35; }
+.users-table .who a { font-weight: 500; color: var(--fg); text-decoration: none; }
+.users-table .who a:hover { text-decoration: underline; text-underline-offset: .2em; }
+.users-table .who small { color: var(--muted); font-size: .8rem; }
+.you { font: 500 .6rem/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-left: .4rem; }
+.never { color: var(--faint); }
+.user-cards { display: none; }
+.user-card { display: grid; gap: .55rem; padding: .95rem 1rem; border-radius: var(--radius-lg); background: var(--bg-raised); box-shadow: inset 0 0 0 1px var(--line); color: inherit; text-decoration: none; }
+.user-card b { font-weight: 600; font-size: .95rem; }
+.user-card small { color: var(--muted); font-size: .8125rem; line-height: 1.45; overflow-wrap: anywhere; }
+.user-card .row { display: flex; flex-wrap: wrap; gap: .4rem; }
+.user-card:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+
+/* One account */
+.page-head .back { justify-self: start; margin-left: -.6rem; }
+.page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.page-notice { margin-bottom: 1rem; }
+.acct-card { padding: 1.25rem 1.4rem; border-radius: var(--radius-lg); background: var(--bg-raised); box-shadow: inset 0 0 0 1px var(--line); }
+.section-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem .75rem; margin: 1.75rem 0 .75rem; }
+.assignments .state { justify-items: start; text-align: left; padding: 1.25rem 1.4rem; }
+.assignments .state p { max-width: 60ch; }
+
+/* The dialogs: a password with its buttons, and a password shown once */
+.pass-row { display: flex; gap: .5rem; min-width: 0; }
+.pass-row .control { flex: 1; min-width: 0; }
+.dialog .field-help { margin-top: -.15rem; }
+.once { display: grid; gap: .35rem; padding: .9rem 1rem; border-radius: var(--radius-md); background: var(--surface); overflow-wrap: anywhere; }
+.once code { font: 500 1.05rem/1.3 var(--font-mono); letter-spacing: .04em; word-break: break-all; }
+
+@media (max-width: 767.98px) {
+  .users-table { display: none; }
+  .user-cards { display: grid; gap: .75rem; }
+  .page-actions { width: 100%; }
+  .page-actions .btn { flex: 1 1 auto; }
+  .acct-card { padding: 1rem; }
+}

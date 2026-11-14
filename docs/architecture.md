@@ -78,7 +78,11 @@ claim their work with `FOR UPDATE SKIP LOCKED`, and Hangfire coordinates its own
 three jobs are *(planned)*; today, the two new-lead emails are sent by Hangfire jobs enqueued after the lead is
 saved, which the outbox replaces (§6). Each job carries the lead's id only and reads the lead when it runs, so no
 personal details are copied into Hangfire's tables. The emails are rendered from the lead in `Infrastructure`: an HTML
-part and a plain-text part, every value from the form HTML-encoded, and the wordmark sent inside the email.
+part and a plain-text part, every value from the form HTML-encoded, and the wordmark sent inside the email. The
+welcome email goes to an address nobody has confirmed, so it repeats nothing an email app could show as a link: the
+note stays in the office's alert (the welcome email says it was sent to the office), and the fields it does repeat
+(the names, street, city and monthly bill) are refused by validation when they hold a web or email address (`://`,
+`@`, or a dot followed by two letters).
 
 ---
 
@@ -95,7 +99,7 @@ feature.
 | **Installation** | One project at one address | Its status is its stage; design data (size, panel count, inverter type); its time zone (an IANA name, BR-P4); an `xmin` concurrency token and the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` *(planned)* |
 | **InstallationStatusHistory** | One row per status change | From, to, who, when, note; append-only, never updated or deleted |
 | **InstallationTechnician** | A technician's assignment | Role Surveyor, Installer or Inspector (an enum); completion date |
-| **User** | A staff account | Name; email, unique whatever its case (`NormalizedEmail`, a unique index); password hash ([ADR 8](adr/0008-password-hashing.md)); role (Admin or Technician); active flag; last sign-in |
+| **User** | A staff account | Name; email, unique whatever its case (`NormalizedEmail`, a unique index); password hash ([ADR 8](adr/0008-password-hashing.md)); role (Admin or Technician); active flag; last sign-in; the time its sessions are valid from, moved by a new password |
 | **EnergyProduction** | The daily production rollup | One row per installation and local day, enforced by a unique index; `ReadingCount` and `ComputedAt` *(planned)* |
 
 Tables for the mechanisms below *(planned)*:
@@ -130,8 +134,10 @@ installation's own time zone (BR-P4).
   index rejected the write).
 - **Outcomes:** expected failures are `Result` values carrying an `Error` (a kind, a stable code and a message);
   unexpected errors are exceptions, handled once by a global handler
-  ([ADR 3](adr/0003-result-objects-for-expected-outcomes.md)). The kinds are `NotFound` (404), `Conflict` (409) and
-  `Unauthorized` (401); a new kind is added when a service first needs it. Controllers choose the success status (200, 201 with
+  ([ADR 3](adr/0003-result-objects-for-expected-outcomes.md)). The kinds are `NotFound` (404), `Conflict` (409),
+  `Unauthorized` (401) and `Invalid` (400: a well-formed field only the service can find wrong, such as a current
+  password that doesn't match, answered like validation, on that field); a new kind is added when a service first
+  needs it. Controllers choose the success status (200, 201 with
   the new resource's URL, 204).
 - **Error responses:** every one is a ProblemDetails (RFC 9457) with a stable `code` and a `traceId`:
 
@@ -142,20 +148,26 @@ installation's own time zone (BR-P4).
   | `lead.concurrent_change` | 409 | Someone else changed the lead since it was read |
   | `address.already_exists` | 409 | An address with the same key exists ([ADR 5](adr/0005-address-natural-key.md)) |
   | `customer.email_taken` | 409 | A customer already has this email |
+  | `user.not_found` | 404 | No staff account has this ID |
+  | `user.email_taken` | 409 | Another account has this email, whatever its case or spaces; a deactivated one keeps it |
+  | `user.cannot_deactivate_self` | 409 | The Admin deactivating their own account |
+  | `user.cannot_set_own_password` | 409 | Setting your own password through the Users endpoint: your own is changed with the current one (`PUT /api/auth/password`) |
   | `auth.invalid_credentials` | 401 | A refused sign-in: the same answer for an unknown email, a wrong password or a deactivated account |
-  | `auth.signed_out` | 401 | A valid token whose account was deactivated since, or no longer exists |
+  | `auth.signed_out` | 401 | A valid token whose account was deactivated since, no longer exists, or has had a new password since the token was issued |
   | `auth.cross_site_request` | 403 | A request that changes data with the session cookie, or signs in or out, from a page on another site (§9) |
-  | `validation_failed` | 400 | The request is malformed or fails validation; `errors` lists the fields |
+  | `validation_failed` | 400 | The request is malformed or fails validation; `errors` lists the fields. Also a wrong current password when changing your own (`errors.CurrentPassword`) |
+  | `too_many_requests` | 429 | One client address used the quote form 5 times, or checked a password 10 times, in the current minute; `Retry-After` says when to try again (§9) |
   | `internal_error` | 500 | A bug. Outside Development the body has no exception details; the log line has the same trace id |
   | The status's name, such as `not_found`, `method_not_allowed`, `unauthorized` or `forbidden` | 4xx | Errors from the framework itself, such as an unknown URL, a request without a session to an endpoint that needs one, or a role the endpoint doesn't allow |
 
-- **Validation:** FluentValidation rejects malformed requests with 400 and the failing fields.
+- **Validation:** FluentValidation rejects malformed requests with 400 and the failing fields. The quote form's
+  names, street, city and monthly bill can't hold a web or email address, as the welcome email repeats them (§3).
 - **Timestamps:** every timestamp in a request must carry `Z` or an offset (`2026-11-02T10:00:00Z`,
   `2026-11-02T11:00:00+01:00`) and is converted to UTC; one without a zone is rejected with 400, because it could
   be UTC or local time. Responses are always UTC, with `Z`.
 - **Pagination:** every list takes `?page=1&pageSize=20` (maximum 100) and returns
   `{ items, page, pageSize, totalCount }`. Each list has a total order, ending with the ID, so no row moves between
-  pages: leads newest first.
+  pages: leads newest first; staff accounts active first, then by name.
 - **Cancellation:** every async path takes a `CancellationToken` *(planned)*.
 
 ---
@@ -305,8 +317,21 @@ Staff sign-in, sessions and the roles' checks are built; the parts marked *(plan
   `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api`, expiring with the token. The API also reads the
   `Authorization: Bearer` header, which wins when both are sent (the API reference, tests, scripts).
   `POST /api/auth/logout` clears the cookie, even when the session had already ended. `GET /api/auth/me` returns the
-  account. A valid token isn't enough on its own: every request that carries one also reads the account, so a
-  deactivated or deleted account stops at its next request (`401 auth.signed_out`).
+  account. A valid token isn't enough on its own: every request that carries one also reads the account, in one
+  query, so a deactivated or deleted account, or a session started before the account's latest new password
+  (`sessions_valid_from`, compared in whole seconds), stops at its next request (`401 auth.signed_out`).
+- **Staff accounts** (FR-U2, FR-U4), all `Admin`: `GET /api/users` (paginated), `GET /api/users/{id}`,
+  `POST /api/users` (always a technician; the Admin gives the person their password, which is never returned),
+  `PUT /api/users/{id}` (name and email; the password and sessions stay), `PUT /api/users/{id}/password` (ends that
+  account's sessions), `POST /api/users/{id}/deactivate` and `/reactivate` (already in that state is a success).
+  The Admin can't deactivate their own account, so the office can't lock itself out, nor set their own password
+  there. Emails are unique whatever their case or spaces, decided by the unique index, also between two requests at
+  the same moment. Saving an account writes only the columns that changed, so a sign-in saving its time at the
+  same moment can't undo a deactivation, nor a new password (unless that sign-in is also replacing a hash made with
+  weaker settings, which writes the password column).
+- **Changing your own password:** `PUT /api/auth/password` with the current and the new one, for any signed-in
+  account. A wrong current password is `400 validation_failed` on that field, not a 401, so the session goes on. On
+  success the account's other sessions end and this one gets a new cookie.
 - **Requests from another site:** a request that changes data and carries the session cookie, or that signs in or
   out, is refused with `403 auth.cross_site_request` when its `Origin` isn't the API's own host. A request without
   `Origin` passes: browsers send it, scripts don't. The public lead form carries no cookie, so it isn't affected.
@@ -318,10 +343,11 @@ Staff sign-in, sessions and the roles' checks are built; the parts marked *(plan
 - **Closed by default** ([ADR 9](adr/0009-closed-by-default.md)): the fallback authorization policy requires a
   signed-in account, so a new endpoint is protected unless it is marked `[AllowAnonymous]`. Open on purpose: the quote
   form (`POST /api/leads`), sign-in and sign-out, and the health checks when they come *(planned)*; in Development
-  only, the API reference (`/scalar`, `/openapi/v1.json`) and the measurement harness's email fault switch. Signed
+  only, the API reference (`/scalar`, `/openapi/v1.json`), the measurement harness's email fault switch, and the
+  Hangfire dashboard. Signed
   out, an address that doesn't exist answers `401`, like one that does.
-- **Policies:** `Admin`, `Technician`, and `Staff` (either role), reading the `role` claim. The leads are `Admin`
-  (the quote form excepted); a technician calling them gets `403 forbidden`. The staff app shows a "Not allowed"
+- **Policies:** `Admin`, `Technician`, and `Staff` (either role), reading the `role` claim. The leads and the staff
+  accounts are `Admin` (the quote form excepted); a technician calling them gets `403 forbidden`. The staff app shows a "Not allowed"
   screen for another role's page, and the API refuses the data anyway.
 - **Technician scoping** *(planned)*: a technician lists and sees only the installations they are assigned to,
   enforced in the service query.
@@ -329,12 +355,27 @@ Staff sign-in, sessions and the roles' checks are built; the parts marked *(plan
   the installation; the secret is checked against `DeviceKeyHash` (SHA-256, constant-time comparison), which is
   adequate because the secret is 32 random bytes, not a human password. The key is shown once at activation and
   removed on deactivation.
-- **Rate limiting** *(planned)*: the built-in rate limiter, fixed window per client IP: 5 per minute on
-  `POST /api/leads`, 10 per minute on sign-in. Behind a proxy, forwarded headers are enabled so the real client IP is
-  used.
-- **Hangfire dashboard** *(planned)*: mounted only in Development.
-- **CORS** *(planned)*: only the configured origins (the marketing site). The staff app needs none: it calls the API
-  on its own site.
+- **Rate limiting** (BR-S1): ASP.NET Core's rate limiter, a fixed window of one minute per client address: 5 on the
+  quote form (`POST /api/leads`), and 10 password checks, one budget shared by signing in and changing your own
+  password (a session left open can't be used to guess the current one faster than sign-in allows). Every request
+  counts, whatever its answer; one refused before (no session, another site) doesn't, as the limiter runs after
+  authorization. Beyond the limit: `429 too_many_requests` with `Retry-After: 60` (the window's length, by which time
+  a new one has started). An IPv4 client reaching a dual-stack socket counts as its IPv4 address. The counts live in
+  the API's memory, which suits a single instance. `RateLimiting__Enabled=false` switches the limits off, in
+  Development only, for the measurement runs.
+- **The client's address behind a proxy:** the forwarded-headers middleware believes `X-Forwarded-For` (the last
+  address, the one the proxy added) and `X-Forwarded-Proto` only from the networks in `ForwardedHeaders__KnownNetworks`.
+  None are listed by default, and then the middleware isn't added at all (with empty lists it would believe every
+  sender), so a client can't claim another address to get past the limits. The deployment lists its proxy once its
+  addresses are confirmed (Railway's edge documents `X-Real-IP` and publishes no address range).
+- **Hangfire dashboard:** mapped in Development only, at `/hangfire`, as an endpoint (so the guard test sees it),
+  open to anyone there like the API reference, and answering requests from the same machine only (Hangfire's own
+  check). Elsewhere the address doesn't exist.
+- **CORS:** only the quote form (`POST /api/leads`) answers other sites, and only the origins in
+  `Cors__AllowedOrigins` (the marketing site; `http://localhost:5173` in Development): a JSON `POST`, without
+  cookies. There is no default policy, so every other endpoint answers no other site. The staff app needs none: it
+  calls the API on its own site ([ADR 7](adr/0007-staff-sessions-in-a-cookie.md)). An origin that isn't exactly
+  scheme, host and port (a path, a trailing slash, `*`) stops the API at startup.
 
 ---
 

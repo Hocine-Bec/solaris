@@ -1,10 +1,11 @@
-using System.Globalization;
 using Application.DTOs.Auth;
 using Application.Errors;
 using Application.Interfaces.Services;
 using Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using WebAPI.Security;
 
 namespace WebAPI.Controllers;
 
@@ -17,9 +18,11 @@ public class AuthController(IAuthService service) : ApiControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimits.PasswordChecks)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<CurrentUserResponse>> Login([FromBody] LoginRequest request)
     {
         var result = await service.SignInAsync(request);
@@ -46,12 +49,36 @@ public class AuthController(IAuthService service) : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<CurrentUserResponse>> Me()
     {
-        if (!int.TryParse(User.FindFirst(Session.UserIdClaim)?.Value, NumberStyles.None, CultureInfo.InvariantCulture,
-                out var userId))
+        if (CurrentUserId is not { } userId)
             return Problem(AuthErrors.SignedOut);
 
         var result = await service.GetCurrentUserAsync(userId);
         return result.IsSuccess ? Ok(result.Value) : Problem(result.Error);
+    }
+
+    /// <summary>
+    /// Changes your own password, given the current one. Your other sessions end; this one goes on with a new cookie,
+    /// as its old token was issued before the change. A wrong current password is a field to fix (400), not a 401, so
+    /// it doesn't end the session.
+    /// </summary>
+    [HttpPut("password")]
+    [Authorize]
+    [EnableRateLimiting(RateLimits.PasswordChecks)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        if (CurrentUserId is not { } userId)
+            return Problem(AuthErrors.SignedOut);
+
+        var result = await service.ChangePasswordAsync(userId, request);
+        if (!result.IsSuccess)
+            return Problem(result.Error);
+
+        Response.Cookies.Append(Session.CookieName, result.Value.Token, CookieOptions(result.Value.ExpiresAt));
+        return NoContent();
     }
 
     /// <summary>

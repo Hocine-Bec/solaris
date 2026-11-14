@@ -2,7 +2,9 @@ using Application.DTOs.Common;
 using Application.DTOs.Lead;
 using Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using WebAPI.Security;
 
 namespace WebAPI.Controllers;
@@ -31,9 +33,12 @@ public class LeadsController(ILeadService service) : ApiControllerBase
 
     [HttpPost]
     [AllowAnonymous]
+    [EnableCors(CrossSiteCalls.QuoteForm)]
+    [EnableRateLimiting(RateLimits.QuoteForm)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<LeadResponse>> Create([FromBody] CreateLeadRequest request)
     {
         var result = await service.CreateAsync(request);

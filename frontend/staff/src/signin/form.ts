@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ApiError } from '../api/errors';
 import type { SignInReason } from '../session/session';
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * The sign-in form's own checks, before anything is sent: both fields filled, the email shaped like one. Whether

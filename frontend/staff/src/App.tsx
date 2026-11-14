@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-router-dom';
 import { createQueryClient } from './api/queryClient';
@@ -9,8 +10,13 @@ import { RequireSession } from './session/RequireSession';
 import { MY_WORK, OFFICE } from './shell/sections';
 import type { RouteHandle } from './shell/Shell';
 import { SignInPage } from './signin/SignInPage';
+import { UserPage } from './users/UserPage';
+import { UsersPage } from './users/UsersPage';
 
 const handle = (title: string): RouteHandle => ({ title });
+
+/** The screens built so far; the other sections show what they will hold. */
+const BUILT: Record<string, ReactNode> = { '/users': <UsersPage /> };
 
 const routes: RouteObject[] = [
   { path: '/login', element: <SignInPage />, errorElement: <ErrorPage /> },
@@ -23,7 +29,8 @@ const routes: RouteObject[] = [
         errorElement: <ErrorPage />,   // a page failed: the frame stays
         children: [
           { index: true, element: <LandingRedirect /> },
-          ...[...OFFICE, MY_WORK].map(s => ({ path: s.path, element: <SectionPage section={s} />, handle: handle(s.title) })),
+          ...[...OFFICE, MY_WORK].map(s => ({ path: s.path, element: BUILT[s.path] ?? <SectionPage section={s} />, handle: handle(s.title) })),
+          { path: '/users/:id', element: <UserPage />, handle: handle('Users') },
           { path: '*', element: <NotFoundPage />, handle: handle('Page not found') },
         ],
       },

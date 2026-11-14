@@ -28,7 +28,7 @@ describe('shouldRetry', () => {
 
 describe('a 401 anywhere', () => {
   const signedOut = new ApiError('signedOut', MESSAGES.signedOut, { status: 401 });
-  const ROSA = { name: 'Rosa Castillo', email: 'rosa.castillo@solaris.test', role: 'Admin' };
+  const ROSA = { id: 1, name: 'Rosa Castillo', email: 'rosa.castillo@solaris.test', role: 'Admin' };
 
   const signedInClient = () => {
     const client = createQueryClient();

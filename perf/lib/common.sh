@@ -46,6 +46,7 @@ start_api() {
     ConnectionStrings__Default="$CONNECTION" Jwt__Secret=perf-secret-perf-secret-perf-secret-perf \
     Email__FromAddress=sales@example.test Email__Provider=Recording Email__SimulatedLatencyMs=2000 \
     Admin__Name="Perf Admin" Admin__Email="$PERF_ADMIN_EMAIL" Admin__Password="$PERF_ADMIN_PASSWORD" \
+    RateLimiting__Enabled=false \
     "$@" dotnet bin/Release/net10.0/WebAPI.dll) >>"$log_file" 2>&1 &
   API_PID=$!
   for _ in $(seq 1 240); do

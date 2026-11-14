@@ -471,66 +471,6 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
 
     #endregion
 
-    #region Remove Tests
-
-    [Fact]
-    public async Task Remove_ExistingLead_SaveSucceeds()
-    {
-        // Arrange
-        var address = AddressFactory.CreateFakeAddress(id: 1);
-        var lead = LeadFactory.CreateFakeLead(id: 1, addressId: 1);
-        await SeedAsync(address);
-        await SeedAsync(lead);
-
-        // Act
-        Repo.Remove(lead);
-        var result = await SaveAsync();
-
-        // Assert
-        result.Should().Be(SaveOutcome.Saved);
-        var deleted = await Context.Leads.FindAsync([1], TestContext.Current.CancellationToken);
-        deleted.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task Remove_NonExistingLead_SaveReturnsConflict()
-    {
-        // Arrange
-        var lead = LeadFactory.CreateFakeLead(id: 999, addressId: 1);
-
-        // Act & Assert
-        Repo.Remove(lead);
-        (await SaveAsync()).Should().Be(SaveOutcome.Conflict);
-    }
-
-    [Fact]
-    public async Task Remove_OneOfMultipleLeads_DeletesOnlySpecified()
-    {
-        // Arrange
-        var address = AddressFactory.CreateFakeAddress(id: 1);
-        var leads = new List<Lead>
-        {
-            LeadFactory.CreateFakeLead(id: 1, addressId: 1),
-            LeadFactory.CreateFakeLead(id: 2, addressId: 1),
-            LeadFactory.CreateFakeLead(id: 3, addressId: 1)
-        };
-        await SeedAsync(address);
-        await SeedAsync(leads.ToArray());
-
-        // Act
-        Repo.Remove(leads[1]);
-        await SaveAsync();
-
-        // Assert
-        var remaining = await Context.Leads.ToListAsync(TestContext.Current.CancellationToken);
-        remaining.Should().HaveCount(2);
-        remaining.Should().NotContain(l => l.Id == 2);
-        remaining.Should().Contain(l => l.Id == 1);
-        remaining.Should().Contain(l => l.Id == 3);
-    }
-
-    #endregion
-
     #region Edge Cases and Boundary Tests
 
     [Fact]

@@ -73,7 +73,7 @@ npm run dev
 
 | Variable | Purpose |
 |---|---|
-| `VITE_API_BASE_URL` | The API's base URL, including `/api` (locally `http://localhost:5228/api`); `/api` on the site's own address if unset |
+| `VITE_API_BASE_URL` | The API's base URL, including `/api` (locally `http://localhost:5228/api`); `/api` on the site's own address if unset. On another address, the API must list the site's origin in `Cors__AllowedOrigins` (it lists `http://localhost:5173` in Development) |
 | `VITE_GEOAPIFY_API_KEY` | A Geoapify API key for the address suggestions; without one, the street is a plain field |
 
 Vite builds both values into the JavaScript sent to the browser, so neither can be a secret: in Geoapify's

@@ -8,9 +8,12 @@ using Domain.Entities;
 using Domain.Enums;
 using FluentAssertions;
 using Hangfire;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using TestUtilities.Base;
@@ -72,6 +75,10 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
         return _factory.CreateClient();
     }
 
+    /// <summary>The running API's services, once <see cref="CreateClient"/> has started it.</summary>
+    protected IServiceProvider ApiServices =>
+        _factory?.Services ?? throw new InvalidOperationException("Call CreateClient first: the API isn't running.");
+
     /// <summary>A technician's account, added to this test's database by <see cref="CreateClientAsAsync"/>.</summary>
     protected static class TestTechnician
     {
@@ -97,6 +104,11 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
+
+    /// <summary>The ID of the account with this email, read from this test's database.</summary>
+    protected Task<int> IdOfAsync(string email) =>
+        Context.Users.Where(u => u.NormalizedEmail == User.NormalizeEmail(email)).Select(u => u.Id)
+            .SingleAsync(TestContext.Current.CancellationToken);
 
     private static async Task<User> AddTechnicianAsync(IServiceProvider services)
     {
@@ -128,6 +140,30 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
         if (_factory is not null)
             await _factory.DisposeAsync();
         await base.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Lets each request say which address it comes from, in its X-Test-Peer header: the API in memory has no connection
+    /// address of its own. Pass it as <see cref="CreateClient"/>'s configureServices.
+    /// </summary>
+    protected static readonly Action<IServiceCollection> WithTestPeers =
+        services => services.AddSingleton<IStartupFilter, TestPeerAddress>();
+
+    /// <summary>Gives each request the connection address in its X-Test-Peer header, before the API's middleware runs.</summary>
+    protected sealed class TestPeerAddress : IStartupFilter
+    {
+        public const string Header = "X-Test-Peer";
+
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use((context, nextMiddleware) =>
+            {
+                if (context.Request.Headers.TryGetValue(Header, out var peer))
+                    context.Connection.RemoteIpAddress = IPAddress.Parse(peer.ToString());
+                return nextMiddleware(context);
+            });
+            next(app);
+        };
     }
 
     /// <summary>Checks the response is a ProblemDetails with this status and code, and returns its body.</summary>

@@ -19,8 +19,6 @@ public class GenericRepo<T>(AppDbContext context) : IGenericRepo<T>
 
     public virtual void Update(T entity) => _set.Update(entity);
 
-    public virtual void Remove(T entity) => _set.Remove(entity);
-
     /// <summary>
     /// One page of an ordered query, and the number of rows in the whole query. The order must be total (end with a
     /// unique column), or rows could move between pages.

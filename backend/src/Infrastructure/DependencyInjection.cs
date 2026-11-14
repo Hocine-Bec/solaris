@@ -21,6 +21,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Infrastructure;
@@ -132,16 +133,18 @@ public static class DependencyInjection
                             context.Token = token;
                         return Task.CompletedTask;
                     },
-                    // A valid token isn't enough: the account must still exist and be active, so deactivating an
-                    // account ends its sessions at their next request (ADR 7).
+                    // A valid token isn't enough: the account must still exist and be active, and its password must not
+                    // have been replaced since the session started, so deactivating an account or setting a new
+                    // password ends its sessions at their next request (ADR 7).
                     OnTokenValidated = async context =>
                     {
                         var users = context.HttpContext.RequestServices.GetRequiredService<IUserRepo>();
                         var id = context.Principal?.FindFirst(Session.UserIdClaim)?.Value;
-                        if (int.TryParse(id, out var userId) && await users.IsActiveAsync(userId))
+                        if (int.TryParse(id, out var userId) && context.SecurityToken is JsonWebToken token &&
+                            await users.AcceptsSessionAsync(userId, token.IssuedAt))
                             return;
                         context.HttpContext.Items[SignedOutKey] = true;
-                        context.Fail("The account was deactivated or no longer exists.");
+                        context.Fail("The account was deactivated, no longer exists, or has a new password.");
                     },
                     // That case answers auth.signed_out, as /me does; any other 401 keeps the framework's answer.
                     OnChallenge = async context =>

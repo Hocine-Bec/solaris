@@ -10,19 +10,22 @@ namespace Application;
 
 public static class DependencyInjection
 {
+    private static readonly Lazy<TypeAdapterConfig> MappingsRegistered = new(() =>
+    {
+        var config = TypeAdapterConfig.GlobalSettings;
+        config.Scan(Assembly.GetExecutingAssembly());
+        return config;
+    });
+
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         //FluentValidation
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         
-        //Mapster Config
-        // 1. Get/create global config
-        var config = TypeAdapterConfig.GlobalSettings;
-    
-        // 2. Scan for custom mappings (IRegister classes)
-        config.Scan(Assembly.GetExecutingAssembly());
-    
-        // 3. Register for DI
+        // Mapster: the services map with .Adapt(), which reads the process-wide GlobalSettings. The mappings go in once
+        // per process: registering them again while another host in the same process maps (the integration tests
+        // start many at once) made Mapster throw "TypeAdapter.Adapt was already called".
+        var config = MappingsRegistered.Value;
         services.AddSingleton(config);
         services.AddScoped<IMapper, ServiceMapper>();
         

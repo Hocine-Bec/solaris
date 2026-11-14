@@ -1,6 +1,6 @@
 # 7. Staff sessions: the token in an HttpOnly cookie
 
-**Status:** Accepted · **Last changed:** 2026-11-13
+**Status:** Accepted · **Last changed:** 2026-11-14
 
 **Context:** Staff sign in to the staff app with an email and a password and should stay signed in for a working
 day, across closed windows and new tabs. The session is a JWT the API signs; the question is where the browser keeps
@@ -24,8 +24,13 @@ reference, tests and scripts use.
 ## Trade-offs
 A cookie is sent by the browser on its own, so cross-site request forgery has to be closed: `SameSite=Strict` and the
 `Origin` check do it. The app and the API must be served from one site (one domain, or the API serving the app's
-files), which the deployment has to keep. A token can't be revoked before it expires, except by deactivating the
-account, which `/me` and every protected request check against the database.
+files), which the deployment has to keep; in return the app needs no CORS, and CORS never allows credentials (only
+the public quote form answers another site, without cookies). One token can't be revoked on its own before it expires; an account's
+tokens all can, together. Every protected request reads the account in the same query: it must exist and be active,
+and the token must have been issued at or after the account's `sessions_valid_from`, which a new password moves to
+now. So deactivating an account, or setting a new password for it, ends its sessions at their next request; changing
+your own password ends the others and gives this session a new cookie. The comparison is in whole seconds, the
+precision of a token's issue time, so a session started in the same second as the change keeps going.
 
 ## Alternative that could also work
 **E**, which shortens what a stolen token is worth and allows revoking sessions; it is a larger change, kept for
