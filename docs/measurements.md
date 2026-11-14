@@ -28,8 +28,9 @@ before and after are recorded here, with the method that produced them.
    with an `env.md` there.
 7. **The before is a git tag** (`p1-before` … `p4-before`) on `main`, created after the naive version is merged,
    so anyone can rebuild and re-run it.
-8. **The public-form rate limiter is switched off** for measurement runs (`RateLimiting__Enabled=false`);
-   otherwise it would block the load. The method says so.
+8. **The rate limits are switched off** for measurement runs (`RateLimiting__Enabled=false`, which `perf/lib/common.sh`
+   sets when it starts the API; the API accepts it in Development only); otherwise the quote form's 5 per minute
+   would block the load. The method says so.
 9. **Every generated lead has a unique email and a unique address**, except in P3a, which is about identical
    submissions. Otherwise the duplicate-lead rule (BR-L1) or the address uniqueness check changes what is
    measured.

@@ -17,14 +17,16 @@ and forgetting to protect one must not leave it open.
 ## Decision
 **A.** A new endpoint is closed until someone opens it on purpose, and opening one is a single attribute a review can
 see. Open to anyone today: the quote form (`POST /api/leads`), signing in and signing out; in Development only, the
-API reference and the measurement harness's switch, which no other environment maps. The leads are the office's:
+API reference, the measurement harness's switch and the background jobs' dashboard (which also answers requests from
+the same machine only), which no other environment maps. The leads are the office's:
 `Admin` on the controller, the quote form opting out. A technician calling an office endpoint gets `403`.
 
 ## Trade-offs
 The fallback also covers addresses that don't exist: signed out, an unknown URL answers `401`, not `404`, so a caller
-can't tell which addresses exist; signed in, it is `404`. Middleware that isn't an endpoint, such as the Hangfire
-dashboard, isn't covered and keeps its own rule. A test that lists every endpoint open to anyone, and fails on a new
-one, is what keeps the list honest *(planned)*.
+can't tell which addresses exist; signed in, it is `404`. Middleware that isn't an endpoint isn't covered, so the
+Hangfire dashboard is mapped as an endpoint, where the list sees it. A test keeps the list honest: it enumerates every endpoint the API
+maps, fails on one open to anyone that isn't on the list, and fails on any endpoint missing from its table of who may
+call what, so a new endpoint can't be added without deciding its access.
 
 ## Alternative that could also work
 **C** closes MVC controllers but not minimal API endpoints, such as the measurement switch, so it would need a second

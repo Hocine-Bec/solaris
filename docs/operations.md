@@ -30,7 +30,7 @@ variables directly, and secrets never go in `appsettings.json`.
 | `Jwt__Issuer`, `Jwt__Audience` | `appsettings.json` | `solaris-api`, `solaris-staff` |
 | `Jwt__LifetimeHours` | `appsettings.json` (`8`) | How long a staff session lasts, 1 to 24 hours |
 | `Admin__Name`, `Admin__Email`, `Admin__Password` | `.env` | The first Admin account, created at startup when no active Admin exists; the API stops if there is neither. All three or none; the password follows the password rule ([architecture](architecture.md#9-security)). Once an Admin exists they can be removed |
-| `Cors__AllowedOrigins` *(planned)* | — | The marketing site's URL |
+| `Cors__AllowedOrigins__0`, `__1`, … | `appsettings.Development.json` (`http://localhost:5173`) | The sites whose pages may send the quote form, as origins (`https://www.example.com`: scheme, host, optional port, no path). Empty outside Development: no other site may call the API. Any other endpoint answers no other site; the staff app needs none ([architecture](architecture.md#9-security)) |
 | `Notifications__Mode` | `appsettings.json` (`Hangfire`) | `Hangfire`: the request enqueues the two lead emails as Hangfire jobs. `Synchronous`: the request sends them itself before it answers; Development only, for measurements, and the API refuses it elsewhere. `Outbox` *(planned)* replaces `Hangfire` as the default |
 | `Email__Provider` | `appsettings.json` (`Gmail`), `appsettings.Development.json` (`Recording`) | `Gmail` sends real email; `Recording` sends nothing, and the API refuses it in Production |
 | `Email__FromName` | `appsettings.json` | The sender name shown on emails: `Solaris` |
@@ -40,7 +40,8 @@ variables directly, and secrets never go in `appsettings.json`.
 | `Email__Smtp__Host`, `Email__Smtp__Port` | `appsettings.json` | `smtp.gmail.com`, 587 |
 | `Email__Gmail__ClientId`, `Email__Gmail__ClientSecret`, `Email__Gmail__RefreshToken` | `.env` | Required only when `Email__Provider=Gmail` |
 | `FaultInjection__Enabled` | — | Development only (the measurement harness): `true` starts the API with the email fault on; `false` by default |
-| `RateLimiting__Enabled` *(planned)* | — | `true` by default; `false` only for measurement runs |
+| `RateLimiting__Enabled` | — | `true` by default: 5 quote forms and 10 password checks per minute per client address ([architecture](architecture.md#9-security)). `false` only in Development, for measurement runs (the scripts in `perf/` set it); the API refuses it elsewhere |
+| `ForwardedHeaders__KnownNetworks__0`, `__1`, … | — | The proxies whose `X-Forwarded-For` and `X-Forwarded-Proto` the API believes, as networks (`10.0.0.0/8`, or `10.1.2.3/32` for one address). Empty by default: no forwarded header is believed, and the rate limits count the connection's address. Set where the API runs behind a proxy, once its addresses are known; an entry that isn't a network stops the API at startup |
 | `Database__MigrateOnStartup` *(planned)* | — | Apply pending migrations at startup |
 | `POSTGRES_PASSWORD` | `.env` | Not read by the API: docker compose gives it to the local database ([running locally](#running-locally)) |
 
