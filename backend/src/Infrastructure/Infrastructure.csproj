@@ -18,4 +18,9 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The wordmark the emails show (Services/Email/Wordmark.cs) -->
+    <EmbeddedResource Include="Services/Email/solaris-wordmark-on-dark.png" LogicalName="solaris-wordmark-on-dark.png" />
+  </ItemGroup>
+
 </Project>

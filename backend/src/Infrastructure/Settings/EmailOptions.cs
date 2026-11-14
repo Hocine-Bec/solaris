@@ -23,6 +23,10 @@ public sealed class EmailOptions
     [Required, EmailAddress]
     public string FromAddress { get; set; } = string.Empty;
 
+    /// <summary>The marketing site's address, for the links in emails: the welcome email links to its How it works page.</summary>
+    [Required, Url]
+    public string SiteUrl { get; set; } = string.Empty;
+
     [Required, ValidateObjectMembers]
     public SmtpOptions Smtp { get; set; } = new();
 

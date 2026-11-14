@@ -15,7 +15,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using MimeKit;
 using TestUtilities.Base;
+using TestUtilities.Factories;
 using TestUtilities.Database;
 
 namespace IntegrationTests.Infrastructure;
@@ -26,7 +28,7 @@ public class EmailSenderTests(PostgresFixture database) : IntegrationTestBase(da
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private static readonly EmailMessage Welcome =
-        new("LeadWelcome:123", "jane.doe@example.com", "Jane", "Welcome", "<p>Hello</p>");
+        new("LeadWelcome:123", "jane.doe@example.com", "Jane", "Welcome", "<p>Hello</p>", "Hello");
 
     #region DeliveryLoggingEmailSender
 
@@ -135,6 +137,42 @@ public class EmailSenderTests(PostgresFixture database) : IntegrationTestBase(da
         await act.Should().ThrowAsync<MailServerUnavailableException>().WithMessage($"*127.0.0.1:{port}*");
     }
 
+    [Fact]
+    public void GmailSmtp_Mime_HasBothPartsTheInlineImageAndTheReplyTo()
+    {
+        var image = new InlineImage("wordmark@solaris", "image/png", [0x89, 0x50, 0x4e, 0x47]);
+        var message = Welcome with
+        {
+            ReplyTo = new EmailAddress("jane.doe@example.com", "Jane Doe"),
+            InlineImages = [image]
+        };
+        var settings = new EmailOptions { FromName = "Solaris", FromAddress = "office@example.com" };
+
+        var mime = GmailSmtpEmailSender.BuildMime(message, settings);
+
+        mime.From.Mailboxes.Single().Address.Should().Be("office@example.com");
+        mime.To.Mailboxes.Single().Address.Should().Be("jane.doe@example.com");
+        mime.ReplyTo.Mailboxes.Single().Address.Should().Be("jane.doe@example.com");
+        mime.TextBody.Should().Be("Hello");
+        mime.HtmlBody.Should().Be("<p>Hello</p>");
+        // multipart/alternative: the text, then the HTML with its image (multipart/related)
+        var alternative = mime.Body.Should().BeAssignableTo<Multipart>().Subject;
+        alternative.ContentType.MimeType.Should().Be("multipart/alternative");
+        var related = alternative[1].Should().BeAssignableTo<Multipart>().Subject;
+        related.ContentType.MimeType.Should().Be("multipart/related");
+        related.OfType<MimePart>().Single(p => p.ContentType.MimeType == "image/png").ContentId
+            .Should().Be("wordmark@solaris");
+    }
+
+    [Fact]
+    public void GmailSmtp_Mime_WithoutReplyTo_HasNone()
+    {
+        var mime = GmailSmtpEmailSender.BuildMime(Welcome,
+            new EmailOptions { FromName = "Solaris", FromAddress = "office@example.com" });
+
+        mime.ReplyTo.Count.Should().Be(0);
+    }
+
     [Theory]
     [InlineData("Recording", typeof(RecordingEmailSender))]
     [InlineData("Gmail", typeof(GmailSmtpEmailSender))]
@@ -170,19 +208,35 @@ public class EmailSenderTests(PostgresFixture database) : IntegrationTestBase(da
     [Fact]
     public async Task Harness_TheHangfireJobs_LogBothNotificationsOfALead()
     {
-        // The jobs the current design enqueues for every new lead: the P2 "before" counts their deliveries.
+        // The jobs the current design enqueues for every new lead, each reading the lead by its id: the P2 "before"
+        // counts their deliveries.
+        await SeedAsync(AddressFactory.CreateFakeAddress(id: 1));
+        await SeedAsync(LeadFactory.CreateFakeLead(id: 123, addressId: 1, email: "jane.doe@example.com"));
         await using var services = BuildServices(harness: true);
         await using var scope = services.CreateAsyncScope();
         var jobs = scope.ServiceProvider.GetRequiredService<IEmailQueueHandler>();
 
-        await jobs.SendLeadWelcomeEmailAsync(123, "jane.doe@example.com", "Jane", "100 Congress Ave");
-        await jobs.SendSalesNotificationEmailAsync(123, "Jane Doe", "jane.doe@example.com", "+1 512 555 0100",
-            "100 Congress Ave");
+        await jobs.SendLeadWelcomeEmailAsync(123);
+        await jobs.SendSalesNotificationEmailAsync(123);
 
         var rows = await Context.EmailDeliveries.AsNoTracking().OrderBy(d => d.Id).ToListAsync(Ct);
         rows.Select(d => (d.NotificationKey, d.Recipient)).Should().Equal(
             ("LeadWelcome:123", "jane.doe@example.com"),
             ("SalesNewLeadAlert:123", "sales@example.com"));
+    }
+
+    [Fact]
+    public async Task Jobs_LeadNoLongerExists_SendNothingAndDontFail()
+    {
+        // Retrying can't bring a missing lead back, so the job ends instead of failing into Hangfire's retries
+        await using var services = BuildServices(harness: true);
+        await using var scope = services.CreateAsyncScope();
+        var jobs = scope.ServiceProvider.GetRequiredService<IEmailQueueHandler>();
+
+        await jobs.SendLeadWelcomeEmailAsync(404);
+        await jobs.SendSalesNotificationEmailAsync(404);
+
+        (await Context.EmailDeliveries.AnyAsync(Ct)).Should().BeFalse();
     }
 
     [Theory]
@@ -212,6 +266,7 @@ public class EmailSenderTests(PostgresFixture database) : IntegrationTestBase(da
             ["Email:SimulatedLatencyMs"] = "0",
             ["Email:FromName"] = "Solaris",
             ["Email:FromAddress"] = "sales@example.com",
+            ["Email:SiteUrl"] = "https://solaris.test",
             ["Email:Smtp:Host"] = "127.0.0.1",
             ["Email:Smtp:Port"] = "25",
             ["Email:Gmail:ClientId"] = "client-id",

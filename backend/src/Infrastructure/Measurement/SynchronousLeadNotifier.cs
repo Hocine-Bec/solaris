@@ -1,4 +1,5 @@
 using Application.Interfaces.Services;
+using Domain.Entities;
 
 namespace Infrastructure.Measurement;
 
@@ -9,10 +10,9 @@ namespace Infrastructure.Measurement;
 /// </summary>
 public sealed class SynchronousLeadNotifier(IEmailService emails) : ILeadNotifier
 {
-    public async Task NotifyNewLeadAsync(int leadId, string email, string firstName, string fullName,
-        string phoneNumber, string address)
+    public async Task NotifyNewLeadAsync(Lead lead)
     {
-        await emails.SendLeadEmailAsync(leadId, email, firstName, address);
-        await emails.SendSalesNotificationEmailAsync(leadId, fullName, email, phoneNumber, address);
+        await emails.SendLeadWelcomeAsync(lead);
+        await emails.SendNewLeadAlertAsync(lead);
     }
 }

@@ -1,50 +1,48 @@
 using System.Diagnostics;
+using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
+using Domain.Entities;
 using Hangfire;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Services;
 
-public class EmailQueueHandler(IEmailService service, ILogger<EmailQueueHandler> logger) : IEmailQueueHandler
+/// <summary>
+/// The Hangfire jobs that send a new lead's emails. Each reads the lead by its id when it runs; a lead that no longer
+/// exists is logged and skipped, as retrying can't bring it back.
+/// </summary>
+public class EmailQueueHandler(ILeadRepo leads, IEmailService service, ILogger<EmailQueueHandler> logger)
+    : IEmailQueueHandler
 {
     [AutomaticRetry(Attempts = 3, DelaysInSeconds = new[] { 30, 60, 120 })]
-    public async Task SendLeadWelcomeEmailAsync(int leadId, string email, string firstName, string address)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        try
-        {
-            await service.SendLeadEmailAsync(leadId, email, firstName, address);
-            logger.LogInformation(
-                "Lead welcome email sent successfully for lead {LeadId} to {Email} in {ElapsedMs}ms",
-                leadId, email, stopwatch.ElapsedMilliseconds);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, 
-                "Failed to send lead welcome email for lead {LeadId} to {Email} after {ElapsedMs}ms",
-                leadId, email, stopwatch.ElapsedMilliseconds);
-            throw; // Let Hangfire handle retry
-        }
-    }
+    public Task SendLeadWelcomeEmailAsync(int leadId) =>
+        SendAsync(leadId, "lead welcome email", service.SendLeadWelcomeAsync);
 
     [AutomaticRetry(Attempts = 3, DelaysInSeconds = new[] { 30, 60, 120 })]
-    public async Task SendSalesNotificationEmailAsync(int leadId, string fullName, string email,
-        string phoneNumber, string address)
+    public Task SendSalesNotificationEmailAsync(int leadId) =>
+        SendAsync(leadId, "new lead alert", service.SendNewLeadAlertAsync);
+
+    private async Task SendAsync(int leadId, string email, Func<Lead, Task> send)
     {
         var stopwatch = Stopwatch.StartNew();
+        var lead = await leads.GetByIdAsync(leadId);
+        if (lead is null)
+        {
+            logger.LogWarning("Skipped the {Email} for lead {LeadId}: the lead doesn't exist", email, leadId);
+            return;
+        }
+
         try
         {
-            await service.SendSalesNotificationEmailAsync(leadId, fullName, email, phoneNumber, address);
-            logger.LogInformation(
-                "Sales notification email sent successfully for lead {LeadId} in {ElapsedMs}ms",
-                leadId, stopwatch.ElapsedMilliseconds);
+            await send(lead);
+            logger.LogInformation("Sent the {Email} for lead {LeadId} in {ElapsedMs}ms", email, leadId,
+                stopwatch.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, 
-                "Failed to send sales notification email for lead {LeadId} after {ElapsedMs}ms",
-                leadId, stopwatch.ElapsedMilliseconds);
-            throw;
+            logger.LogError(ex, "Failed to send the {Email} for lead {LeadId} after {ElapsedMs}ms", email, leadId,
+                stopwatch.ElapsedMilliseconds);
+            throw; // Hangfire retries it
         }
     }
 }

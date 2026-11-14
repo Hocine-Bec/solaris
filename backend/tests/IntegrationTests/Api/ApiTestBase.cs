@@ -47,6 +47,7 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
             builder.UseSetting("ConnectionStrings:Default", ConnectionString);
             builder.UseSetting("Jwt:Secret", "test-secret-test-secret-test-secret-test-secret");
             builder.UseSetting("Email:FromAddress", "solaris.test@example.com");
+            builder.UseSetting("Email:SiteUrl", "https://solaris.test");
             builder.UseSetting("Email:Gmail:ClientId", "test-client-id");
             builder.UseSetting("Email:Gmail:ClientSecret", "test-client-secret");
             builder.UseSetting("Email:Gmail:RefreshToken", "test-refresh-token");
