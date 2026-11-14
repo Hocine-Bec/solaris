@@ -31,6 +31,7 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
   installation's time zone (BR-P4).
 - **FR-I5** — Admin assigns technicians to an installation, each with a role: Surveyor, Installer or Inspector.
 - **FR-I6** — A technician sees the installations they are assigned to and can mark their own assignment complete.
+  Admin can mark any assignment complete on the technician's behalf; the history records who did it.
 - **FR-I7** — Activation issues a device API key (shown once) and notifies the customer by email.
 
 ### Telemetry and production
@@ -54,6 +55,8 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
 - **FR-U2** — Admin creates technician accounts and can deactivate users.
 - **FR-U3** — The first Admin account is created from configuration at startup; there are no default passwords
   in the code.
+- **FR-U4** — Admin can open a technician's page: the account, and the installations they are assigned to, each
+  with their role and whether their part is complete.
 
 ---
 
