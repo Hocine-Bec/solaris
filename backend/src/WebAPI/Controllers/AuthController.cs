@@ -4,6 +4,8 @@ using Application.Interfaces.Services;
 using Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using WebAPI.Security;
 
 namespace WebAPI.Controllers;
 
@@ -16,9 +18,11 @@ public class AuthController(IAuthService service) : ApiControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimits.PasswordChecks)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<CurrentUserResponse>> Login([FromBody] LoginRequest request)
     {
         var result = await service.SignInAsync(request);
@@ -59,9 +63,11 @@ public class AuthController(IAuthService service) : ApiControllerBase
     /// </summary>
     [HttpPut("password")]
     [Authorize]
+    [EnableRateLimiting(RateLimits.PasswordChecks)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {
         if (CurrentUserId is not { } userId)

@@ -30,6 +30,11 @@ builder.Services.AddControllers()
 // Every endpoint needs a signed-in account unless it allows anonymous callers; policies narrow it to a role (ADR 9)
 builder.Services.AddStaffPolicies();
 
+// Who a request comes from (behind the proxies the settings name), and how often one address may use the quote form
+// and check a password (BR-S1)
+builder.Services.AddClientAddress(builder.Configuration);
+builder.Services.AddRateLimits(builder.Configuration);
+
 // Every error response is a ProblemDetails (RFC 9457) with a stable code (ADR 3). An expected failure sets its own
 // (ApiControllerBase.Problem); the others get one here: validation_failed, internal_error, or the status's name.
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
@@ -97,6 +102,9 @@ var app = builder.Build();
 // Check every setting now, before the database is touched; app.Run() would only check them after the migrations.
 app.Services.GetRequiredService<IStartupValidator>().Validate();
 
+// The client's address from the trusted proxies' headers, before anything reads it; nothing when none are listed.
+app.UseClientAddress();
+
 // One log line per request, with its final status. It comes first, so it sees the status the client gets and an
 // exception reaches it already handled: the exception handler below logs it, once.
 app.UseSerilogRequestLogging();
@@ -145,6 +153,9 @@ app.UseMiddleware<SameOriginCheck>();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// After authorization, so a request refused there (no session, another site) doesn't use up the address's budget.
+app.UseRateLimits();
 
 app.MapControllers();
 
