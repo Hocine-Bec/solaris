@@ -54,14 +54,8 @@ public class AddressConfiguration : IEntityTypeConfiguration<Address>
             .HasMaxLength(64);
         
         // Indexes
-        builder.HasIndex(a => new { a.City, a.State })
-            .HasDatabaseName("ix_addresses_city_state");
-
         builder.HasIndex(a => a.UniqueAddressHash)
             .HasDatabaseName("ux_addresses_unique_address_hash")
             .IsUnique();
-        
-        builder.HasIndex(a => a.ZipCode)
-            .HasDatabaseName("ix_addresses_zip_code");
     }
 }

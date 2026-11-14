@@ -84,12 +84,6 @@ namespace Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_addresses_unique_address_hash");
 
-                    b.HasIndex("ZipCode")
-                        .HasDatabaseName("ix_addresses_zip_code");
-
-                    b.HasIndex("City", "State")
-                        .HasDatabaseName("ix_addresses_city_state");
-
                     b.ToTable("addresses", (string)null);
                 });
 
