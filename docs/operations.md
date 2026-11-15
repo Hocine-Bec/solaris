@@ -31,7 +31,8 @@ variables directly, and secrets never go in `appsettings.json`.
 | `Jwt__LifetimeHours` | `appsettings.json` (`8`) | How long a staff session lasts, 1 to 24 hours |
 | `Admin__Name`, `Admin__Email`, `Admin__Password` | `.env` | The first Admin account, created at startup when no active Admin exists; the API stops if there is neither. All three or none; the password follows the password rule ([architecture](architecture.md#9-security)). Once an Admin exists they can be removed |
 | `Cors__AllowedOrigins__0`, `__1`, … | `appsettings.Development.json` (`http://localhost:5173`) | The sites whose pages may send the quote form, as origins (`https://www.example.com`: scheme, host, optional port, no path). Empty outside Development: no other site may call the API. Any other endpoint answers no other site; the staff app needs none ([architecture](architecture.md#9-security)) |
-| `Notifications__Mode` | `appsettings.json` (`Hangfire`) | `Hangfire`: the request enqueues the two lead emails as Hangfire jobs. `Synchronous`: the request sends them itself before it answers; Development only, for measurements, and the API refuses it elsewhere. `Outbox` *(planned)* replaces `Hangfire` as the default |
+| `Notifications__Mode` | `appsettings.json` (`Outbox`) | `Outbox`: the request saves a new lead's two emails as outbox messages, with the lead, and the outbox dispatcher sends them in the background ([architecture](architecture.md#6-notifications)). `Synchronous`: the request sends them itself before it answers, and writes no outbox messages; Development only, for measurements, and the API refuses it elsewhere |
+| `Outbox__MaxConcurrentSends` | — | How many of a batch's emails the dispatcher sends at once, 1 to 20; 5 by default (Gmail refused emails from one account at about 10 at once). The P1 and P2 measurement runs set 20, as many as the Hangfire reference's workers |
 | `Email__Provider` | `appsettings.json` (`Gmail`), `appsettings.Development.json` (`Recording`) | `Gmail` sends real email; `Recording` sends nothing, and the API refuses it in Production |
 | `Email__FromName` | `appsettings.json` | The sender name shown on emails: `Solaris` |
 | `Email__FromAddress` | `.env` | The sender's address; sales notifications are sent to it too |
@@ -109,8 +110,13 @@ dotnet ef database update --project backend/src/Infrastructure --startup-project
   to the console and to daily-rolling files. Every line written during a request ends with its trace id, which is
   the middle part of an error response's `traceId` (`00-<trace id>-…`), so a 500 leads to its exception. EF Core's
   own failure events (a failed command, save, query or connection) are logged at Debug: the code that catches the
-  exception decides whether it is an error, so an expected duplicate logs nothing and a bug is logged once. Performance numbers come from the load tool, not from logs
-  ([measurements](measurements.md)).
+  exception decides whether it is an error, so an expected duplicate logs nothing and a bug is logged once.
+  ASP.NET Core and EF Core log at Warning and above only (`Serilog:MinimumLevel:Override` in `appsettings.json`): the
+  request line above replaces ASP.NET Core's own, and SQL isn't logged, the outbox dispatcher's check every 2 s
+  included. To see the SQL, set `Serilog__MinimumLevel__Override__Microsoft.EntityFrameworkCore.Database.Command` to
+  `Information`; shells can't assign a name with dots, so through `env`, for example
+  `env 'Serilog__MinimumLevel__Override__Microsoft.EntityFrameworkCore.Database.Command=Information' dotnet run`.
+  Performance numbers come from the load tool, not from logs ([measurements](measurements.md)).
 
 ---
 

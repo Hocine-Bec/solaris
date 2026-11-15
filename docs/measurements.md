@@ -87,9 +87,10 @@ These parts exist only to make the measurements possible. They are registered in
 only, and measurement runs use the Development environment with a Release build.
 
 - **Synchronous notifications** (`Notifications__Mode=Synchronous`): the P1 "before". The lead request sends its two
-  emails itself, the welcome email and then the sales alert, through the same senders as the Hangfire jobs, and
+  emails itself, the welcome email and then the sales alert, through the same senders as the outbox's dispatcher, and
   answers only once both are sent. A failed send fails the request with a 500, after the lead is saved. The API
-  refuses to start with this mode outside Development. The default, `Hangfire`, enqueues the two jobs as before.
+  refuses to start with this mode outside Development. It writes no outbox messages, so the before saves only what
+  it saved. The default, `Outbox`, saves the two emails as outbox messages with the lead, for the dispatcher to send.
 - **Email senders:** the provider's sender, chosen by `Email__Provider`, wrapped in two decorators:
 
   | Sender | Role |
@@ -108,7 +109,7 @@ only, and measurement runs use the Development environment with a Release build.
   ```
   email_delivery_log   id bigint identity PK, notification_key text (e.g. 'LeadWelcome:123'),
                        recipient text, subject text, sent_at timestamptz
-                       outbox_message_id uuid NULL   (planned: added with the outbox)
+                       outbox_message_id uuid NULL   (the outbox message it delivered; null for the other designs)
   ```
 
   `notification_key` is deliberately not unique, so a re-send is a second row. The table exists in every
@@ -150,7 +151,7 @@ The data is shaped to look real:
 |---|---|---|
 | **Before** | tag `p1-before` | `Notifications__Mode=Synchronous` · `Email__Provider=Recording` · `Email__SimulatedLatencyMs=2000` (two emails ≈ 4 s per request) |
 | Reference (optional) | tag `p2-before` | The original Hangfire design, for context |
-| **After** | the outbox | `Notifications__Mode=Outbox` · the same simulated latency, now paid by the dispatcher instead of the request |
+| **After** | the outbox | `Notifications__Mode=Outbox` · `Outbox__MaxConcurrentSends=20`, as many sends at once as the reference's 20 Hangfire workers · the same simulated latency, now paid by the dispatcher instead of the request |
 
 The before is the original design: until `5128768` (2025-11-15) moved the emails to Hangfire jobs, `LeadService`
 awaited both of them in the request (`7b98c80`, 2025-10-27). The synchronous mode rebuilds that on today's code, so
@@ -166,10 +167,11 @@ reliability (P2).
    phase's leads, of an email's `sent_at` in `email_delivery_log` minus its lead's `created_at`. The same table for
    every design, written by the same code (§4).
 
-**Running:** `perf/p1/run.sh <run number> <reference|before|after>` does all of this on a fresh `postgres:18`
-container, with `perf/p1/leads.js`, and writes `results.json`, k6's summary and `env.md` to
-`perf/results/p1/<date>-<label>/run<N>/`; `before` starts the API with `Notifications__Mode=Synchronous`. 3 runs; the
-median run by p95 is reported.
+**Running:** `perf/p1/run.sh <run number> <after|before>` does all of this on a fresh `postgres:18` container, with
+`perf/p1/leads.js`, and writes `results.json`, k6's summary and `env.md` to `perf/results/p1/<date>-<label>/run<N>/`;
+`before` starts the API with `Notifications__Mode=Synchronous`, `after` with the outbox and 20 sends at once. The
+reference is the Hangfire design, which the code no longer has: it runs from the tag `p2-before`, with that tag's
+version of the script (`<reference>`). 3 runs; the median run by p95 is reported.
 
 **Realism check:** is the simulated 2 s per email honest? The before again, with `Email__Provider=Gmail`: real emails
 from one Gmail account, the welcome emails to plus-addresses of it, so they all reach one inbox.
@@ -266,9 +268,12 @@ SELECT 2 * count(*) AS expected FROM leads;
 SELECT count(DISTINCT notification_key) AS delivered_unique,
        count(*) - count(DISTINCT notification_key) AS duplicates
 FROM email_delivery_log;
--- still waiting when the wait ends (the before: Hangfire jobs not yet run or retried)
+-- still waiting when the wait ends
+--   before: Hangfire jobs not yet run or retried
 SELECT count(*) AS pending_at_cutoff FROM hangfire.job
 WHERE statename IN ('Enqueued', 'Scheduled', 'Awaiting', 'Processing');
+--   after: outbox messages not yet sent (a Failed one isn't pending: it counts as lost)
+SELECT count(*) AS pending_at_cutoff FROM outbox_messages WHERE status = 'Pending';
 -- lost = expected − delivered_unique − pending_at_cutoff
 ```
 
@@ -276,13 +281,15 @@ A notification still pending at the cutoff isn't counted as lost: it gets its ow
 "gone" stay apart. Also recorded: the **drain time**, from "fault off" (A, C) or the restart (B) until the last
 delivery.
 
-**Running:** `perf/p2/run.sh <A|B|C> <run number> <before|after>` runs one scenario end to end on a fresh
+**Running:** `perf/p2/run.sh <A|B|C> <run number> [after]` runs one scenario of the outbox (with
+`Outbox__MaxConcurrentSends=20`, as many sends at once as the before's 20 Hangfire workers) end to end on a fresh
 `postgres:18` container: the API's Release build in Development, a warm-up of read requests only (so the only leads
 are the 500 counted), the load (`perf/p2/leads.js`), the fault and the crash, the wait, and the counts. Since the lead
 list became the office's (2026-11-14), the warm-up signs in once as the run's own Admin and sends the token with each
 read, and its second read is `GET /api/leads/999` (a 404) instead of the removed `GET /api/addresses/999`; the
 measured requests, the quote form's `POST /api/leads`, are sent signed out as before. The "before" runs of
-2026-11-08 used the earlier warm-up. It writes
+2026-11-08 used the earlier warm-up. The before, the Hangfire design, runs from the tag `p2-before`, with that tag's
+version of the script. It writes
 `results.json`, k6's summary and `env.md` to `perf/results/p2/<date>-<design>/<scenario>-run<N>/`; the API's own log
 (`api.log`) stays out of git. Each scenario runs 3 times; the median run by Lost is reported, ties broken by drain
 time.
