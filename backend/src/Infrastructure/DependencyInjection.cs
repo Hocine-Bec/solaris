@@ -5,6 +5,7 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Hangfire;
 using Hangfire.PostgreSql;
+using Hangfire.PostgreSql.Factories;
 using Infrastructure.Auth;
 using Infrastructure.Data;
 using Infrastructure.Measurement;
@@ -18,6 +19,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -71,26 +73,31 @@ public static class DependencyInjection
                 (CoreEventId.SaveChangesFailed, LogLevel.Debug),
                 (CoreEventId.QueryIterationFailed, LogLevel.Debug))));
 
-        //Add Hangfire services
+        // Hangfire, for scheduled jobs. Its storage belongs to this host, in the container, rather than to the process:
+        // Hangfire's global JobStorage.Current is shared by every host in a process, and the integration tests run many
+        // at once, each on its own database (one host used another's storage, whose database had been dropped).
+        services.AddSingleton(provider =>
+        {
+            var storageOptions = new PostgreSqlStorageOptions
+            {
+                QueuePollInterval = TimeSpan.FromSeconds(1),
+                PrepareSchemaIfNecessary = true,
+                InvisibilityTimeout = TimeSpan.FromMinutes(5),
+                UseNativeDatabaseTransactions = true,
+                EnableTransactionScopeEnlistment = true,
+                SchemaName = "hangfire"
+            };
+            var connectionString = provider.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Default;
+            return new PostgreSqlStorage(new NpgsqlConnectionFactory(connectionString, storageOptions), storageOptions);
+        });
         services.AddHangfire((provider, config) =>
             config.SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
                 .UseSimpleAssemblyNameTypeSerializer()
                 .UseRecommendedSerializerSettings()
-                .UsePostgreSqlStorage(options =>
-                {
-                    options.UseNpgsqlConnection(
-                        provider.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Default);
-                }, new PostgreSqlStorageOptions()
-                {
-                    QueuePollInterval = TimeSpan.FromSeconds(1),
-                    PrepareSchemaIfNecessary = true,
-                    InvisibilityTimeout = TimeSpan.FromMinutes(5),
-                    UseNativeDatabaseTransactions = true,
-                    EnableTransactionScopeEnlistment = true,
-                    SchemaName = "hangfire"
-                })
-        );
-        
+                .UseStorage(provider.GetRequiredService<PostgreSqlStorage>()));
+        services.RemoveAll<JobStorage>();
+        services.AddSingleton<JobStorage>(provider => provider.GetRequiredService<PostgreSqlStorage>());
+
         services.AddHangfireServer();
 
         //Configure Jwt settings
