@@ -3,9 +3,8 @@
 The app [Solaris](../../README.md)'s staff work in: the office (Admin) runs leads, customers, installations,
 production, failed notifications and accounts; technicians see the installations they're assigned to.
 
-**Status:** signing in, the app's frame and the Users screens are built: the session, the navigation by role, the
-account menu, the themes, the states every screen shares, the client that talks to the API, and the staff accounts.
-The other screens come with their features; until then each section shows what it will hold.
+**Status:** signing in, the app's frame, the Users screens and Failed notifications are built: the session, the navigation by role, the
+account menu, the themes, the states every screen shares, the client that talks to the API, the staff accounts, and the failed emails. The other screens come with their features; until then each section shows what it will hold.
 
 ## Pages
 
@@ -15,6 +14,7 @@ The other screens come with their features; until then each section shows what i
 | `/` | Opens the account's landing page: Leads for the office, My work for technicians |
 | `/leads`, `/customers`, `/installations`, `/production`, `/notifications`, `/users` | The office's six sections, in the side bar; a technician who opens one sees Not allowed |
 | `/users`, `/users/:id` | The staff accounts, and one account (see Users below) |
+| `/notifications` | The emails that failed for good, and retrying them (see Failed notifications below) |
 | `/my-work` | A technician's work; an Admin who opens it sees Not allowed |
 | Any other | Page not found, inside the frame |
 
@@ -65,6 +65,22 @@ The Admin's screens for staff accounts (FR-U2, FR-U4), from the approved Users d
   minute.
 - **The dialogs** are native modal `<dialog>`s: focus goes to the first field (or Cancel), Escape closes them and
   focus goes back to the button that opened them; a click outside doesn't close a form.
+
+## Failed notifications
+
+The Admin's screen for the emails the outbox couldn't send in 24 hours of tries (FR-N2), from the approved design.
+
+- **The list** (`/notifications`, `?page=` past the first 20): newest failure first; which email (Welcome email, New
+  lead alert), to whom (the office's alert names the lead it is about), when it last failed and after how many tries,
+  and the start of the error. Nothing failed: "Nothing has failed". Below 768 px the rows become cards.
+- **A row's details:** a click anywhere on the row opens them (the error's start is the button, for the keyboard):
+  the whole error, the lead, when it was first and last tried, how many times, and who retried it before. A click
+  inside them leaves them open, so the error can be selected.
+- **Retry** sends one email again without asking: the row says "Sending again", focus moves to the next Retry, and
+  the email leaves the list at the next load. If another Admin retried it first, the list reloads. **Retry all**
+  asks first, then says how many are sending again. A retried email gets another 24 hours (BR-N2).
+- **Its layout** measures the space the frame leaves it (a container query): under 960 px the lines wrap, so Retry
+  stays in view down to the phone layout.
 
 ## The frame
 

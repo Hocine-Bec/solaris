@@ -9,6 +9,7 @@ import { SectionPage } from './pages/SectionPage';
 import { RequireSession } from './session/RequireSession';
 import { MY_WORK, OFFICE } from './shell/sections';
 import type { RouteHandle } from './shell/Shell';
+import { NotificationsPage } from './notifications/NotificationsPage';
 import { SignInPage } from './signin/SignInPage';
 import { UserPage } from './users/UserPage';
 import { UsersPage } from './users/UsersPage';
@@ -16,7 +17,7 @@ import { UsersPage } from './users/UsersPage';
 const handle = (title: string): RouteHandle => ({ title });
 
 /** The screens built so far; the other sections show what they will hold. */
-const BUILT: Record<string, ReactNode> = { '/users': <UsersPage /> };
+const BUILT: Record<string, ReactNode> = { '/notifications': <NotificationsPage />, '/users': <UsersPage /> };
 
 const routes: RouteObject[] = [
   { path: '/login', element: <SignInPage />, errorElement: <ErrorPage /> },
