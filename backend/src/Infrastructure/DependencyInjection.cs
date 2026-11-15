@@ -186,6 +186,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomerRepo, CustomerRepo>();
         services.AddScoped<ILeadRepo, LeadRepo>();
         services.AddScoped<IUserRepo, UserRepo>();
+        services.AddScoped<IOutboxRepo, OutboxRepo>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         
         // Email: the provider's sender (Email:Provider), which the measurement harness wraps in Development
@@ -197,6 +198,7 @@ public static class DependencyInjection
         // The outbox (BR-N1, BR-N2): the dispatcher sends its messages in the background
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<OutboxProcessor>();
+        services.AddScoped<OutboxCleanupJob>();
         services.AddHostedService<OutboxDispatcher>();
 
         return services;

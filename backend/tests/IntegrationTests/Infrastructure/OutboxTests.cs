@@ -7,6 +7,7 @@ using Domain.Enums;
 using FluentAssertions;
 using Infrastructure.Data;
 using Infrastructure.Outbox;
+using Infrastructure.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Settings;
 using Microsoft.EntityFrameworkCore;
@@ -283,6 +284,69 @@ public class OutboxTests(PostgresFixture database) : IntegrationTestBase(databas
         int current;
         while ((current = Volatile.Read(ref target)) < value &&
                Interlocked.CompareExchange(ref target, value, current) != current) { }
+    }
+
+    #endregion
+
+    #region A retry (FR-N2) and the cleanup
+
+    [Fact]
+    public async Task BR_N2_RetriedEmail_TheScheduleStartsOver_AndItFailsOnlyAfterAnotherDay()
+    {
+        // Arrange - an email Failed at the end of its day, then retried by the Admin
+        var seeded = await SeedLeadsAsync(1, createdAt: _clock.UtcNow.AddHours(-24));
+        var failing = new RecordingSender(_ => throw new InvalidOperationException("Still down."));
+        await Processor(failing).SendDueAsync(Ct);
+        (await RowsAsync()).Should().AllSatisfy(m => m.Status.Should().Be(OutboxMessageStatus.Failed));
+        var admin = UserRepoTests.NewUser("rosa.castillo@example.com");
+        await SeedAsync(admin);
+        var retried = await new OutboxRepo(CreateContext()).RetryFailedAsync(seeded[0].Id, _clock.UtcNow, admin.Id);
+
+        // Act - the next batch, and the end of the new day
+        await Processor(failing).SendDueAsync(Ct);
+        var afterFirst = (await RowsAsync()).Single(m => m.Id == seeded[0].Id);
+        _clock.Now = afterFirst.GiveUpAt;
+        await Processor(failing).SendDueAsync(Ct);
+        var atTheEnd = (await RowsAsync()).Single(m => m.Id == seeded[0].Id);
+
+        // Assert - 10 s after the retry, as a new email; Failed only once the new 24 hours have passed
+        retried.Should().Be(1);
+        (afterFirst.Status, afterFirst.Attempts, afterFirst.NextAttemptAt - afterFirst.RetriedAt)
+            .Should().Be((OutboxMessageStatus.Pending, 1, TimeSpan.FromSeconds(10)));
+        afterFirst.GiveUpAt.Should().Be(afterFirst.RetriedAt!.Value.AddHours(24));
+        (atTheEnd.Status, atTheEnd.Attempts, atTheEnd.RetriedByUserId)
+            .Should().Be((OutboxMessageStatus.Failed, 2, admin.Id));
+        var (listed, _) = await new OutboxRepo(CreateContext()).GetFailedPageAsync(0, 10);
+        listed.Single(m => m.Id == seeded[0].Id).RetriedBy!.Name.Should().Be("Rosa Castillo");
+    }
+
+    [Fact]
+    public async Task CleanupJob_DeletesTheEmailsSentMoreThanSevenDaysAgo_Only()
+    {
+        // Arrange - three leads' messages: sent 8 days ago, sent 6 days ago, and one Failed 8 days ago with one Pending
+        var seeded = await SeedLeadsAsync(3, createdAt: _clock.UtcNow.AddDays(-9));
+        await using (var context = CreateContext())
+        {
+            var rows = await context.OutboxMessages.OrderBy(m => m.LeadId).ThenBy(m => m.Type).ToListAsync(Ct);
+            rows[0].MarkSent(_clock.UtcNow.AddDays(-8));
+            rows[1].MarkSent(_clock.UtcNow.AddDays(-8));
+            rows[2].MarkSent(_clock.UtcNow.AddDays(-6));
+            rows[3].MarkSent(_clock.UtcNow.AddDays(-6));
+            rows[4].RecordFailure("Down.", _clock.UtcNow.AddDays(-8));
+            await context.SaveChangesAsync(Ct);
+        }
+
+        // Act - one row per statement, so the job needs several
+        var deleted = await new OutboxCleanupJob(CreateContext(), _clock, NullLogger<OutboxCleanupJob>.Instance)
+            { BatchSize = 1 }.RunAsync(Ct);
+
+        // Assert
+        deleted.Should().Be(2);
+        (await RowsAsync()).Select(m => m.Status).Should().BeEquivalentTo(new[]
+        {
+            OutboxMessageStatus.Sent, OutboxMessageStatus.Sent, OutboxMessageStatus.Failed, OutboxMessageStatus.Pending
+        });
+        seeded.Should().HaveCount(6);
     }
 
     #endregion

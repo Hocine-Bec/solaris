@@ -3,6 +3,7 @@ using Hangfire;
 using Infrastructure;
 using Infrastructure.Data;
 using Infrastructure.Measurement;
+using Infrastructure.Outbox;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -140,6 +141,10 @@ if (app.Environment.IsDevelopment())
 
 // The first Admin, from the Admin settings, when no active Admin exists; the API stops if there is neither (FR-U3).
 await FirstAdmin.EnsureAsync(app.Services);
+
+// The scheduled jobs, run by Hangfire's server (once per job, whatever the number of API instances)
+app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<OutboxCleanupJob>(OutboxCleanupJob.RecurringJobId,
+    job => job.RunAsync(CancellationToken.None), Cron.Daily());
 
 app.UseHttpsRedirection();
 
