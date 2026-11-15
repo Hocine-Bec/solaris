@@ -18,7 +18,7 @@ public class SynchronousNotificationsTests(PostgresFixture database) : ApiTestBa
     public async Task CreateLead_SynchronousMode_SendsBothEmailsBeforeAnswering()
     {
         // Arrange - the real notifier of the mode, and each email takes 250 ms
-        var client = CreateClient(environment: "Development", fakeNotifier: false,
+        var client = CreateClient(environment: "Development",
             settings: new Dictionary<string, string>
             {
                 ["Notifications:Mode"] = "Synchronous",
@@ -37,6 +37,7 @@ public class SynchronousNotificationsTests(PostgresFixture database) : ApiTestBa
         var keys = await Context.EmailDeliveries.AsNoTracking().OrderBy(d => d.Id).Select(d => d.NotificationKey)
             .ToListAsync(Ct);
         keys.Should().Equal($"LeadWelcome:{id}", $"SalesNewLeadAlert:{id}");
+        (await Context.OutboxMessages.AnyAsync(Ct)).Should().BeFalse("the before saves only the lead, as it did");
         stopwatch.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(450));
     }
 }

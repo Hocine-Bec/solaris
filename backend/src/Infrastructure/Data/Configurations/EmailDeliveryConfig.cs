@@ -21,6 +21,9 @@ public class EmailDeliveryConfig : IEntityTypeConfiguration<EmailDelivery>
             .HasColumnName("notification_key")
             .IsRequired();
 
+        builder.Property(d => d.OutboxMessageId)
+            .HasColumnName("outbox_message_id");
+
         builder.Property(d => d.Recipient)
             .HasColumnName("recipient")
             .IsRequired();

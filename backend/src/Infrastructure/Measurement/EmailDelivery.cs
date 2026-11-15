@@ -11,6 +11,9 @@ public sealed class EmailDelivery
     /// <summary>The notification this email delivers, such as <c>LeadWelcome:123</c>. Not unique: a re-send is a second row.</summary>
     public string NotificationKey { get; set; } = string.Empty;
 
+    /// <summary>The outbox message it delivered; null for the other designs, which have none.</summary>
+    public Guid? OutboxMessageId { get; set; }
+
     public string Recipient { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public DateTime SentAt { get; set; }

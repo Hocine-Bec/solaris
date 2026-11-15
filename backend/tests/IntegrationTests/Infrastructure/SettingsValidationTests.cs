@@ -139,6 +139,8 @@ public class SettingsValidationTests
     [InlineData("Email:FromAddress", "not-an-email-address", "FromAddress")]
     [InlineData("Email:SiteUrl", "solaris.example", "SiteUrl")]
     [InlineData("Email:Smtp:Port", "70000", "Port")]
+    [InlineData("Outbox:MaxConcurrentSends", "0", "MaxConcurrentSends")]
+    [InlineData("Outbox:MaxConcurrentSends", "21", "MaxConcurrentSends")]
     public void Startup_SettingInvalid_FailsNamingTheSetting(string key, string value, string member)
     {
         // Arrange

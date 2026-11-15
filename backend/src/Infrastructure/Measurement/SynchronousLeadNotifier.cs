@@ -10,7 +10,10 @@ namespace Infrastructure.Measurement;
 /// </summary>
 public sealed class SynchronousLeadNotifier(IEmailService emails) : ILeadNotifier
 {
-    public async Task NotifyNewLeadAsync(Lead lead)
+    /// <summary>Nothing is saved with the lead: no outbox messages, so the before writes only what it did.</summary>
+    public void OnSaving(Lead lead) { }
+
+    public async Task OnSavedAsync(Lead lead)
     {
         await emails.SendLeadWelcomeAsync(lead);
         await emails.SendNewLeadAlertAsync(lead);

@@ -62,7 +62,7 @@ public class RateLimitTests(PostgresFixture database) : ApiTestBase(database)
         body.GetProperty("detail").GetString().Should().Be("Too many requests from this address. Wait a minute, then try again.");
         response.Headers.RetryAfter!.Delta.Should().Be(TimeSpan.FromSeconds(60));
         (await Context.Leads.CountAsync(Ct)).Should().Be(5);
-        Notifier.Notified.Should().HaveCount(5);
+        (await Context.OutboxMessages.CountAsync(Ct)).Should().Be(10);
     }
 
     [Fact]

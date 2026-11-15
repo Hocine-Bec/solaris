@@ -56,12 +56,13 @@ public class LeadService : ILeadService
         if (await _addressRepo.ExistsAsync(address.UniqueAddressHash))
             return Result.Failure<LeadResponse>(AddressErrors.AlreadyExists);
 
-        // The lead and its address are saved together, in one transaction.
+        // The lead, its address and its two notifications are saved together, in one transaction (BR-N1).
         _repo.Add(lead);
+        _notifier.OnSaving(lead);
         if (await _unitOfWork.SaveAsync() == SaveOutcome.Duplicate)
             return Result.Failure<LeadResponse>(AddressErrors.AlreadyExists);
 
-        await _notifier.NotifyNewLeadAsync(lead);
+        await _notifier.OnSavedAsync(lead);
 
         return Result.Success(lead.Adapt<LeadResponse>());
     }

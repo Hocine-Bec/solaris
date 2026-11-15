@@ -260,6 +260,90 @@ namespace Infrastructure.Migrations
                     b.ToTable("leads", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("GiveUpAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("give_up_at");
+
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<int>("LeadId")
+                        .HasColumnType("integer")
+                        .HasColumnName("lead_id");
+
+                    b.Property<DateTime>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<DateTime?>("RetriedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retried_at");
+
+                    b.Property<int?>("RetriedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("retried_by_user_id");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_outbox_messages");
+
+                    b.HasIndex("LastAttemptAt")
+                        .HasDatabaseName("ix_outbox_messages_failed")
+                        .HasFilter("status = 'Failed'");
+
+                    b.HasIndex("NextAttemptAt")
+                        .HasDatabaseName("ix_outbox_messages_due")
+                        .HasFilter("status = 'Pending'");
+
+                    b.HasIndex("RetriedByUserId")
+                        .HasDatabaseName("ix_outbox_messages_retried_by_user_id");
+
+                    b.HasIndex("SentAt")
+                        .HasDatabaseName("ix_outbox_messages_sent")
+                        .HasFilter("status = 'Sent'");
+
+                    b.HasIndex("LeadId", "Type")
+                        .IsUnique()
+                        .HasDatabaseName("ux_outbox_messages_lead_id_type");
+
+                    b.ToTable("outbox_messages", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -339,6 +423,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("notification_key");
 
+                    b.Property<Guid?>("OutboxMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("outbox_message_id");
+
                     b.Property<string>("Recipient")
                         .IsRequired()
                         .HasColumnType("text")
@@ -388,6 +476,26 @@ namespace Infrastructure.Migrations
                     b.Navigation("Address");
 
                     b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("Domain.Entities.OutboxMessage", b =>
+                {
+                    b.HasOne("Domain.Entities.Lead", "Lead")
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_outbox_messages_leads_lead_id");
+
+                    b.HasOne("Domain.Entities.User", "RetriedBy")
+                        .WithMany()
+                        .HasForeignKey("RetriedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_outbox_messages_users_retried_by_user_id");
+
+                    b.Navigation("Lead");
+
+                    b.Navigation("RetriedBy");
                 });
 #pragma warning restore 612, 618
         }

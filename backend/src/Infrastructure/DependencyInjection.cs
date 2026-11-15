@@ -9,6 +9,7 @@ using Hangfire.PostgreSql.Factories;
 using Infrastructure.Auth;
 using Infrastructure.Data;
 using Infrastructure.Measurement;
+using Infrastructure.Outbox;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Settings;
@@ -53,6 +54,10 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<EmailOptions>, EmailOptionsValidator>();
+        services.AddOptions<OutboxOptions>()
+            .Bind(configuration.GetSection(OutboxOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddOptions<NotificationsOptions>()
             .Bind(configuration.GetSection(NotificationsOptions.SectionName))
             .Validate<IHostEnvironment>(
@@ -187,8 +192,12 @@ public static class DependencyInjection
         services.AddSingleton<IGmailAuthService, GmailAuthService>();
         services.AddScoped<IEmailSender>(CreateProviderSender);
         services.AddScoped<IEmailService, EmailService>();
-        services.AddScoped<IEmailQueueHandler, EmailQueueHandler>();
         services.AddScoped<ILeadNotifier>(CreateLeadNotifier);
+
+        // The outbox (BR-N1, BR-N2): the dispatcher sends its messages in the background
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<OutboxProcessor>();
+        services.AddHostedService<OutboxDispatcher>();
 
         return services;
     }
@@ -197,7 +206,7 @@ public static class DependencyInjection
     private static ILeadNotifier CreateLeadNotifier(IServiceProvider provider) =>
         provider.GetRequiredService<IOptions<NotificationsOptions>>().Value.Mode switch
         {
-            NotificationsMode.Hangfire => ActivatorUtilities.CreateInstance<HangfireLeadNotifier>(provider),
+            NotificationsMode.Outbox => ActivatorUtilities.CreateInstance<OutboxLeadNotifier>(provider),
             NotificationsMode.Synchronous => ActivatorUtilities.CreateInstance<SynchronousLeadNotifier>(provider),
             var other => throw new UnreachableException($"No notifier for the notifications mode {other}.")
         };

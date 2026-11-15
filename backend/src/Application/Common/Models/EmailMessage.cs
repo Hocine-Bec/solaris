@@ -8,6 +8,9 @@ namespace Application.Common.Models;
 public sealed record EmailMessage(string NotificationKey, string ToAddress, string ToName, string Subject,
     string HtmlBody, string TextBody)
 {
+    /// <summary>The outbox message it delivers, when the outbox sends it: also the email's Message-ID.</summary>
+    public Guid? OutboxMessageId { get; init; }
+
     /// <summary>Where replies go, when not to the sender.</summary>
     public EmailAddress? ReplyTo { get; init; }
 
