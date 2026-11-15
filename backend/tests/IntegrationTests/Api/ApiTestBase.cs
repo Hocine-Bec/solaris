@@ -58,7 +58,7 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
             builder.UseSetting("Email:Gmail:ClientId", "test-client-id");
             builder.UseSetting("Email:Gmail:ClientSecret", "test-client-secret");
             builder.UseSetting("Email:Gmail:RefreshToken", "test-refresh-token");
-            builder.UseSetting("Serilog:MinimumLevel", "Warning");
+            builder.UseSetting("Serilog:MinimumLevel:Default", "Warning");
             builder.UseSetting("Admin:Name", TestAdmin.Name);
             builder.UseSetting("Admin:Email", TestAdmin.Email);
             builder.UseSetting("Admin:Password", TestAdmin.Password);
