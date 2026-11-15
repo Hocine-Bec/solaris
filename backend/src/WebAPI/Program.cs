@@ -101,6 +101,9 @@ app.UseClientAddress();
 // exception reaches it already handled: the exception handler below logs it, once.
 app.UseSerilogRequestLogging();
 
+// A request its client abandoned ends as 499, logged as such, rather than as an exception reported as a 500.
+app.UseMiddleware<ClientClosedRequest>();
+
 // Outside Development, an unhandled exception becomes a 500 ProblemDetails with a traceId and no stack trace; the
 // exception is logged with the same trace id. In Development, the developer exception page shows the details.
 if (!app.Environment.IsDevelopment())
