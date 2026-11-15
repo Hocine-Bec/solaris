@@ -394,5 +394,7 @@ Architecture decisions are recorded as ADRs, one file each, in [`adr/`](adr/):
 | [7](adr/0007-staff-sessions-in-a-cookie.md) | Staff sessions: the token in an HttpOnly cookie |
 | [8](adr/0008-password-hashing.md) | Passwords hashed with PBKDF2-HMAC-SHA512 |
 | [9](adr/0009-closed-by-default.md) | Closed by default: every endpoint needs a signed-in account unless it opens itself |
+| [10](adr/0010-transactional-outbox.md) | A new lead's emails through a transactional outbox |
+| [11](adr/0011-outbox-dispatcher.md) | The outbox dispatcher: a background service with `FOR UPDATE SKIP LOCKED` |
 
 Decisions for parts not built yet are added as ADRs when those parts are built.
