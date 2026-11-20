@@ -315,11 +315,11 @@ time.
 | Scenario | Design | Expected | Delivered | **Lost** | Pending at cutoff | Duplicates | Drain time |
 |---|---|---|---|---|---|---|---|
 | A outage | before | 1000 | 1000 | **0** | 0 | 0 | 794 s |
-| A outage | after | | | | | | |
+| A outage | after | 1000 | 1000 | **0** | 0 | 0 | 299 s |
 | B crash | before | 958 | 958 | **0** | 0 | 0 | 301 s |
-| B crash | after | | | | | | |
+| B crash | after | 950 | 950 | **0** | 0 | 0 | 93 s |
 | C both | before | 988 | 988 | **0** | 0 | 0 | 807 s |
-| C both | after | | | | | | |
+| C both | after | 986 | 986 | **0** | 0 | 0 | 119 s |
 
 **Before, as measured** (2026-11-08, tag `p2-before`, raw results in `perf/results/p2/2026-11-08-before/`):
 
@@ -340,6 +340,29 @@ time.
 - **Environment:** a browser (Brave) was open during all the runs, on kernel 7.0.0-42; `env.md` records both. The
   drain times follow Hangfire's retry schedule and its invisibility timeout, not the machine's speed. Later runs are on
   kernel 7.0.0-43.
+
+**After, as measured** (2026-11-20, commit `495754b` on the outbox branch, no uncommitted change; raw results in
+`perf/results/p2/2026-11-20-after/`). The dispatcher sent 20 at once (`Outbox__MaxConcurrentSends=20`), as many as the
+before's Hangfire workers.
+
+- All nine runs (Lost; expected; drain time): A 0, 0, 0 (1000 each; 293, 299, 302 s); B 0, 0, 0 (950, 950, 948;
+  93, 92, 93 s); C 0, 0, 0 (986 each; 119, 121, 117 s). No duplicates, nothing pending at the cutoff, and no
+  notification Failed, in any run. The median run: A run 2, B run 1 (runs 1 and 3 tie at 93 s; run 1 is reported),
+  C run 1.
+- **Nothing lost, where the before lost one** (B, run 1): a lead and its two notifications are saved in one
+  transaction, so a crash leaves both or neither.
+- **No duplicate after six crashes** (B and C), though delivery is at least once: an email sent just before the
+  `kill -9` and not yet recorded would go twice. None did in these runs; that says they are rare here, not that
+  they can't happen.
+- **The outage drains sooner** (A: 299 s from the fault going off, against 794 s): the outbox's schedule, not
+  Hangfire's 10 retries with growing random delays, decides when each email is tried again.
+- **A crash drains sooner** (B: 93 s from the restart, against 301 s): the dispatcher's row locks went with its
+  connection, so the restarted API took the messages at once, where the before's jobs waited out Hangfire's 5-minute
+  invisibility timeout. What remains is the sending itself, 10 emails a second.
+- Expected differs between runs because requests sent while the API was down failed (B: 25, 25, 26 of 500; C: 7 each),
+  so those leads never existed and owe no notification.
+- **Environment:** mains power, no browser open, kernel 7.0.0-43 (`env.md`); the before ran with a browser open, on
+  kernel 7.0.0-42. The drain times follow the retry schedules and the timeout, not the machine's speed.
 
 Duplicates are reported as they are, whatever they are.
 
