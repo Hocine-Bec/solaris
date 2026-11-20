@@ -22,6 +22,7 @@ public sealed class DeliveryLoggingEmailSender(IEmailSender inner, IServiceScope
         context.EmailDeliveries.Add(new EmailDelivery
         {
             NotificationKey = message.NotificationKey,
+            OutboxMessageId = message.OutboxMessageId,
             Recipient = message.ToAddress,
             Subject = message.Subject,
             SentAt = DateTime.UtcNow

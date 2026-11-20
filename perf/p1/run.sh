@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # P1: how much latency does sending email add to the lead request? (docs/measurements.md §6)
 #
-#   perf/p1/run.sh <run number> [reference|before|after|realism|realism-sequential]
+#   perf/p1/run.sh <run number> [after|before|realism|realism-sequential]
 #
 # The request latencies of the measured phase, then, once every notification has gone, the time to delivery of its
-# leads' emails (sent_at in email_delivery_log − the lead's created_at). "before" runs the API with
-# Notifications__Mode=Synchronous: the request sends its two emails itself. "realism" is the before with real Gmail
+# leads' emails (sent_at in email_delivery_log − the lead's created_at). "after" runs the outbox, its dispatcher sending
+# 20 at once, as many as the Hangfire reference's workers. "before" runs the API with
+# Notifications__Mode=Synchronous: the request sends its two emails itself. The reference, the Hangfire design, is
+# run from the tag p2-before, with that tag's version of this script. "realism" is the before with real Gmail
 # (5 s at 1 req/s, then 30 s at 1 req/s, to plus-addresses of Email__FromAddress); "realism-sequential" sends 1 lead,
 # then 10 more one at a time, so no two emails are sent at once. Both read Email__FromAddress and the three
 # Email__Gmail__ secrets from the repository's .env, and print none of them. Output:
@@ -13,8 +15,8 @@
 set -euo pipefail
 source "$(dirname "$0")/../lib/common.sh"
 
-RUN=${1:?usage: perf/p1/run.sh <run number> [reference|before|after|realism|realism-sequential]}
-LABEL=${2:-reference}
+RUN=${1:?usage: perf/p1/run.sh <run number> [after|before|realism|realism-sequential]}
+LABEL=${2:-after}
 WAIT_LIMIT_SECONDS=${WAIT_LIMIT_SECONDS:-3600}
 WARMUP_RATE=2 WARMUP_SECONDS=30 RATE=10 MEASURE_SECONDS=120 EMAIL_BASE=""
 SEQUENTIAL=0 WARMUP_REQUESTS=1 MEASURE_REQUESTS=10 GMAIL_REFRESH_TOKEN=""
@@ -46,9 +48,17 @@ case "$LABEL" in
     fi
     SENDER="Gmail sender, real emails"
     ;;
+  after)
+    MODE="Outbox, 20 sends at once"
+    SETTINGS=(Notifications__Mode=Outbox Outbox__MaxConcurrentSends=20)
+    ;;
+  reference)
+    echo "The reference is the Hangfire design: check out the tag p2-before and run its version of this script." >&2
+    exit 2
+    ;;
   *)
-    MODE="the default"
-    SETTINGS=()
+    echo "The label must be after, before, realism or realism-sequential." >&2
+    exit 2
     ;;
 esac
 if [ "$SEQUENTIAL" = 1 ]; then
@@ -91,7 +101,7 @@ sql "with delivery as (
   select json_build_object('run', $RUN, 'label', '$LABEL',
     'measured_leads', (select count(*) from leads where email like '%p1-measure-%'),
     'deliveries', (select count(*) from delivery),
-    'pending_at_cutoff', (select count(*) from hangfire.job where statename in ('Enqueued', 'Scheduled', 'Awaiting', 'Processing')),
+    'pending_at_cutoff', ($PENDING_SQL),
     'time_to_delivery_p50_ms', (select round(percentile_cont(0.5) within group (order by ms)) from delivery),
     'time_to_delivery_p95_ms', (select round(percentile_cont(0.95) within group (order by ms)) from delivery))" |
   jq --slurpfile k6 "$OUT/k6-summary.json" --argjson seconds "$MEASURE_SECONDS" --argjson sequential "$SEQUENTIAL" \

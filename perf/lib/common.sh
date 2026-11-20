@@ -92,13 +92,14 @@ set_email_fault() {
   curl -sf -o /dev/null -X PUT -H 'Content-Type: application/json' --data "{\"on\":$1}" "$BASE_URL/api/dev/email-fault"
 }
 
-# Hangfire jobs still to run: waiting in the queue, scheduled for a retry, or running (a job that was running when the
-# API was killed stays Processing until Hangfire gives it to another worker).
+# Notifications still to send: outbox messages not yet Sent or Failed. (The Hangfire design these scripts measured
+# before is on the tags p1-before and p2-before, with their own scripts.)
+PENDING_SQL="select count(*) from outbox_messages where status = 'Pending'"
 pending_jobs() {
-  sql "select count(*) from hangfire.job where statename in ('Enqueued', 'Scheduled', 'Awaiting', 'Processing')"
+  sql "$PENDING_SQL"
 }
 
-# wait_until_drained <deadline, epoch seconds>: until no job is pending at two checks in a row, or the deadline.
+# wait_until_drained <deadline, epoch seconds>: until nothing is pending at two checks in a row, or the deadline.
 wait_until_drained() {
   local deadline=$1 quiet=0
   while [ "$(date +%s)" -lt "$deadline" ]; do

@@ -27,7 +27,7 @@ exists in the code.
   through its API reference (Scalar).
 - **Inverter gateways** upload production readings for their own installation *(planned)*.
 - **Gmail** delivers the notification emails over SMTP.
-- **PostgreSQL** holds all state: the application tables, the outbox *(planned)* and Hangfire's job storage.
+- **PostgreSQL** holds all state: the application tables, the outbox and Hangfire's job storage.
 
 ---
 
@@ -52,7 +52,7 @@ solaris/
 │   ├── brand/                 the tokens, the core components' CSS, the fonts, the logo and the line drawings, shared by the frontends
 │   ├── marketing/             the marketing site and the quote form
 │   └── staff/                 the staff app
-└── perf/                      load and fault scripts, and their raw results (planned; see measurements.md)
+└── perf/                      load and fault scripts for P1 and P2, and their raw results (see measurements.md)
 ```
 
 Dependencies point inward: `WebAPI` → `Infrastructure` → `Application` → `Domain` ([ADR 1](adr/0001-layered-solution.md)).
@@ -74,10 +74,10 @@ they do.
 ```
 
 One API process holds everything. Several instances can run side by side: the dispatcher and the rollup job
-claim their work with `FOR UPDATE SKIP LOCKED`, and Hangfire coordinates its own jobs. The dispatcher and the
-three jobs are *(planned)*; today, the two new-lead emails are sent by Hangfire jobs enqueued after the lead is
-saved, which the outbox replaces (§6). Each job carries the lead's id only and reads the lead when it runs, so no
-personal details are copied into Hangfire's tables. The emails are rendered from the lead in `Infrastructure`: an HTML
+claim their work with `FOR UPDATE SKIP LOCKED`, and Hangfire coordinates its own jobs. The dispatcher is built, and
+`OutboxCleanupJob` runs daily in Hangfire; the rollup jobs are *(planned)*. A new lead's two emails are outbox
+messages, saved with the lead and sent by the dispatcher (§6). Each holds the lead's id only and the email is
+rendered when it is sent, so no personal details are copied into the outbox. The emails are rendered from the lead in `Infrastructure`: an HTML
 part and a plain-text part, every value from the form HTML-encoded, and the wordmark sent inside the email. The
 welcome email goes to an address nobody has confirmed, so it repeats nothing an email app could show as a link: the
 note stays in the office's alert (the welcome email says it was sent to the office), and the fields it does repeat
@@ -88,7 +88,7 @@ note stays in the office's alert (the welcome email says it was sent to the offi
 
 ## 4. Data model
 
-Today the code has `Lead`, `Address`, `Customer` and `User`. The other entities are *(planned)*, each built with its
+Today the code has `Lead`, `Address`, `Customer`, `User` and the outbox's `OutboxMessage` (§6). The other entities are *(planned)*, each built with its
 feature.
 
 | Entity | What it is | Key rules |
@@ -102,12 +102,16 @@ feature.
 | **User** | A staff account | Name; email, unique whatever its case (`NormalizedEmail`, a unique index); password hash ([ADR 8](adr/0008-password-hashing.md)); role (Admin or Technician); active flag; last sign-in; the time its sessions are valid from, moved by a new password |
 | **EnergyProduction** | The daily production rollup | One row per installation and local day, enforced by a unique index; `ReadingCount` and `ComputedAt` *(planned)* |
 
-Tables for the mechanisms below *(planned)*:
+Tables for the mechanisms below (the outbox is built; the others are *(planned)*):
 
 ```
-outbox_messages        id uuid PK, type text, payload jsonb, status (Pending | Sent | Failed),
-                       attempts int, next_attempt_at timestamptz, last_error text, created_at, sent_at
-                       index: (next_attempt_at) WHERE status = 'Pending'
+outbox_messages        id uuid PK (version 7, made by the app; the email's Message-ID), type text
+                       (LeadWelcome | SalesNewLeadAlert), lead_id int FK → leads, status (Pending | Sent | Failed),
+                       attempts int, created_at, give_up_at (the end of its 24 hours), next_attempt_at,
+                       last_attempt_at, sent_at, retried_at timestamptz, retried_by_user_id int FK → users
+                       (SET NULL), last_error text
+                       unique (lead_id, type); indexes (next_attempt_at) WHERE status = 'Pending',
+                       (last_attempt_at) WHERE status = 'Failed', (sent_at) WHERE status = 'Sent'
 
 energy_readings        installation_id int, slot_start timestamptz, energy_wh int
                        PK (installation_id, slot_start)
@@ -151,6 +155,8 @@ installation's own time zone (BR-P4).
   | `user.not_found` | 404 | No staff account has this ID |
   | `user.email_taken` | 409 | Another account has this email, whatever its case or spaces; a deactivated one keeps it |
   | `user.cannot_deactivate_self` | 409 | The Admin deactivating their own account |
+  | `notification.not_found` | 404 | No outbox message has this ID |
+  | `notification.not_failed` | 409 | Retrying an email that isn't Failed: already retried (by another Admin, or in another tab) or sent |
   | `user.cannot_set_own_password` | 409 | Setting your own password through the Users endpoint: your own is changed with the current one (`PUT /api/auth/password`) |
   | `auth.invalid_credentials` | 401 | A refused sign-in: the same answer for an unknown email, a wrong password or a deactivated account |
   | `auth.signed_out` | 401 | A valid token whose account was deactivated since, no longer exists, or has had a new password since the token was issued |
@@ -160,6 +166,9 @@ installation's own time zone (BR-P4).
   | `internal_error` | 500 | A bug. Outside Development the body has no exception details; the log line has the same trace id |
   | The status's name, such as `not_found`, `method_not_allowed`, `unauthorized` or `forbidden` | 4xx | Errors from the framework itself, such as an unknown URL, a request without a session to an endpoint that needs one, or a role the endpoint doesn't allow |
 
+- **A request its client abandons** (a screen left before its data came; the staff app cancels those loads): the work
+  stops through the request's token, and the request ends as `499 Client Closed Request`, logged as an ordinary
+  request. A cancellation the client didn't cause is still an error.
 - **Validation:** FluentValidation rejects malformed requests with 400 and the failing fields. The quote form's
   names, street, city and monthly bill can't hold a web or email address, as the welcome email repeats them (§3).
 - **Timestamps:** every timestamp in a request must carry `Z` or an offset (`2026-11-02T10:00:00Z`,
@@ -172,56 +181,72 @@ installation's own time zone (BR-P4).
 
 ---
 
-## 6. Notifications *(planned)*
+## 6. Notifications
 
 A transactional outbox: a notification is stored in the same transaction as the event that causes it, and a
-background dispatcher sends it (BR-N1, BR-N2).
+background dispatcher sends it (BR-N1, BR-N2; [ADR 10](adr/0010-transactional-outbox.md),
+[ADR 11](adr/0011-outbox-dispatcher.md)).
 
 ### Write path
 The event and its notifications are saved in **one save, which is one transaction**:
-- **Lead created:** the lead (+ its address) and two outbox messages, `LeadWelcome` and `SalesNewLeadAlert`.
-- **Installation activated:** the status change, its history row, the device key and an `InstallationActivated`
-  message.
+- **Lead created:** the lead (+ its address) and two outbox messages, `LeadWelcome` and `SalesNewLeadAlert`, due at
+  once. If the save fails, neither exists.
+- **Installation activated** *(planned)*: the status change, its history row, the device key and an
+  `InstallationActivated` message.
 
-The HTTP request never talks to the mail server.
+The HTTP request never talks to the mail server. `Notifications:Mode` picks the path: `Outbox`, the default, or
+`Synchronous`, the P1 "before" kept in the measurement harness, Development only, which writes no outbox messages and
+sends both emails in the request ([measurements](measurements.md#4-measurement-harness)).
 
 ### Dispatcher
-`OutboxDispatcher` is a `BackgroundService`:
+`OutboxDispatcher` is a `BackgroundService`; each batch is `OutboxProcessor.SendDueAsync`:
 
 ```
-every 2 s (and again immediately if the last batch was full):
+every 2 s (and again at once if the last batch was full and the mail server answered):
   BEGIN
-  SELECT … FROM outbox_messages
-   WHERE status = 'Pending' AND next_attempt_at <= now()
+  SELECT * FROM outbox_messages
+   WHERE status = 'Pending' AND next_attempt_at <= now
    ORDER BY next_attempt_at
    LIMIT 20
    FOR UPDATE SKIP LOCKED;                         -- safe with several instances
-  for each message:
-     send through IEmailSender (10 s timeout; Message-ID header = the outbox id)
-       ok      → status = Sent, sent_at = now()
-       failure → attempts + 1, last_error, next_attempt_at = now() + backoff(attempts)
-                 once created_at + 24 h has passed → status = Failed (shown to Admin, FR-N2)
-     if the mail server is unreachable: stop the batch and reschedule the rest
-  COMMIT
+  read the batch's leads (with their addresses)
+  send up to Outbox:MaxConcurrentSends at once (5 by default), each through IEmailSender
+  (10 s timeout; Message-ID header = the outbox id)
+     ok      → Sent, sent_at = now
+     failure → attempts + 1, last_error, next attempt after the schedule's delay
+               once give_up_at has passed → Failed (shown to Admin, FR-N2)
+     mail server unreachable → no more sends start; the messages not tried wait until the failed one's next attempt
+  COMMIT                                           -- also when the host is stopping, so a sent email isn't sent again
 ```
 
-**Backoff:** 10 s, 30 s, 1 min, 2 min, 5 min, 10 min, 30 min, 1 h, 2 h, 4 h, 8 h; Failed once 24 hours have passed.
+**Backoff:** 10 s, 30 s, 1 min, 2 min, 5 min, 10 min, 30 min, 1 h, 2 h, 4 h, then 8 h. No attempt is scheduled after
+`give_up_at`, 24 h after the message was saved or retried: the last one comes at that moment, and if it fails the
+message is Failed. Every failure is
+retried, whatever the mail server answered.
 
-**Delivery is at least once.** If the process dies after the mail server accepted a message but before
-`COMMIT`, the message is still Pending and is sent again: a rare duplicate is accepted, a loss is not.
+**Delivery is at least once.** If the process dies after the mail server accepted a message but before `COMMIT`,
+the message is still Pending and is sent again, with the same Message-ID: a rare duplicate is accepted, a loss is
+not. A send abandoned because the host is stopping counts no attempt.
 
 ### Senders
 `IEmailSender` hides the mail provider, chosen by `Email:Provider`. In production it is `GmailSmtpEmailSender`
 (MailKit over SMTP, with a Gmail OAuth2 token); it reports a mail server it can't reach with
 `MailServerUnavailableException`. `RecordingEmailSender` sends nothing and waits a set time per email: the
 Development default, refused in Production. Development wraps the provider's sender in the measurement harness
-([measurements](measurements.md#4-measurement-harness)). Built today; until the outbox, the Hangfire jobs send
-through it.
+([measurements](measurements.md#4-measurement-harness)).
 
-### Administration
-- `GET /api/notifications/failed` (paginated) lists the Failed messages.
-- `POST /api/notifications/{id}/retry` sets a message back to Pending, due now.
-- `OutboxCleanupJob` deletes Sent messages older than 7 days, daily.
+### Administration (FR-N2)
+All `Admin`; the staff app's Failed notifications screen uses them.
+- `GET /api/notifications/failed` (paginated) lists the Failed messages, newest failure first: which email, to whom
+  (the person, or the office for its alert, as the email service addresses them), the lead, when it was saved and
+  last tried, the attempts, the last error, and who retried it before.
+- `POST /api/notifications/{id}/retry` retries one; `POST /api/notifications/failed/retry` retries every message
+  Failed at that moment and answers how many. A retry is one conditional `UPDATE … WHERE status = 'Failed'`:
+  Pending, due now, attempts back to 0, `give_up_at` 24 h from now (the schedule starts over), `retried_at` and
+  `retried_by_user_id` recorded, `created_at` kept. Two Admins retrying one email at once: one changes it, the other
+  gets `409 notification.not_failed`, as does retrying one that is Pending or Sent.
+- `OutboxCleanupJob`, a Hangfire recurring job, daily at midnight UTC: deletes the Sent messages sent more than 7
+  days ago, 1,000 per statement. Failed ones stay until a retry sends them; the delivery log isn't touched.
 
 ---
 
@@ -229,7 +254,8 @@ through it.
 
 ### Duplicate-safe lead capture (BR-L1)
 - The database enforces the rule: a partial unique index on `NormalizedEmail` for the open statuses.
-- One transaction: insert or reuse the address, insert the lead, insert its outbox messages, commit.
+- One transaction: insert or reuse the address, insert the lead, insert its outbox messages, commit (the outbox
+  messages are built, §6).
 - On a unique violation of the open-lead index (SQLSTATE `23505`), the transaction rolls back, so no duplicate
   emails exist; the existing open lead is loaded and returned with **200**.
 - Addresses are inserted with `ON CONFLICT (UniqueAddressHash) DO NOTHING`, then selected by hash: never
@@ -346,8 +372,8 @@ Staff sign-in, sessions and the roles' checks are built; the parts marked *(plan
   only, the API reference (`/scalar`, `/openapi/v1.json`), the measurement harness's email fault switch, and the
   Hangfire dashboard. Signed
   out, an address that doesn't exist answers `401`, like one that does.
-- **Policies:** `Admin`, `Technician`, and `Staff` (either role), reading the `role` claim. The leads and the staff
-  accounts are `Admin` (the quote form excepted); a technician calling them gets `403 forbidden`. The staff app shows a "Not allowed"
+- **Policies:** `Admin`, `Technician`, and `Staff` (either role), reading the `role` claim. The leads, the staff
+  accounts and the failed notifications are `Admin` (the quote form excepted); a technician calling them gets `403 forbidden`. The staff app shows a "Not allowed"
   screen for another role's page, and the API refuses the data anyway.
 - **Technician scoping** *(planned)*: a technician lists and sees only the installations they are assigned to,
   enforced in the service query.
@@ -394,5 +420,7 @@ Architecture decisions are recorded as ADRs, one file each, in [`adr/`](adr/):
 | [7](adr/0007-staff-sessions-in-a-cookie.md) | Staff sessions: the token in an HttpOnly cookie |
 | [8](adr/0008-password-hashing.md) | Passwords hashed with PBKDF2-HMAC-SHA512 |
 | [9](adr/0009-closed-by-default.md) | Closed by default: every endpoint needs a signed-in account unless it opens itself |
+| [10](adr/0010-transactional-outbox.md) | A new lead's emails through a transactional outbox |
+| [11](adr/0011-outbox-dispatcher.md) | The outbox dispatcher: a background service with `FOR UPDATE SKIP LOCKED` |
 
 Decisions for parts not built yet are added as ADRs when those parts are built.

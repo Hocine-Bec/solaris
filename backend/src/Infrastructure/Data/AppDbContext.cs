@@ -11,6 +11,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Lead> Leads { get; set; }
     public DbSet<User> Users { get; set; }
 
+    /// <summary>Notifications waiting to be sent, saved with the event that causes them (BR-N1).</summary>
+    public DbSet<OutboxMessage> OutboxMessages { get; set; }
+
     /// <summary>Written only by the measurement harness, in Development; empty elsewhere.</summary>
     public DbSet<EmailDelivery> EmailDeliveries { get; set; }
     

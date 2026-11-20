@@ -3,6 +3,7 @@ using Hangfire;
 using Infrastructure;
 using Infrastructure.Data;
 using Infrastructure.Measurement;
+using Infrastructure.Outbox;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -101,6 +102,9 @@ app.UseClientAddress();
 // exception reaches it already handled: the exception handler below logs it, once.
 app.UseSerilogRequestLogging();
 
+// A request its client abandoned ends as 499, logged as such, rather than as an exception reported as a 500.
+app.UseMiddleware<ClientClosedRequest>();
+
 // Outside Development, an unhandled exception becomes a 500 ProblemDetails with a traceId and no stack trace; the
 // exception is logged with the same trace id. In Development, the developer exception page shows the details.
 if (!app.Environment.IsDevelopment())
@@ -137,6 +141,10 @@ if (app.Environment.IsDevelopment())
 
 // The first Admin, from the Admin settings, when no active Admin exists; the API stops if there is neither (FR-U3).
 await FirstAdmin.EnsureAsync(app.Services);
+
+// The scheduled jobs, run by Hangfire's server (once per job, whatever the number of API instances)
+app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<OutboxCleanupJob>(OutboxCleanupJob.RecurringJobId,
+    job => job.RunAsync(CancellationToken.None), Cron.Daily());
 
 app.UseHttpsRedirection();
 

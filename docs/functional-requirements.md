@@ -138,8 +138,9 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
   it (a lead created, an installation activated). If the event is saved, its notification exists; if the event
   fails, no notification exists.
 - **BR-N2 Retries.** Failed sends are retried with growing delays for up to 24 hours. After that, the
-  notification is marked Failed and shown to Admin (FR-N2). Delivery is *at least once*: a rare duplicate email
-  after a crash is acceptable; a lost one is not.
+  notification is marked Failed and shown to Admin (FR-N2). An Admin's retry sends it again at once and gives it
+  another 24 hours on the same schedule. Delivery is *at least once*: a rare duplicate email after a crash is
+  acceptable; a lost one is not.
 
 ### Security
 - **BR-S1 Public form.** The public lead endpoint accepts at most 5 submissions per minute per IP address; beyond

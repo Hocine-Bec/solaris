@@ -7,17 +7,13 @@ import { Icon } from '../components/Icon';
 import { PageHead } from '../components/PageHead';
 import { Pager } from '../components/Pager';
 import { formatMoment } from '../lib/dates';
+import { pageFrom } from '../lib/paging';
 import { useCurrentUser } from '../session/session';
 import { opensFor } from '../shell/sections';
 import { Empty, NotAllowed } from '../states/States';
 import { QueryView } from '../states/QueryView';
 import { NewTechnicianDialog } from './AccountDialogs';
 import { StatusChip } from './StatusChip';
-
-const pageFrom = (value: string | null) => {
-  const page = Number(value);
-  return Number.isInteger(page) && page >= 1 ? page : 1;
-};
 
 const lastSignIn = (user: User) => (user.lastLoginAt ? formatMoment(user.lastLoginAt) : null);
 

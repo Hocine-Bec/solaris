@@ -1,5 +1,6 @@
 using Application.DTOs.Lead;
 using Application.Errors;
+using Application.Interfaces.Repositories;
 using Application.Services;
 using Domain.Entities;
 using Domain.Enums;
@@ -11,11 +12,12 @@ using Microsoft.EntityFrameworkCore;
 using TestUtilities.Base;
 using TestUtilities.Database;
 using TestUtilities.Factories;
+using Infrastructure.Outbox;
 using TestUtilities.Fakes;
 
 namespace IntegrationTests.Services;
 
-// LeadService with the real repositories, unit of work and PostgreSQL; only the lead notifier is a fake.
+// LeadService with the real repositories, unit of work, outbox and PostgreSQL.
 public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(database)
 {
     static LeadServiceTests()
@@ -24,11 +26,11 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         TypeAdapterConfig.GlobalSettings.Scan(typeof(LeadService).Assembly);
     }
 
-    private readonly RecordingLeadNotifier _notifier = new();
+    private static readonly ManualClock Clock = new(new DateTimeOffset(2026, 11, 15, 9, 30, 0, TimeSpan.Zero));
 
     private LeadService CreateService() => new(
         new LeadRepo(Context), new AddressRepo(Context), new CustomerRepo(Context), new UnitOfWork(Context),
-        _notifier);
+        new OutboxLeadNotifier(Context, Clock));
 
     private static CreateLeadRequest ValidRequest(string email = "jane.doe@example.com") => new()
     {
@@ -61,7 +63,21 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         result.Value.FullName.Should().Be("Jane Doe");
         result.Value.Email.Should().Be("jane.doe@example.com");
         result.Value.PropertyAddress.Should().StartWith("100 Congress Ave");
-        _notifier.Notified.Should().ContainSingle().Which.LeadId.Should().Be(result.Value.Id);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ValidRequest_SavesTheLeadsTwoNotificationsDueNow()
+    {
+        // Act
+        var result = await CreateService().CreateAsync(ValidRequest());
+
+        // Assert - BR-N1: saved with the lead, for the dispatcher to send
+        ClearTracking();
+        var messages = await Context.OutboxMessages.AsNoTracking().OrderBy(m => m.Type)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        messages.Select(m => (m.Type, m.LeadId, m.Status, m.Attempts, m.NextAttemptAt)).Should().Equal(
+            (OutboxMessageType.LeadWelcome, result.Value.Id, OutboxMessageStatus.Pending, 0, Clock.UtcNow),
+            (OutboxMessageType.SalesNewLeadAlert, result.Value.Id, OutboxMessageStatus.Pending, 0, Clock.UtcNow));
     }
 
     [Fact]
@@ -93,12 +109,46 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         var act = () => CreateService().CreateAsync(request);
 
         // Assert - an unexpected failure is an exception for the API's handler, not a result (ADR 3); and one
-        // transaction: the address is rolled back with the lead
+        // transaction: the address and the notifications are rolled back with the lead (BR-N1)
         await act.Should().ThrowAsync<DbUpdateException>();
         ClearTracking();
         (await Context.Leads.CountAsync(TestContext.Current.CancellationToken)).Should().Be(0);
         (await Context.Addresses.CountAsync(TestContext.Current.CancellationToken)).Should().Be(0);
-        _notifier.Notified.Should().BeEmpty();
+        (await Context.OutboxMessages.CountAsync(TestContext.Current.CancellationToken)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task BR_N1_LeadRefusedByTheDatabase_SavesNoNotificationEither()
+    {
+        // Arrange - another request saved this address after this one checked it: the unique index refuses the lead
+        var request = ValidRequest();
+        await SeedAsync(new Address
+        {
+            Street = request.PropertyStreet, City = request.PropertyCity, State = request.PropertyState,
+            ZipCode = request.PropertyZipCode, Country = request.PropertyCountry,
+            UniqueAddressHash = Address.BuildHash(request.PropertyStreet, request.PropertyCity, request.PropertyState,
+                request.PropertyZipCode, request.PropertyCountry)
+        });
+        var service = new LeadService(new LeadRepo(Context), new AddressCheckedBeforeTheOtherSave(new AddressRepo(Context)),
+            new CustomerRepo(Context), new UnitOfWork(Context), new OutboxLeadNotifier(Context, Clock));
+
+        // Act
+        var result = await service.CreateAsync(request);
+
+        // Assert - one transaction: no lead, and no notification for it
+        result.Error.Should().Be(AddressErrors.AlreadyExists);
+        ClearTracking();
+        (await Context.Leads.CountAsync(TestContext.Current.CancellationToken)).Should().Be(0);
+        (await Context.OutboxMessages.CountAsync(TestContext.Current.CancellationToken)).Should().Be(0);
+    }
+
+    /// <summary>The address check as it was before the other request saved: it finds nothing.</summary>
+    private sealed class AddressCheckedBeforeTheOtherSave(AddressRepo inner) : IAddressRepo
+    {
+        public Task<bool> ExistsAsync(string uniqueAddressHash) => Task.FromResult(false);
+        public Task<Address?> GetByIdAsync(int id) => inner.GetByIdAsync(id);
+        public void Add(Address entity) => inner.Add(entity);
+        public void Update(Address entity) => inner.Update(entity);
     }
 
     [Fact]

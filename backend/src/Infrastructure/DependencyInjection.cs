@@ -5,9 +5,11 @@ using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Hangfire;
 using Hangfire.PostgreSql;
+using Hangfire.PostgreSql.Factories;
 using Infrastructure.Auth;
 using Infrastructure.Data;
 using Infrastructure.Measurement;
+using Infrastructure.Outbox;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Settings;
@@ -18,6 +20,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -51,6 +54,10 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<EmailOptions>, EmailOptionsValidator>();
+        services.AddOptions<OutboxOptions>()
+            .Bind(configuration.GetSection(OutboxOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddOptions<NotificationsOptions>()
             .Bind(configuration.GetSection(NotificationsOptions.SectionName))
             .Validate<IHostEnvironment>(
@@ -71,26 +78,31 @@ public static class DependencyInjection
                 (CoreEventId.SaveChangesFailed, LogLevel.Debug),
                 (CoreEventId.QueryIterationFailed, LogLevel.Debug))));
 
-        //Add Hangfire services
+        // Hangfire, for scheduled jobs. Its storage belongs to this host, in the container, rather than to the process:
+        // Hangfire's global JobStorage.Current is shared by every host in a process, and the integration tests run many
+        // at once, each on its own database (one host used another's storage, whose database had been dropped).
+        services.AddSingleton(provider =>
+        {
+            var storageOptions = new PostgreSqlStorageOptions
+            {
+                QueuePollInterval = TimeSpan.FromSeconds(1),
+                PrepareSchemaIfNecessary = true,
+                InvisibilityTimeout = TimeSpan.FromMinutes(5),
+                UseNativeDatabaseTransactions = true,
+                EnableTransactionScopeEnlistment = true,
+                SchemaName = "hangfire"
+            };
+            var connectionString = provider.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Default;
+            return new PostgreSqlStorage(new NpgsqlConnectionFactory(connectionString, storageOptions), storageOptions);
+        });
         services.AddHangfire((provider, config) =>
             config.SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
                 .UseSimpleAssemblyNameTypeSerializer()
                 .UseRecommendedSerializerSettings()
-                .UsePostgreSqlStorage(options =>
-                {
-                    options.UseNpgsqlConnection(
-                        provider.GetRequiredService<IOptions<ConnectionStringsOptions>>().Value.Default);
-                }, new PostgreSqlStorageOptions()
-                {
-                    QueuePollInterval = TimeSpan.FromSeconds(1),
-                    PrepareSchemaIfNecessary = true,
-                    InvisibilityTimeout = TimeSpan.FromMinutes(5),
-                    UseNativeDatabaseTransactions = true,
-                    EnableTransactionScopeEnlistment = true,
-                    SchemaName = "hangfire"
-                })
-        );
-        
+                .UseStorage(provider.GetRequiredService<PostgreSqlStorage>()));
+        services.RemoveAll<JobStorage>();
+        services.AddSingleton<JobStorage>(provider => provider.GetRequiredService<PostgreSqlStorage>());
+
         services.AddHangfireServer();
 
         //Configure Jwt settings
@@ -174,14 +186,20 @@ public static class DependencyInjection
         services.AddScoped<ICustomerRepo, CustomerRepo>();
         services.AddScoped<ILeadRepo, LeadRepo>();
         services.AddScoped<IUserRepo, UserRepo>();
+        services.AddScoped<IOutboxRepo, OutboxRepo>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         
         // Email: the provider's sender (Email:Provider), which the measurement harness wraps in Development
         services.AddSingleton<IGmailAuthService, GmailAuthService>();
         services.AddScoped<IEmailSender>(CreateProviderSender);
         services.AddScoped<IEmailService, EmailService>();
-        services.AddScoped<IEmailQueueHandler, EmailQueueHandler>();
         services.AddScoped<ILeadNotifier>(CreateLeadNotifier);
+
+        // The outbox (BR-N1, BR-N2): the dispatcher sends its messages in the background
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<OutboxProcessor>();
+        services.AddScoped<OutboxCleanupJob>();
+        services.AddHostedService<OutboxDispatcher>();
 
         return services;
     }
@@ -190,7 +208,7 @@ public static class DependencyInjection
     private static ILeadNotifier CreateLeadNotifier(IServiceProvider provider) =>
         provider.GetRequiredService<IOptions<NotificationsOptions>>().Value.Mode switch
         {
-            NotificationsMode.Hangfire => ActivatorUtilities.CreateInstance<HangfireLeadNotifier>(provider),
+            NotificationsMode.Outbox => ActivatorUtilities.CreateInstance<OutboxLeadNotifier>(provider),
             NotificationsMode.Synchronous => ActivatorUtilities.CreateInstance<SynchronousLeadNotifier>(provider),
             var other => throw new UnreachableException($"No notifier for the notifications mode {other}.")
         };

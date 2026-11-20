@@ -32,6 +32,9 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
         ["GET api/leads/{id:int}"] = Access.Admin,
         ["PUT api/leads/{id:int}/status"] = Access.Admin,
         ["POST api/leads/convert"] = Access.Admin,
+        ["GET api/notifications/failed"] = Access.Admin,
+        ["POST api/notifications/{id:guid}/retry"] = Access.Admin,
+        ["POST api/notifications/failed/retry"] = Access.Admin,
         ["GET api/users"] = Access.Admin,
         ["GET api/users/{id:int}"] = Access.Admin,
         ["POST api/users"] = Access.Admin,
@@ -119,7 +122,7 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
             _ => CreateClient()
         };
         var method = endpoint.Split(' ')[0];
-        var url = "/" + endpoint.Split(' ')[1].Replace("{id:int}", "1");
+        var url = "/" + endpoint.Split(' ')[1].Replace("{id:int}", "1").Replace("{id:guid}", Guid.Empty.ToString());
         var request = new HttpRequestMessage(new HttpMethod(method), url)
         {
             Content = method is "POST" or "PUT" ? JsonContent.Create(new { }) : null

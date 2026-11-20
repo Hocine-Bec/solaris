@@ -2,7 +2,10 @@
 # P2: of all the notifications that should be sent, how many are lost when the mail server is down or the API crashes?
 # (docs/measurements.md §7)
 #
-#   perf/p2/run.sh <A|B|C> <run number> [before|after]
+#   perf/p2/run.sh <A|B|C> <run number> [after]
+#
+# The outbox, its dispatcher sending 20 at once, as many as the before's Hangfire workers. The before, the Hangfire
+# design, is run from the tag p2-before, with that tag's version of this script.
 #
 #   A  mail outage: the fault is on for 10 minutes from the start; 500 leads at 5/s
 #   B  API crash:   no fault; 500 leads at 20/s; kill -9 about 10 s in, restarted at once
@@ -13,9 +16,13 @@
 set -euo pipefail
 source "$(dirname "$0")/../lib/common.sh"
 
-SCENARIO=${1:?usage: perf/p2/run.sh <A|B|C> <run number> [before|after]}
-RUN=${2:?usage: perf/p2/run.sh <A|B|C> <run number> [before|after]}
-DESIGN=${3:-before}
+SCENARIO=${1:?usage: perf/p2/run.sh <A|B|C> <run number> [after]}
+RUN=${2:?usage: perf/p2/run.sh <A|B|C> <run number> [after]}
+DESIGN=${3:-after}
+if [ "$DESIGN" != after ]; then
+  echo "This version runs the outbox (after). The before is the Hangfire design: check out the tag p2-before and run its version of this script." >&2
+  exit 2
+fi
 LEADS=${LEADS:-500}
 OUTAGE_SECONDS=${OUTAGE_SECONDS:-600}
 CRASH_AFTER_SECONDS=${CRASH_AFTER_SECONDS:-10}
@@ -34,7 +41,7 @@ trap 'stop_api; stop_database' EXIT
 build_api
 start_database
 # The fault's state at startup, so that in C the restarted API is still cut off from the mail server.
-start_api "$OUT/api.log" FaultInjection__Enabled=$FAULT
+start_api "$OUT/api.log" FaultInjection__Enabled=$FAULT Outbox__MaxConcurrentSends=20
 warm_up
 
 log "P2 $SCENARIO, run $RUN ($DESIGN): $LEADS leads at $RATE/s; fault: $FAULT; crash: $CRASH"
@@ -48,7 +55,7 @@ if $CRASH; then
   sleep "$CRASH_AFTER_SECONDS"
   crash_api
   log "API killed (kill -9)"
-  start_api "$OUT/api.log" FaultInjection__Enabled=$FAULT
+  start_api "$OUT/api.log" FaultInjection__Enabled=$FAULT Outbox__MaxConcurrentSends=20
   restarted=$(date +%s)
   log "API restarted"
 fi
@@ -77,8 +84,8 @@ sql "select json_build_object(
   'delivered_unique', (select count(distinct notification_key) from email_delivery_log),
   'deliveries', (select count(*) from email_delivery_log),
   'duplicates', (select count(*) - count(distinct notification_key) from email_delivery_log),
-  'pending_at_cutoff', (select count(*) from hangfire.job where statename in ('Enqueued', 'Scheduled', 'Awaiting', 'Processing')),
-  'failed_jobs', (select count(*) from hangfire.job where statename = 'Failed'),
+  'pending_at_cutoff', ($PENDING_SQL),
+  'failed_notifications', (select count(*) from outbox_messages where status = 'Failed'),
   'drain_seconds', (select greatest(0, round(extract(epoch from max(sent_at)) - $event)) from email_delivery_log),
   'drain_from', '$event_name')" |
   jq --slurpfile k6 "$OUT/k6-summary.json" '. + {
@@ -89,5 +96,5 @@ sql "select json_build_object(
   }' >"$OUT/results.json"
 
 write_env "$OUT/env.md" "perf/p2/leads.js (scenario $SCENARIO, $LEADS leads at $RATE/s)" "$mhz" \
-  "Recording sender, 2 s per email. Drain time measured from the $event_name."
+  "Recording sender, 2 s per email; the outbox, 20 sends at once. Drain time measured from the $event_name."
 log "done: $(jq -c '{expected, delivered_unique, lost, duplicates, pending_at_cutoff, drain_seconds}' "$OUT/results.json")"

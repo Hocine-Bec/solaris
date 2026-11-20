@@ -8,6 +8,7 @@ using Domain.Entities;
 using Domain.Enums;
 using FluentAssertions;
 using Hangfire;
+using Infrastructure.Outbox;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -18,19 +19,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using TestUtilities.Base;
 using TestUtilities.Database;
-using TestUtilities.Fakes;
 
 namespace IntegrationTests.Api;
 
 /// <summary>
 /// Runs the real API in memory, on this test's own PostgreSQL database, outside Development by default (so errors
-/// look as they do in production). Only the lead notifier is a fake, unless a test asks for the real one.
+/// look as they do in production). The background services that send email (the outbox dispatcher) and run jobs
+/// (Hangfire's server) don't run, unless a test asks for the dispatcher: a new lead's outbox messages stay Pending.
 /// </summary>
 public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBase(database)
 {
     private WebApplicationFactory<Program>? _factory;
-
-    protected RecordingLeadNotifier Notifier { get; } = new();
 
     /// <summary>The first Admin, created when the API starts on this test's empty database (FR-U3).</summary>
     protected static class TestAdmin
@@ -42,11 +41,11 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
 
     /// <summary>
     /// A client for the API; <paramref name="configureServices"/> can replace services, <paramref name="environment"/>
-    /// can change the environment, <paramref name="settings"/> can add settings and <paramref name="fakeNotifier"/>
-    /// = false keeps the notifier of the configured mode, before the first call only.
+    /// can change the environment, <paramref name="settings"/> can add settings and <paramref name="dispatcher"/> =
+    /// true runs the outbox dispatcher, before the first call only.
     /// </summary>
     protected HttpClient CreateClient(Action<IServiceCollection>? configureServices = null,
-        string environment = "Testing", IDictionary<string, string>? settings = null, bool fakeNotifier = true)
+        string environment = "Testing", IDictionary<string, string>? settings = null, bool dispatcher = false)
     {
         _factory ??= new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -58,7 +57,7 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
             builder.UseSetting("Email:Gmail:ClientId", "test-client-id");
             builder.UseSetting("Email:Gmail:ClientSecret", "test-client-secret");
             builder.UseSetting("Email:Gmail:RefreshToken", "test-refresh-token");
-            builder.UseSetting("Serilog:MinimumLevel", "Warning");
+            builder.UseSetting("Serilog:MinimumLevel:Default", "Warning");
             builder.UseSetting("Admin:Name", TestAdmin.Name);
             builder.UseSetting("Admin:Email", TestAdmin.Email);
             builder.UseSetting("Admin:Password", TestAdmin.Password);
@@ -66,9 +65,9 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
                 builder.UseSetting(key, value);
             builder.ConfigureTestServices(services =>
             {
-                if (fakeNotifier)
-                    services.AddSingleton<ILeadNotifier>(Notifier);
                 RemoveHangfireServer(services);
+                if (!dispatcher)
+                    services.Remove(services.Single(d => d.ImplementationType == typeof(OutboxDispatcher)));
                 configureServices?.Invoke(services);
             });
         });

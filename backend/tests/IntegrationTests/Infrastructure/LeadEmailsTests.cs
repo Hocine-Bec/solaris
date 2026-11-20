@@ -182,7 +182,7 @@ public class LeadEmailsTests
     {
         var (service, sender) = Service();
 
-        await service.SendLeadWelcomeAsync(Maya());
+        await service.SendLeadWelcomeAsync(Maya(), cancellationToken: TestContext.Current.CancellationToken);
 
         var message = sender.Sent.Single();
         message.NotificationKey.Should().Be("LeadWelcome:128");
@@ -200,7 +200,7 @@ public class LeadEmailsTests
     {
         var (service, sender) = Service();
 
-        await service.SendNewLeadAlertAsync(Maya());
+        await service.SendNewLeadAlertAsync(Maya(), cancellationToken: TestContext.Current.CancellationToken);
 
         var message = sender.Sent.Single();
         message.NotificationKey.Should().Be("SalesNewLeadAlert:128");

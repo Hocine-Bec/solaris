@@ -38,8 +38,9 @@ public sealed class GmailSmtpEmailSender(IGmailAuthService authService, IOptions
     }
 
     /// <summary>
-    /// The email as MIME: the plain text and the HTML as alternatives, the HTML's images inside the email with it,
-    /// and a <c>Reply-To</c> when the message has one.
+    /// The email as MIME: the plain text and the HTML as alternatives, the HTML's images inside the email with it, a
+    /// <c>Reply-To</c> when the message has one, and, from the outbox, its message's id as the Message-ID (a re-send
+    /// after a crash carries the same one).
     /// </summary>
     public static MimeMessage BuildMime(EmailMessage message, EmailOptions settings)
     {
@@ -49,6 +50,8 @@ public sealed class GmailSmtpEmailSender(IGmailAuthService authService, IOptions
         if (message.ReplyTo is { } replyTo)
             mime.ReplyTo.Add(new MailboxAddress(replyTo.Name, replyTo.Address));
         mime.Subject = message.Subject;
+        if (message.OutboxMessageId is { } id)
+            mime.MessageId = $"{id}@{settings.FromAddress[(settings.FromAddress.LastIndexOf('@') + 1)..]}";
 
         var body = new BodyBuilder { TextBody = message.TextBody, HtmlBody = message.HtmlBody };
         foreach (var image in message.InlineImages)

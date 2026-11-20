@@ -1,0 +1,18 @@
+{
+  "scenario": "C",
+  "run": 2,
+  "design": "after",
+  "leads": 493,
+  "expected": 986,
+  "delivered_unique": 986,
+  "deliveries": 986,
+  "duplicates": 0,
+  "pending_at_cutoff": 0,
+  "failed_notifications": 0,
+  "drain_seconds": 121,
+  "drain_from": "fault off",
+  "lost": 0,
+  "requests": 500,
+  "failed_requests": 7,
+  "dropped_iterations": 0
+}

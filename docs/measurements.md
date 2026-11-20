@@ -87,9 +87,10 @@ These parts exist only to make the measurements possible. They are registered in
 only, and measurement runs use the Development environment with a Release build.
 
 - **Synchronous notifications** (`Notifications__Mode=Synchronous`): the P1 "before". The lead request sends its two
-  emails itself, the welcome email and then the sales alert, through the same senders as the Hangfire jobs, and
+  emails itself, the welcome email and then the sales alert, through the same senders as the outbox's dispatcher, and
   answers only once both are sent. A failed send fails the request with a 500, after the lead is saved. The API
-  refuses to start with this mode outside Development. The default, `Hangfire`, enqueues the two jobs as before.
+  refuses to start with this mode outside Development. It writes no outbox messages, so the before saves only what
+  it saved. The default, `Outbox`, saves the two emails as outbox messages with the lead, for the dispatcher to send.
 - **Email senders:** the provider's sender, chosen by `Email__Provider`, wrapped in two decorators:
 
   | Sender | Role |
@@ -108,7 +109,7 @@ only, and measurement runs use the Development environment with a Release build.
   ```
   email_delivery_log   id bigint identity PK, notification_key text (e.g. 'LeadWelcome:123'),
                        recipient text, subject text, sent_at timestamptz
-                       outbox_message_id uuid NULL   (planned: added with the outbox)
+                       outbox_message_id uuid NULL   (the outbox message it delivered; null for the other designs)
   ```
 
   `notification_key` is deliberately not unique, so a re-send is a second row. The table exists in every
@@ -150,7 +151,7 @@ The data is shaped to look real:
 |---|---|---|
 | **Before** | tag `p1-before` | `Notifications__Mode=Synchronous` · `Email__Provider=Recording` · `Email__SimulatedLatencyMs=2000` (two emails ≈ 4 s per request) |
 | Reference (optional) | tag `p2-before` | The original Hangfire design, for context |
-| **After** | the outbox | `Notifications__Mode=Outbox` · the same simulated latency, now paid by the dispatcher instead of the request |
+| **After** | the outbox | `Notifications__Mode=Outbox` · `Outbox__MaxConcurrentSends=20`, as many sends at once as the reference's 20 Hangfire workers · the same simulated latency, now paid by the dispatcher instead of the request |
 
 The before is the original design: until `5128768` (2025-11-15) moved the emails to Hangfire jobs, `LeadService`
 awaited both of them in the request (`7b98c80`, 2025-10-27). The synchronous mode rebuilds that on today's code, so
@@ -166,10 +167,11 @@ reliability (P2).
    phase's leads, of an email's `sent_at` in `email_delivery_log` minus its lead's `created_at`. The same table for
    every design, written by the same code (§4).
 
-**Running:** `perf/p1/run.sh <run number> <reference|before|after>` does all of this on a fresh `postgres:18`
-container, with `perf/p1/leads.js`, and writes `results.json`, k6's summary and `env.md` to
-`perf/results/p1/<date>-<label>/run<N>/`; `before` starts the API with `Notifications__Mode=Synchronous`. 3 runs; the
-median run by p95 is reported.
+**Running:** `perf/p1/run.sh <run number> <after|before>` does all of this on a fresh `postgres:18` container, with
+`perf/p1/leads.js`, and writes `results.json`, k6's summary and `env.md` to `perf/results/p1/<date>-<label>/run<N>/`;
+`before` starts the API with `Notifications__Mode=Synchronous`, `after` with the outbox and 20 sends at once. The
+reference is the Hangfire design, which the code no longer has: it runs from the tag `p2-before`, with that tag's
+version of the script (`<reference>`). 3 runs; the median run by p95 is reported.
 
 **Realism check:** is the simulated 2 s per email honest? The before again, with `Email__Provider=Gmail`: real emails
 from one Gmail account, the welcome emails to plus-addresses of it, so they all reach one inbox.
@@ -184,7 +186,7 @@ One run each, since they send real email. The results are recorded below.
 |---|---|---|---|---|---|---|
 | Before (synchronous) | 10 | 4,025.3 ms | 4,031 ms | 4,046.5 ms | 0 | 4,020 ms |
 | Reference (Hangfire) | 10 | 16.2 ms | 20.3 ms | 28.9 ms | 0 | 121,247 ms |
-| After (outbox) | | | | | | |
+| After (outbox) | 10 | 19.5 ms | 23.6 ms | 26.6 ms | 0 | 122,923 ms |
 
 **Before, as measured** (2026-11-09, tag `p1-before`, the median run by p95; raw results in
 `perf/results/p1/2026-11-09-before/`): all three runs had 1200 requests in the measured phase, none failed and none
@@ -210,6 +212,22 @@ the load asks for 20 (2 per lead at 10 leads a second), and the queue grows for 
   the API's code was the tag's.
 - The CPU frequency in `env.md` is one sample, taken 90 s in, when the machine was nearly idle: it shows how fast the
   cores ran at that moment, not whether the CPU could reach full speed.
+
+**After, as measured** (2026-11-20, commit `495754b` on the outbox branch, no uncommitted change, the median run by
+p95; raw results in `perf/results/p1/2026-11-20-after/`): all three runs had 1200 requests in the measured phase, none
+failed and none was dropped; p50 19.4, 19.5, 19.7 ms; p95 23.2, 23.6, 24 ms; p99 26.9, 26.6, 27.2 ms; time to delivery
+p95 123,193, 122,923, 122,895 ms (p50 67,015, 66,734, 66,789 ms). The dispatcher sent 20 at once
+(`Outbox__MaxConcurrentSends=20`). On mains power, with no browser open, on kernel 7.0.0-43 (`env.md`).
+
+- **The request no longer waits for email:** a p95 of 23.6 ms against the before's 4,031 ms, under the 300 ms target.
+- **Against the reference** (Hangfire, p95 20.3 ms): 3.3 ms more at the p95. The request runs more code than at the
+  tag `p2-before` (the session and authorization checks, the same-origin check, the quote form's added checks, and
+  the outbox's two rows in its transaction; the rate limits are off in measurement runs), so this difference isn't
+  the outbox's alone.
+- **Time to delivery** is the reference's (121,247 ms): both send 20 emails at once at 2 s each, 10 a second, while
+  the load asks for 20, so the queue grows for the whole run, in both. Delivery speed is set by how many are sent at
+  once, which the outbox makes a setting; the before's emails arrived sooner (4,020 ms) because each request sent its
+  own, with no limit.
 
 **Realism check, as measured** (2026-11-10, the code of tag `p1-before`; `env.md` says `dirty` because these two
 script options weren't committed yet; raw results in `perf/results/p1/2026-11-10-realism/` and
@@ -266,9 +284,12 @@ SELECT 2 * count(*) AS expected FROM leads;
 SELECT count(DISTINCT notification_key) AS delivered_unique,
        count(*) - count(DISTINCT notification_key) AS duplicates
 FROM email_delivery_log;
--- still waiting when the wait ends (the before: Hangfire jobs not yet run or retried)
+-- still waiting when the wait ends
+--   before: Hangfire jobs not yet run or retried
 SELECT count(*) AS pending_at_cutoff FROM hangfire.job
 WHERE statename IN ('Enqueued', 'Scheduled', 'Awaiting', 'Processing');
+--   after: outbox messages not yet sent (a Failed one isn't pending: it counts as lost)
+SELECT count(*) AS pending_at_cutoff FROM outbox_messages WHERE status = 'Pending';
 -- lost = expected − delivered_unique − pending_at_cutoff
 ```
 
@@ -276,13 +297,15 @@ A notification still pending at the cutoff isn't counted as lost: it gets its ow
 "gone" stay apart. Also recorded: the **drain time**, from "fault off" (A, C) or the restart (B) until the last
 delivery.
 
-**Running:** `perf/p2/run.sh <A|B|C> <run number> <before|after>` runs one scenario end to end on a fresh
+**Running:** `perf/p2/run.sh <A|B|C> <run number> [after]` runs one scenario of the outbox (with
+`Outbox__MaxConcurrentSends=20`, as many sends at once as the before's 20 Hangfire workers) end to end on a fresh
 `postgres:18` container: the API's Release build in Development, a warm-up of read requests only (so the only leads
 are the 500 counted), the load (`perf/p2/leads.js`), the fault and the crash, the wait, and the counts. Since the lead
 list became the office's (2026-11-14), the warm-up signs in once as the run's own Admin and sends the token with each
 read, and its second read is `GET /api/leads/999` (a 404) instead of the removed `GET /api/addresses/999`; the
 measured requests, the quote form's `POST /api/leads`, are sent signed out as before. The "before" runs of
-2026-11-08 used the earlier warm-up. It writes
+2026-11-08 used the earlier warm-up. The before, the Hangfire design, runs from the tag `p2-before`, with that tag's
+version of the script. It writes
 `results.json`, k6's summary and `env.md` to `perf/results/p2/<date>-<design>/<scenario>-run<N>/`; the API's own log
 (`api.log`) stays out of git. Each scenario runs 3 times; the median run by Lost is reported, ties broken by drain
 time.
@@ -292,11 +315,11 @@ time.
 | Scenario | Design | Expected | Delivered | **Lost** | Pending at cutoff | Duplicates | Drain time |
 |---|---|---|---|---|---|---|---|
 | A outage | before | 1000 | 1000 | **0** | 0 | 0 | 794 s |
-| A outage | after | | | | | | |
+| A outage | after | 1000 | 1000 | **0** | 0 | 0 | 299 s |
 | B crash | before | 958 | 958 | **0** | 0 | 0 | 301 s |
-| B crash | after | | | | | | |
+| B crash | after | 950 | 950 | **0** | 0 | 0 | 93 s |
 | C both | before | 988 | 988 | **0** | 0 | 0 | 807 s |
-| C both | after | | | | | | |
+| C both | after | 986 | 986 | **0** | 0 | 0 | 119 s |
 
 **Before, as measured** (2026-11-08, tag `p2-before`, raw results in `perf/results/p2/2026-11-08-before/`):
 
@@ -317,6 +340,29 @@ time.
 - **Environment:** a browser (Brave) was open during all the runs, on kernel 7.0.0-42; `env.md` records both. The
   drain times follow Hangfire's retry schedule and its invisibility timeout, not the machine's speed. Later runs are on
   kernel 7.0.0-43.
+
+**After, as measured** (2026-11-20, commit `495754b` on the outbox branch, no uncommitted change; raw results in
+`perf/results/p2/2026-11-20-after/`). The dispatcher sent 20 at once (`Outbox__MaxConcurrentSends=20`), as many as the
+before's Hangfire workers.
+
+- All nine runs (Lost; expected; drain time): A 0, 0, 0 (1000 each; 293, 299, 302 s); B 0, 0, 0 (950, 950, 948;
+  93, 92, 93 s); C 0, 0, 0 (986 each; 119, 121, 117 s). No duplicates, nothing pending at the cutoff, and no
+  notification Failed, in any run. The median run: A run 2, B run 1 (runs 1 and 3 tie at 93 s; run 1 is reported),
+  C run 1.
+- **Nothing lost, where the before lost one** (B, run 1): a lead and its two notifications are saved in one
+  transaction, so a crash leaves both or neither.
+- **No duplicate after six crashes** (B and C), though delivery is at least once: an email sent just before the
+  `kill -9` and not yet recorded would go twice. None did in these runs; that says they are rare here, not that
+  they can't happen.
+- **The outage drains sooner** (A: 299 s from the fault going off, against 794 s): the outbox's schedule, not
+  Hangfire's 10 retries with growing random delays, decides when each email is tried again.
+- **A crash drains sooner** (B: 93 s from the restart, against 301 s): the dispatcher's row locks went with its
+  connection, so the restarted API took the messages at once, where the before's jobs waited out Hangfire's 5-minute
+  invisibility timeout. What remains is the sending itself, 10 emails a second.
+- Expected differs between runs because requests sent while the API was down failed (B: 25, 25, 26 of 500; C: 7 each),
+  so those leads never existed and owe no notification.
+- **Environment:** mains power, no browser open, kernel 7.0.0-43 (`env.md`); the before ran with a browser open, on
+  kernel 7.0.0-42. The drain times follow the retry schedules and the timeout, not the machine's speed.
 
 Duplicates are reported as they are, whatever they are.
 

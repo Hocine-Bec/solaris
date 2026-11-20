@@ -7,6 +7,9 @@ using Application.Interfaces.Services;
 using FluentAssertions;
 using Infrastructure;
 using Infrastructure.Measurement;
+using Infrastructure.Outbox;
+using Domain.Entities;
+using Domain.Enums;
 using Infrastructure.Services;
 using Infrastructure.Settings;
 using Microsoft.EntityFrameworkCore;
@@ -173,6 +176,18 @@ public class EmailSenderTests(PostgresFixture database) : IntegrationTestBase(da
         mime.ReplyTo.Count.Should().Be(0);
     }
 
+    [Fact]
+    public void GmailSmtp_Mime_FromTheOutbox_HasTheMessagesIdAsItsMessageId()
+    {
+        // A re-send after a crash carries the same Message-ID, so it can be recognised as the same email
+        var id = Guid.Parse("019a8a3e-7c41-7b12-9d3e-5a1c2b3d4e5f");
+
+        var mime = GmailSmtpEmailSender.BuildMime(Welcome with { OutboxMessageId = id },
+            new EmailOptions { FromName = "Solaris", FromAddress = "office@example.com" });
+
+        mime.MessageId.Should().Be("019a8a3e-7c41-7b12-9d3e-5a1c2b3d4e5f@example.com");
+    }
+
     [Theory]
     [InlineData("Recording", typeof(RecordingEmailSender))]
     [InlineData("Gmail", typeof(GmailSmtpEmailSender))]
@@ -206,46 +221,36 @@ public class EmailSenderTests(PostgresFixture database) : IntegrationTestBase(da
     }
 
     [Fact]
-    public async Task Harness_TheHangfireJobs_LogBothNotificationsOfALead()
+    public async Task Harness_TheOutbox_LogsBothNotificationsOfALead_WithTheirMessageIds()
     {
-        // The jobs the current design enqueues for every new lead, each reading the lead by its id: the P2 "before"
-        // counts their deliveries.
+        // The outbox's batch, through the senders Development wires: the P2 "after" counts these rows
         await SeedAsync(AddressFactory.CreateFakeAddress(id: 1));
         await SeedAsync(LeadFactory.CreateFakeLead(id: 123, addressId: 1, email: "jane.doe@example.com"));
+        var lead = await Context.Leads.SingleAsync(Ct);
+        var welcome = OutboxMessage.ForLead(lead, OutboxMessageType.LeadWelcome, DateTime.UtcNow);
+        var alert = OutboxMessage.ForLead(lead, OutboxMessageType.SalesNewLeadAlert, DateTime.UtcNow);
+        Context.OutboxMessages.AddRange(welcome, alert);
+        await Context.SaveChangesAsync(Ct);
         await using var services = BuildServices(harness: true);
         await using var scope = services.CreateAsyncScope();
-        var jobs = scope.ServiceProvider.GetRequiredService<IEmailQueueHandler>();
 
-        await jobs.SendLeadWelcomeEmailAsync(123);
-        await jobs.SendSalesNotificationEmailAsync(123);
+        await scope.ServiceProvider.GetRequiredService<OutboxProcessor>().SendDueAsync(Ct);
 
-        var rows = await Context.EmailDeliveries.AsNoTracking().OrderBy(d => d.Id).ToListAsync(Ct);
-        rows.Select(d => (d.NotificationKey, d.Recipient)).Should().Equal(
-            ("LeadWelcome:123", "jane.doe@example.com"),
-            ("SalesNewLeadAlert:123", "sales@example.com"));
-    }
-
-    [Fact]
-    public async Task Jobs_LeadNoLongerExists_SendNothingAndDontFail()
-    {
-        // Retrying can't bring a missing lead back, so the job ends instead of failing into Hangfire's retries
-        await using var services = BuildServices(harness: true);
-        await using var scope = services.CreateAsyncScope();
-        var jobs = scope.ServiceProvider.GetRequiredService<IEmailQueueHandler>();
-
-        await jobs.SendLeadWelcomeEmailAsync(404);
-        await jobs.SendSalesNotificationEmailAsync(404);
-
-        (await Context.EmailDeliveries.AnyAsync(Ct)).Should().BeFalse();
+        var rows = await Context.EmailDeliveries.AsNoTracking().ToListAsync(Ct);
+        rows.Select(d => (d.NotificationKey, d.Recipient, d.OutboxMessageId)).Should().BeEquivalentTo(new[]
+        {
+            ("LeadWelcome:123", "jane.doe@example.com", (Guid?)welcome.Id),
+            ("SalesNewLeadAlert:123", "sales@example.com", (Guid?)alert.Id)
+        });
     }
 
     [Theory]
-    [InlineData(null, typeof(HangfireLeadNotifier))]
-    [InlineData("Hangfire", typeof(HangfireLeadNotifier))]
+    [InlineData(null, typeof(OutboxLeadNotifier))]
+    [InlineData("Outbox", typeof(OutboxLeadNotifier))]
     [InlineData("Synchronous", typeof(SynchronousLeadNotifier))]
     public async Task Harness_TheLeadNotifier_IsTheConfiguredModes(string? mode, Type expected)
     {
-        // Hangfire unless a measurement asks for the P1 "before"
+        // The outbox unless a measurement asks for the P1 "before"
         await using var services = BuildServices(harness: true, notificationsMode: mode);
         await using var scope = services.CreateAsyncScope();
 
