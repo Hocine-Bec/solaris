@@ -186,7 +186,7 @@ One run each, since they send real email. The results are recorded below.
 |---|---|---|---|---|---|---|
 | Before (synchronous) | 10 | 4,025.3 ms | 4,031 ms | 4,046.5 ms | 0 | 4,020 ms |
 | Reference (Hangfire) | 10 | 16.2 ms | 20.3 ms | 28.9 ms | 0 | 121,247 ms |
-| After (outbox) | | | | | | |
+| After (outbox) | 10 | 19.5 ms | 23.6 ms | 26.6 ms | 0 | 122,923 ms |
 
 **Before, as measured** (2026-11-09, tag `p1-before`, the median run by p95; raw results in
 `perf/results/p1/2026-11-09-before/`): all three runs had 1200 requests in the measured phase, none failed and none
@@ -212,6 +212,22 @@ the load asks for 20 (2 per lead at 10 leads a second), and the queue grows for 
   the API's code was the tag's.
 - The CPU frequency in `env.md` is one sample, taken 90 s in, when the machine was nearly idle: it shows how fast the
   cores ran at that moment, not whether the CPU could reach full speed.
+
+**After, as measured** (2026-11-20, commit `495754b` on the outbox branch, no uncommitted change, the median run by
+p95; raw results in `perf/results/p1/2026-11-20-after/`): all three runs had 1200 requests in the measured phase, none
+failed and none was dropped; p50 19.4, 19.5, 19.7 ms; p95 23.2, 23.6, 24 ms; p99 26.9, 26.6, 27.2 ms; time to delivery
+p95 123,193, 122,923, 122,895 ms (p50 67,015, 66,734, 66,789 ms). The dispatcher sent 20 at once
+(`Outbox__MaxConcurrentSends=20`). On mains power, with no browser open, on kernel 7.0.0-43 (`env.md`).
+
+- **The request no longer waits for email:** a p95 of 23.6 ms against the before's 4,031 ms, under the 300 ms target.
+- **Against the reference** (Hangfire, p95 20.3 ms): 3.3 ms more at the p95. The request runs more code than at the
+  tag `p2-before` (the session and authorization checks, the same-origin check, the quote form's added checks, and
+  the outbox's two rows in its transaction; the rate limits are off in measurement runs), so this difference isn't
+  the outbox's alone.
+- **Time to delivery** is the reference's (121,247 ms): both send 20 emails at once at 2 s each, 10 a second, while
+  the load asks for 20, so the queue grows for the whole run, in both. Delivery speed is set by how many are sent at
+  once, which the outbox makes a setting; the before's emails arrived sooner (4,020 ms) because each request sent its
+  own, with no limit.
 
 **Realism check, as measured** (2026-11-10, the code of tag `p1-before`; `env.md` says `dirty` because these two
 script options weren't committed yet; raw results in `perf/results/p1/2026-11-10-realism/` and
