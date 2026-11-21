@@ -32,6 +32,16 @@ public class Customer
 
     public string FullName => $"{FirstName} {LastName}";
 
+    /// <summary>
+    /// BR-C1, from the statuses of all its installations: Active if one is Active; Prospect if one is in progress (or
+    /// none exists yet); Inactive once every one is Cancelled or Deactivated.
+    /// </summary>
+    public static CustomerStatus StatusFor(IReadOnlyCollection<InstallationStatus> installations) =>
+        installations.Contains(InstallationStatus.Active) ? CustomerStatus.Active
+        : installations.Count == 0 || installations.Any(s => s is not (InstallationStatus.Cancelled or InstallationStatus.Deactivated))
+            ? CustomerStatus.Prospect
+            : CustomerStatus.Inactive;
+
     /// <summary>A new customer from a converted lead: its contact details, Prospect, living at the lead's property.</summary>
     public static Customer FromLead(Lead lead, DateTime now) => new()
     {
