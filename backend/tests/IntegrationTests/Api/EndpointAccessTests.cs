@@ -16,7 +16,7 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    public enum Access { Anyone, Staff, Admin }
+    public enum Access { Anyone, Staff, Admin, Technician }
 
     public enum Caller { SignedOut, Technician, Admin }
 
@@ -35,6 +35,19 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
         ["POST api/leads/{id:int}/convert"] = Access.Admin,
         ["GET api/customers"] = Access.Admin,
         ["GET api/customers/{id:int}"] = Access.Admin,
+        ["GET api/installations"] = Access.Admin,
+        ["GET api/installations/{id:int}"] = Access.Admin,
+        ["POST api/installations/{id:int}/status"] = Access.Admin,
+        ["POST api/installations/{id:int}/cancel"] = Access.Admin,
+        ["POST api/installations/{id:int}/deactivate"] = Access.Admin,
+        ["PUT api/installations/{id:int}/design"] = Access.Admin,
+        ["PUT api/installations/{id:int}/time-zone"] = Access.Admin,
+        ["POST api/installations/{id:int}/assignments"] = Access.Admin,
+        ["DELETE api/installations/{id:int}/assignments/{assignmentId:int}"] = Access.Admin,
+        ["POST api/installations/{id:int}/assignments/{assignmentId:int}/complete"] = Access.Admin,
+        ["GET api/my-work"] = Access.Technician,   // a technician's own work
+        ["GET api/my-work/{installationId:int}"] = Access.Technician,
+        ["POST api/my-work/{installationId:int}/assignments/{assignmentId:int}/complete"] = Access.Technician,
         ["GET api/notifications/failed"] = Access.Admin,
         ["POST api/notifications/{id:guid}/retry"] = Access.Admin,
         ["POST api/notifications/failed/retry"] = Access.Admin,
@@ -45,6 +58,7 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
         ["PUT api/users/{id:int}/password"] = Access.Admin,
         ["POST api/users/{id:int}/deactivate"] = Access.Admin,
         ["POST api/users/{id:int}/reactivate"] = Access.Admin,
+        ["GET api/users/{id:int}/assignments"] = Access.Admin,
     };
 
     /// <summary>
@@ -125,7 +139,8 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
             _ => CreateClient()
         };
         var method = endpoint.Split(' ')[0];
-        var url = "/" + endpoint.Split(' ')[1].Replace("{id:int}", "1").Replace("{id:guid}", Guid.Empty.ToString());
+        var url = "/" + System.Text.RegularExpressions.Regex.Replace(endpoint.Split(' ')[1], @"\{\w+:int\}", "1")
+            .Replace("{id:guid}", Guid.Empty.ToString());
         var request = new HttpRequestMessage(new HttpMethod(method), url)
         {
             Content = method is "POST" or "PUT" ? JsonContent.Create(new { }) : null
@@ -134,6 +149,7 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
         {
             Access.Anyone => true,
             Access.Staff => caller != Caller.SignedOut,
+            Access.Technician => caller == Caller.Technician,
             _ => caller == Caller.Admin
         };
 
