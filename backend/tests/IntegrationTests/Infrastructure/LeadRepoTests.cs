@@ -22,7 +22,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     public async Task GetPageAsync_EmptyDatabase_ReturnsNoLeadsAndZeroTotal()
     {
         // Act
-        var (items, totalCount) = await Repo.GetPageAsync(skip: 0, take: 20);
+        var (items, totalCount) = await Repo.GetPageAsync([], skip: 0, take: 20);
 
         // Assert
         items.Should().BeEmpty();
@@ -43,7 +43,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(leads.ToArray());
 
         // Act
-        var (items, totalCount) = await Repo.GetPageAsync(skip: 0, take: 20);
+        var (items, totalCount) = await Repo.GetPageAsync([], skip: 0, take: 20);
 
         // Assert
         items.Should().HaveCount(2);
@@ -59,7 +59,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(Enumerable.Range(1, 3).Select(i => LeadFactory.CreateFakeLead(id: i, addressId: 1)).ToArray());
 
         // Act
-        var (items, _) = await Repo.GetPageAsync(skip: 0, take: 20);
+        var (items, _) = await Repo.GetPageAsync([], skip: 0, take: 20);
 
         // Assert
         items.Select(l => l.Id).Should().Equal(3, 2, 1);
@@ -74,7 +74,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(Enumerable.Range(1, 5).Select(i => LeadFactory.CreateFakeLead(id: i, addressId: 1)).ToArray());
 
         // Act
-        var (items, totalCount) = await Repo.GetPageAsync(skip: 2, take: 2);
+        var (items, totalCount) = await Repo.GetPageAsync([], skip: 2, take: 2);
 
         // Assert
         items.Select(l => l.Id).Should().Equal(3, 2);
@@ -91,7 +91,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(lead);
 
         // Act
-        var (items, _) = await Repo.GetPageAsync(skip: 0, take: 20);
+        var (items, _) = await Repo.GetPageAsync([], skip: 0, take: 20);
 
         // Assert
         items.Should().HaveCount(1);
@@ -100,36 +100,23 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     }
 
     [Fact]
-    public async Task GetPageAsync_IncludesCustomer_WhenConverted()
+    public async Task GetPageAsync_WithStatuses_ReturnsOnlyThoseAndCountsOnlyThem()
     {
-        // Arrange
+        // Arrange - Closed in the staff app is Converted, Disqualified and Lost
         var address = AddressFactory.CreateFakeAddress(id: 1);
-        var customer = new Customer
-        {
-            Id = 1,
-            FirstName = "John",
-            LastName = "Doe",
-            Email = "john@example.com",
-            PhoneNumber = "123-456-7890",
-            ContactAddressId = 1
-        };
-        var lead = LeadFactory.CreateFakeLead(
-            id: 1, 
-            addressId: 1, 
-            customerId: 1,
-            status: LeadStatus.Converted);
-        
         await SeedAsync(address);
-        await SeedAsync(customer);
-        await SeedAsync(lead);
+        var statuses = new[] { LeadStatus.New, LeadStatus.Contacted, LeadStatus.Converted, LeadStatus.Disqualified, LeadStatus.Lost, LeadStatus.New };
+        await SeedAsync(statuses.Select((status, i) => LeadFactory.CreateFakeLead(id: i + 1, addressId: 1, status: status)).ToArray());
 
         // Act
-        var (items, _) = await Repo.GetPageAsync(skip: 0, take: 20);
+        var (closed, closedCount) = await Repo.GetPageAsync([LeadStatus.Converted, LeadStatus.Disqualified, LeadStatus.Lost], skip: 0, take: 20);
+        var (fresh, freshCount) = await Repo.GetPageAsync([LeadStatus.New], skip: 0, take: 20);
 
         // Assert
-        items.Should().HaveCount(1);
-        items[0].Customer.Should().NotBeNull();
-        items[0].Customer!.FirstName.Should().Be("John");
+        closed.Select(l => l.Id).Should().Equal(5, 4, 3);
+        closedCount.Should().Be(3);
+        fresh.Select(l => l.Id).Should().Equal(6, 1);
+        freshCount.Should().Be(2);
     }
 
     [Fact]
@@ -142,7 +129,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(lead);
 
         // Act
-        var (items, _) = await Repo.GetPageAsync(skip: 0, take: 20);
+        var (items, _) = await Repo.GetPageAsync([], skip: 0, take: 20);
 
         // Assert
         Context.Entry(items[0]).State.Should().Be(EntityState.Detached);
@@ -262,19 +249,22 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     }
 
     [Fact]
-    public async Task GetByIdAsync_ReturnsDetachedEntity()
+    public async Task GetByIdAsync_ReturnsATrackedLead_SoASaveWritesWhatChanged()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
-        var lead = LeadFactory.CreateFakeLead(id: 1, addressId: 1);
+        var lead = LeadFactory.CreateFakeLead(id: 1, addressId: 1, status: LeadStatus.New);
         await SeedAsync(address);
         await SeedAsync(lead);
 
         // Act
         var result = await Repo.GetByIdAsync(1);
+        result!.Status = LeadStatus.Contacted;
+        await SaveAsync();
+        ClearTracking();
 
         // Assert
-        Context.Entry(result!).State.Should().Be(EntityState.Detached);
+        (await Context.Leads.SingleAsync(TestContext.Current.CancellationToken)).Status.Should().Be(LeadStatus.Contacted);
     }
 
     #endregion
@@ -430,7 +420,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
     }
 
     [Fact]
-    public async Task Update_ConvertLead_SetsConvertedAtAndCustomerId()
+    public async Task Update_ConvertLead_SetsClosedAtAndCustomerId()
     {
         // Arrange
         var address = AddressFactory.CreateFakeAddress(id: 1);
@@ -452,9 +442,9 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(lead);
         await SeedAsync(customer);
 
-        var convertedAt = DateTime.UtcNow;
+        var closedAt = DateTime.UtcNow;
         lead.Status = LeadStatus.Converted;
-        lead.ConvertedAt = convertedAt;
+        lead.ClosedAt = closedAt;
         lead.CustomerId = 100;
 
         // Act
@@ -465,7 +455,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         // Assert
         var updated = await Context.Leads.FindAsync([1], TestContext.Current.CancellationToken);
         updated!.Status.Should().Be(LeadStatus.Converted);
-        updated.ConvertedAt.Should().BeCloseTo(convertedAt, TimeSpan.FromSeconds(1));
+        updated.ClosedAt.Should().BeCloseTo(closedAt, TimeSpan.FromSeconds(1));
         updated.CustomerId.Should().Be(100);
     }
 
@@ -488,7 +478,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         await SeedAsync(leads.ToArray());
 
         // Act
-        var (items, totalCount) = await Repo.GetPageAsync(skip: 0, take: 20);
+        var (items, totalCount) = await Repo.GetPageAsync([], skip: 0, take: 20);
 
         // Assert
         items.Should().HaveCount(20);
@@ -537,13 +527,13 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
             id: 1,
             addressId: 1,
             contactedAt: null,
-            convertedAt: null,
+            closedAt: null,
             notes: null,
             customerId: null);
         
         // Explicitly set nullable fields to null to ensure they are null
         lead.ContactedAt = null;
-        lead.ConvertedAt = null;
+        lead.ClosedAt = null;
         lead.Notes = null;
         lead.CustomerId = null;
         
@@ -556,7 +546,7 @@ public class LeadRepoTests(PostgresFixture database) : IntegrationTestBase(datab
         // Assert
         result.Should().NotBeNull();
         result!.ContactedAt.Should().BeNull();
-        result.ConvertedAt.Should().BeNull();
+        result.ClosedAt.Should().BeNull();
         result.Notes.Should().BeNull();
         result.CustomerId.Should().BeNull();
     }

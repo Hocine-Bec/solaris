@@ -1,0 +1,59 @@
+/* The lead and customer screens, from the approved Leads design. */
+
+/* A list's filters, in its address (the UI kit's filters) */
+.filters { display: flex; gap: .25rem; flex-wrap: wrap; }
+.filters a { display: inline-flex; align-items: center; height: 2rem; padding: 0 .7rem; border-radius: var(--radius-sm); font: 500 .66rem/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: background-color var(--duration-fast), color var(--duration-fast); }
+.filters a:hover { background: var(--surface); color: var(--fg); }
+.filters a[aria-current="true"] { background: var(--surface); color: var(--fg); box-shadow: inset 0 -2px 0 var(--accent-fill); }
+.filters a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.list-search { width: min(100%, 16rem); }
+
+/* The lists: a table, or below 768 px a card per row */
+.list-table .who { display: grid; line-height: 1.35; }
+.list-table .who a { font-weight: 500; color: var(--fg); text-decoration: none; }
+.list-table .who a:hover { text-decoration: underline; text-underline-offset: .2em; }
+.list-table .who small { color: var(--muted); font-size: .8rem; }
+.record-cards { display: none; }
+.record-card { display: grid; gap: .5rem; padding: .95rem 1rem; border-radius: var(--radius-lg); background: var(--bg-raised); box-shadow: inset 0 0 0 1px var(--line); color: inherit; text-decoration: none; }
+.record-card b { font-weight: 600; font-size: .95rem; }
+.record-card small { color: var(--muted); font-size: .8125rem; line-height: 1.45; overflow-wrap: anywhere; }
+.record-card .row { display: flex; flex-wrap: wrap; gap: .4rem; }
+.record-card:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+
+/* A lead, a customer */
+.rec-grid { display: grid; gap: 1rem; }
+.rec-card { display: grid; gap: .8rem; align-content: start; padding: 1.15rem 1.3rem; border-radius: var(--radius-lg); background: var(--bg-raised); box-shadow: inset 0 0 0 1px var(--line); }
+.rec-card .kv a { color: var(--fg); text-underline-offset: .2em; }
+.note-quote { display: grid; grid-template-columns: 1.4rem 1fr; gap: .6rem; margin-top: 1rem; padding: 1rem 1.2rem; border-radius: var(--radius-lg); background: var(--surface); font-size: .9rem; overflow-wrap: anywhere; white-space: pre-line; }
+.note-quote > .ic { width: 1rem; height: 1rem; margin-top: .2rem; color: var(--faint); }
+.note-quote small { display: block; margin-top: .35rem; color: var(--muted); font-size: .78rem; white-space: normal; }
+.lead-progress { display: grid; gap: .6rem; margin-top: 1.5rem; }
+.lead-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.lead-steps li { display: grid; gap: .15rem; align-content: start; padding-top: .6rem; border-top: 2px solid var(--line); font-size: .875rem; color: var(--faint); }
+.lead-steps li > span { font: 400 .66rem/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; }
+.lead-steps li b { font-weight: 600; color: inherit; }
+.lead-steps li small { font-size: .8rem; }
+.lead-steps li.done { border-color: var(--fg); color: var(--muted); }
+.lead-steps li.closed { border-color: var(--faint); color: var(--muted); }
+.lead-steps li[aria-current="step"] { color: var(--fg); }
+.lead-steps li.done[aria-current="step"] { border-color: var(--accent-fill); }
+
+/* The Convert dialog: what it makes, and the time zone it proposes */
+.made { display: grid; gap: .45rem; font-size: .8125rem; }
+.made li { display: grid; grid-template-columns: 1.2rem 1fr; gap: .5rem; }
+.made .ic { width: 1rem; height: 1rem; margin-top: .1rem; color: var(--accent); }
+.tz { display: grid; grid-template-columns: 1.2rem 1fr; gap: .5rem; padding: .75rem .85rem; border-radius: var(--radius-md); background: var(--surface); font-size: .8125rem; color: var(--muted); }
+.tz .ic { width: 1rem; height: 1rem; margin-top: .1rem; }
+.tz b { color: var(--fg); font-weight: 500; }
+
+@media (min-width: 768px) {
+  .rec-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 767.98px) {
+  .list-table { display: none; }
+  .record-cards { display: grid; gap: .75rem; }
+  .list-search { width: 100%; }
+  .lead-steps { grid-template-columns: 1fr; }
+  .rec-card { padding: 1rem; }
+}

@@ -8,6 +8,10 @@ describe('interpret', () => {
     expect(interpret(201, { id: 7 })).toEqual({ kind: 'sent' });
   });
 
+  it('treats 200 as sent: this email already has an open request, which the office already has', () => {
+    expect(interpret(200, { id: 7 })).toEqual({ kind: 'sent' });
+  });
+
   it("shows the API's own messages for a 400, each linked to its field", () => {
     const body = {
       code: 'validation_failed',
@@ -33,11 +37,6 @@ describe('interpret', () => {
   it('shows the detail of a 400 that lists no fields', () => {
     expect(interpret(400, { code: 'validation_failed', detail: 'The body could not be read.' }))
       .toEqual({ kind: 'invalid', problems: [{ message: 'The body could not be read.' }] });
-  });
-
-  it('explains a request for an address that already has one (409)', () => {
-    const outcome = interpret(409, { code: 'address.already_exists', detail: 'Address already exists.' });
-    expect(outcome).toMatchObject({ kind: 'refused', title: 'This address already has a request' });
   });
 
   it('asks to wait after a 429', () => {

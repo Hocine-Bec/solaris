@@ -56,6 +56,8 @@ code, pre { font-family: var(--font-mono); }
 .btn-danger-outline:hover { background: var(--surface); }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; pointer-events: none; }
 .btn.is-loading { pointer-events: none; }
+/* The label of a button with a spinner; an icon inside it keeps the button's gap from the words */
+.btn-text { display: inline-flex; align-items: center; gap: inherit; }
 .btn.is-loading .btn-text { opacity: .55; }
 .btn .spin { display: none; }
 .btn.is-loading .spin { display: inline-block; }

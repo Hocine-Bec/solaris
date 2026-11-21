@@ -30,8 +30,11 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
         ["POST api/leads"] = Access.Anyone,   // the website's quote form
         ["GET api/leads"] = Access.Admin,
         ["GET api/leads/{id:int}"] = Access.Admin,
+        ["PUT api/leads/{id:int}"] = Access.Admin,
         ["PUT api/leads/{id:int}/status"] = Access.Admin,
-        ["POST api/leads/convert"] = Access.Admin,
+        ["POST api/leads/{id:int}/convert"] = Access.Admin,
+        ["GET api/customers"] = Access.Admin,
+        ["GET api/customers/{id:int}"] = Access.Admin,
         ["GET api/notifications/failed"] = Access.Admin,
         ["POST api/notifications/{id:guid}/retry"] = Access.Admin,
         ["POST api/notifications/failed/retry"] = Access.Admin,

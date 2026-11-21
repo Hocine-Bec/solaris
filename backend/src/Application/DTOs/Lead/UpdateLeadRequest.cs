@@ -1,11 +1,13 @@
 namespace Application.DTOs.Lead;
 
 /// <summary>
-/// DTO for updating lead status and notes
+/// An open lead's corrected contact details (FR-L7): a typo in the name, the email or the phone. The property and the
+/// visitor's note stay as they were sent.
 /// </summary>
-public class UpdateLeadStatusRequest
+public sealed class UpdateLeadRequest
 {
-    public string Status { get; set; } = string.Empty;
-    public DateTime? ContactedAt { get; set; }
-    public string? Notes { get; set; }
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
 }

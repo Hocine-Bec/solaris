@@ -4,6 +4,6 @@ namespace Application.Errors;
 
 public static class CustomerErrors
 {
-    public static readonly Error EmailTaken =
-        new(ErrorKind.Conflict, "customer.email_taken", "A customer with this email already exists.");
+    public static Error NotFound(int id) =>
+        new(ErrorKind.NotFound, "customer.not_found", $"Customer with ID {id} not found.");
 }

@@ -11,6 +11,8 @@ public class CustomerConfig : IEntityTypeConfiguration<Customer>
         // Table name
         builder.ToTable("customers");
 
+        builder.Ignore(c => c.FullName);
+
         // Primary key
         builder.HasKey(c => c.Id)
             .HasName("pk_customers");
@@ -34,6 +36,11 @@ public class CustomerConfig : IEntityTypeConfiguration<Customer>
             .HasMaxLength(255)
             .IsRequired();
 
+        builder.Property(c => c.NormalizedEmail)
+            .HasColumnName("normalized_email")
+            .HasMaxLength(255)
+            .IsRequired();
+
         builder.Property(c => c.PhoneNumber)
             .HasColumnName("phone_number")
             .HasMaxLength(20)
@@ -49,16 +56,13 @@ public class CustomerConfig : IEntityTypeConfiguration<Customer>
             .HasColumnName("registration_date")
             .IsRequired();
 
-        builder.Property(c => c.LastActivityDate)
-            .HasColumnName("last_activity_date");
-
         builder.Property(c => c.ContactAddressId)
             .HasColumnName("contact_address_id");
 
-        // Indexes for performance
-        builder.HasIndex(c => c.Email)
+        // One customer per email, whatever its case: a second conversion for it reuses the customer (BR-L3)
+        builder.HasIndex(c => c.NormalizedEmail)
             .IsUnique()
-            .HasDatabaseName("ix_customers_email");
+            .HasDatabaseName("ix_customers_normalized_email");
 
         builder.HasIndex(c => c.Status)
             .HasDatabaseName("ix_customers_status");

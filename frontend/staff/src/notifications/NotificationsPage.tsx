@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronUp, CircleCheck, Inbox, ListRestart, LoaderCircle, Mail, RotateCcw } from 'lucide-react';
 import { ApiError } from '../api/errors';
 import { FAILED_PAGE_SIZE, failedPageKey, fetchFailed, retryAllFailed, retryNotification, type FailedNotification } from '../api/notifications';
@@ -208,7 +208,7 @@ function Details({ n }: { n: FailedNotification }) {
   return (
     <dl className="why">
       <dt>Why it failed</dt><dd><code>{n.lastError ?? 'No error was recorded.'}</code></dd>
-      <dt>Lead</dt><dd>{n.lead.name}, <span className="num">#{n.lead.id}</span></dd>
+      <dt>Lead</dt><dd><Link to={`/leads/${n.lead.id}`}>{n.lead.name}</Link>, <span className="num">#{n.lead.id}</span></dd>
       <dt>First tried</dt><dd className="num">{formatMoment(n.retriedAt ?? n.createdAt)}{n.retriedAt && ', when it was retried'}</dd>
       <dt>Last tried</dt><dd className="num">{n.lastAttemptAt ? formatMoment(n.lastAttemptAt) : '—'}</dd>
       <dt>Tries</dt><dd className="num">{n.attempts}{n.retriedAt && ' since the retry'}, over 24 hours</dd>

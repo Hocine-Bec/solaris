@@ -1,7 +1,7 @@
 # 5. Addresses deduplicated by a normalized natural key
 
 **Status:** Accepted, recorded retroactively; trimming and space collapsing were added on 2026-10-31 ·
-**Last changed:** 2026-10-31
+**Last changed:** 2026-11-20
 
 **Context:** The same property arrives many times: repeat quote requests, and later the lead's address reused
 for its installation. It must be stored once, and "the same address" has to be defined in one place.
@@ -18,7 +18,9 @@ for its installation. It must be stored once, and "the same address" has to be d
 **A.** The database enforces uniqueness, so concurrent requests can't create two rows for one address.
 "Same address" is defined once, in `Address.BuildHash`: each field is trimmed, repeated spaces are collapsed,
 and the result is upper-cased before hashing. One fixed-size indexed column replaces an index over five long
-text columns.
+text columns. A new address is inserted with `ON CONFLICT (unique_address_hash) DO NOTHING`, then read by its key,
+inside the lead's transaction: a request for a property already stored reuses its row, and two requests for one
+property at the same moment share one row, where checking first and then inserting would let one of them fail.
 
 ## Trade-offs
 The normalization is still basic: "St." and "Street" give different hashes. Changing the normalization means

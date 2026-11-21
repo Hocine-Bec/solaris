@@ -14,26 +14,10 @@ public class CreateLeadRequestValidator : AbstractValidator<CreateLeadRequest>
 {
     public CreateLeadRequestValidator()
     {
-        RuleFor(x => x.FirstName)
-            .NotEmpty().WithMessage("First name is required")
-            .MaximumLength(100).WithMessage("First name cannot exceed 100 characters")
-            .MinimumLength(2).WithMessage("First name must be at least 2 characters")
-            .HasNoWebAddress("First name");
-
-        RuleFor(x => x.LastName)
-            .NotEmpty().WithMessage("Last name is required")
-            .MaximumLength(100).WithMessage("Last name cannot exceed 100 characters")
-            .MinimumLength(2).WithMessage("Last name must be at least 2 characters")
-            .HasNoWebAddress("Last name");
-
-        RuleFor(x => x.Email)
-            .NotEmpty().WithMessage("Email is required")
-            .EmailAddress().WithMessage("Invalid email format")
-            .MaximumLength(255).WithMessage("Email cannot exceed 255 characters");
-
-        RuleFor(x => x.PhoneNumber)
-            .NotEmpty().WithMessage("Phone number is required")
-            .Matches(@"^\+?[\d\s\-\(\)]+$").WithMessage("Invalid phone number format");
+        RuleFor(x => x.FirstName).IsLeadName("First name");
+        RuleFor(x => x.LastName).IsLeadName("Last name");
+        RuleFor(x => x.Email).IsLeadEmail();
+        RuleFor(x => x.PhoneNumber).IsLeadPhone();
 
         RuleFor(x => x.PropertyStreet)
             .NotEmpty().WithMessage("Property street is required")

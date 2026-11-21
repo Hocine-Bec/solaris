@@ -10,6 +10,10 @@ public class LeadConfiguration : IEntityTypeConfiguration<Lead>
     {
         builder.ToTable("leads");
 
+        builder.Ignore(l => l.FullName);
+        builder.Ignore(l => l.IsOpen);
+        builder.Ignore(l => l.NextStatuses);
+
         builder.HasKey(l => l.Id)
             .HasName("pk_leads");
 
@@ -63,8 +67,8 @@ public class LeadConfiguration : IEntityTypeConfiguration<Lead>
         builder.Property(l => l.ContactedAt)
             .HasColumnName("contacted_at");
 
-        builder.Property(l => l.ConvertedAt)
-            .HasColumnName("converted_at");
+        builder.Property(l => l.ClosedAt)
+            .HasColumnName("closed_at");
 
         builder.Property(l => l.MonthlyBillRange)
             .HasColumnName("monthly_bill_range")

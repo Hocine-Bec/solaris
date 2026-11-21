@@ -1,6 +1,5 @@
 // Sends the request and turns the API's answer into what the form shows. Every error is a ProblemDetails (RFC 9457)
 // with a code; a refused field comes back in "errors", keyed by the request's property names.
-import { CONTACT } from '../content/contact';
 import type { CreateLeadRequest } from './lead';
 import type { FieldName } from './types';
 
@@ -45,9 +44,6 @@ export function interpret(status: number, body: unknown): Outcome {
     const problems = Object.entries(problem.errors ?? {}).flatMap(([key, messages]) =>
       messages.map(message => ({ field: FIELD_OF[key.toLowerCase()], message })));
     return { kind: 'invalid', problems: problems.length ? problems : [{ message: problem.detail ?? problem.title ?? 'The request was refused.' }] };
-  }
-  if (status === 409 && problem.code === 'address.already_exists') {
-    return { kind: 'refused', title: 'This address already has a request', message: `We already have a quote request for this property's address. To add to it or change it, write to ${CONTACT.email}.` };
   }
   if (status === 429) {
     return { kind: 'refused', title: 'Too many requests from this connection', message: `Wait a minute, then send it again. Nothing you entered is lost.` };
