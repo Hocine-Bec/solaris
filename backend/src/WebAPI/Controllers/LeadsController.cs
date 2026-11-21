@@ -1,5 +1,6 @@
 using Application.DTOs.Common;
 using Application.DTOs.Lead;
+using Application.Errors;
 using Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
@@ -70,7 +71,10 @@ public class LeadsController(ILeadService service) : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<LeadResponse>> Convert(int id)
     {
-        var result = await service.ConvertAsync(id);
+        if (CurrentUserId is not { } me)
+            return Problem(AuthErrors.SignedOut);
+
+        var result = await service.ConvertAsync(id, me);
         return result.IsSuccess ? Ok(result.Value) : Problem(result.Error);
     }
 

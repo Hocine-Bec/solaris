@@ -1,4 +1,5 @@
 using Application.DTOs.Common;
+using Application.DTOs.Installations;
 using Application.DTOs.Users;
 using Application.Errors;
 using Application.Interfaces.Services;
@@ -83,6 +84,15 @@ public class UsersController(IUserService service) : ApiControllerBase
 
         var result = await service.DeactivateAsync(me, id);
         return result.IsSuccess ? NoContent() : Problem(result.Error);
+    }
+
+    /// <summary>A technician's assignments, open first, for their page (FR-U4); an empty list for anyone else.</summary>
+    [HttpGet("{id:int}/assignments")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<UserAssignmentResponse>>> GetAssignments(int id,
+        [FromServices] IInstallationService installations)
+    {
+        return Ok(await installations.GetAssignmentsOfAsync(id));
     }
 
     [HttpPost("{id:int}/reactivate")]

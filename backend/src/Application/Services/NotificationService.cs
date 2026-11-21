@@ -16,11 +16,11 @@ public class NotificationService(IOutboxRepo outbox, IEmailService emails, TimeP
         var (messages, totalCount) = await outbox.GetFailedPageAsync(request.Offset(), request.PageSize);
         var items = messages.Select(m =>
         {
-            var lead = m.Lead!;
-            var to = emails.RecipientOf(m.Type, lead);
+            var to = m.Lead is { } lead ? emails.RecipientOf(m.Type, lead) : emails.RecipientOf(m.Installation!);
             return new FailedNotificationResponse(m.Id, m.Type.ToString(), new RecipientResponse(to.Name, to.Address),
-                new LeadSummary(lead.Id, $"{lead.FirstName} {lead.LastName}"), m.CreatedAt, m.LastAttemptAt,
-                m.Attempts, m.LastError, m.RetriedAt, m.RetriedBy?.Name);
+                m.Lead is { } l ? new LeadSummary(l.Id, l.FullName) : null,
+                m.Installation is { } i ? new InstallationRef(i.Id, i.Address.Street) : null,
+                m.CreatedAt, m.LastAttemptAt, m.Attempts, m.LastError, m.RetriedAt, m.RetriedBy?.Name);
         }).ToList();
         return new PagedResponse<FailedNotificationResponse>(items, request.Page, request.PageSize, totalCount);
     }

@@ -18,13 +18,13 @@ public sealed record RenderedEmail(string Subject, string Preheader, string Html
 public static partial class LeadEmails
 {
     // The brand's colours as solid values (email apps handle transparency poorly): the text roles over Limestone
-    private const string Night = "#040405", Limestone = "#f4f2ed", Raised = "#f9f6ef", Ink = "#0b0b0c",
+    internal const string Night = "#040405", Limestone = "#f4f2ed", Raised = "#f9f6ef", Ink = "#0b0b0c",
         Muted = "#484746", Faint = "#646362", Line = "#cfcdc9", Sun = "#ffc21f", SunDeep = "#8a5a00",
         BandText = "#a6a6a5", Info = "#2b5ea8", InfoBg = "#e6e8e9", InfoLine = "#a5b8d2";
 
     // Email apps don't load the brand's fonts: the closest common ones
-    private const string Sans = "Arial,Helvetica,sans-serif";
-    private const string Mono = "ui-monospace,Menlo,Consolas,'Courier New',monospace";
+    internal const string Sans = "Arial,Helvetica,sans-serif";
+    internal const string Mono = "ui-monospace,Menlo,Consolas,'Courier New',monospace";
 
     private static readonly string[] Steps = ["Survey", "Design", "Permits", "Installation", "Inspection", "Switch-on"];
 
@@ -214,24 +214,24 @@ public static partial class LeadEmails
     /// <summary>"Morning, 8 am to 12 pm"</summary>
     private static string OfficeCallTime(string time) => Hours(time) is { } h ? $"{time}, {h.Hours}" : time;
 
-    private static string AddressLine(Address a) => $"{a.Street}, {a.City}, {a.State} {a.ZipCode}";
+    internal static string AddressLine(Address a) => $"{a.Street}, {a.City}, {a.State} {a.ZipCode}";
 
     // ---- HTML ----
 
     /// <summary>HTML-encodes a value from the form.</summary>
-    private static string E(string value) => WebUtility.HtmlEncode(value);
+    internal static string E(string value) => WebUtility.HtmlEncode(value);
 
     /// <summary>A multi-line value, encoded, its line breaks kept.</summary>
     private static string Lines(string value) => LineBreaks().Replace(E(value.Trim()), "<br>");
 
-    private static string Label(string text, string color = Faint) =>
+    internal static string Label(string text, string color = Faint) =>
         $"<p style=\"margin:0 0 12px;font:400 11px/1.4 {Mono};letter-spacing:2px;text-transform:uppercase;color:{color};\">{text}</p>";
 
     private static string Fact(string label, string valueHtml) =>
         $"<td class=\"k\" valign=\"top\" style=\"padding:14px 12px 14px 0;border-top:1px solid {Line};\"><p style=\"margin:0 0 4px;font:400 11px/1.4 {Mono};letter-spacing:1.5px;text-transform:uppercase;color:{Faint};\">{label}</p><p style=\"margin:0;font:600 15px/1.45 {Sans};color:{Ink};\">{valueHtml}</p></td>";
 
     /// <summary>A card of labels and values; on a phone each label sits above its value.</summary>
-    private static string Rows(IReadOnlyList<(string Label, string Html)> rows) =>
+    internal static string Rows(IReadOnlyList<(string Label, string Html)> rows) =>
         $"<table role=\"presentation\" class=\"stack\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:{Raised};border:1px solid {Line};border-radius:16px;\">"
         + string.Concat(rows.Select((row, i) =>
         {
@@ -241,7 +241,7 @@ public static partial class LeadEmails
         }))
         + "</table>";
 
-    private static string Head(string title, string preheader) => $$"""
+    internal static string Head(string title, string preheader) => $$"""
         <!doctype html>
         <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>{{E(title)}}</title>
         <style>
@@ -265,7 +265,7 @@ public static partial class LeadEmails
 
         """;
 
-    private static string Band(string right) => $$"""
+    internal static string Band(string right) => $$"""
         <tr><td class="px band" style="background:{{Night}};padding:14px 32px 14px 24px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
             <td valign="middle"><img src="cid:{{Wordmark.ContentId}}" width="168" height="35" alt="Solaris" style="display:block;border:0;"></td>
@@ -274,7 +274,7 @@ public static partial class LeadEmails
 
         """;
 
-    private static string Foot(string text) => $$"""
+    internal static string Foot(string text) => $$"""
 
         <tr><td class="px" style="padding:36px 32px 44px;"><p style="margin:0;padding-top:20px;border-top:1px solid {{Line}};font:400 12px/1.6 {{Sans}};color:{{Faint}};">{{E(text)}}</p></td></tr>
         </table></td></tr></table></body></html>

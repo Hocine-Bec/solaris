@@ -83,7 +83,7 @@ public class LeadService(
         return await SaveAsync(lead);
     }
 
-    public async Task<Result<LeadResponse>> ConvertAsync(int id)
+    public async Task<Result<LeadResponse>> ConvertAsync(int id, int actingUserId)
     {
         // The customer (reused when one has this email), the installation and the lead commit together, or not at all.
         await using var transaction = await unitOfWork.BeginTransactionAsync();
@@ -98,7 +98,7 @@ public class LeadService(
         var customer = await customers.GetOrAddAsync(Customer.FromLead(lead, now));
         lead.Customer = customer;
         var installation = Installation.ForConvertedLead(lead, customer.Id,
-            UsTimeZones.ProposedFor(lead.Address.State), now);
+            UsTimeZones.ProposedFor(lead.Address.State), actingUserId, now);
         installations.Add(installation);
 
         var outcome = await unitOfWork.SaveAsync();

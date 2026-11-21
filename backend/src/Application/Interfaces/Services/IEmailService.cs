@@ -5,8 +5,8 @@ using Domain.Enums;
 namespace Application.Interfaces.Services;
 
 /// <summary>
-/// Renders a new lead's two emails and sends them through <see cref="IEmailSender"/>. The outbox passes its message's
-/// id, which becomes the email's Message-ID.
+/// Renders a new lead's two emails and an installation's switch-on email, and sends them through
+/// <see cref="IEmailSender"/>. The outbox passes its message's id, which becomes the email's Message-ID.
 /// </summary>
 public interface IEmailService
 {
@@ -18,4 +18,11 @@ public interface IEmailService
 
     /// <summary>Who an email about this lead goes to: the person, or the office.</summary>
     EmailAddress RecipientOf(OutboxMessageType type, Lead lead);
+
+    /// <summary>To the customer: their system is switched on (FR-I7). Needs the installation's customer and address.</summary>
+    Task SendInstallationActivatedAsync(Installation installation, Guid? outboxMessageId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Who an installation's email goes to: its customer.</summary>
+    EmailAddress RecipientOf(Installation installation);
 }

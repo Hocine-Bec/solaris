@@ -41,6 +41,34 @@ public class InstallationConfig : IEntityTypeConfiguration<Installation>
             .HasColumnName("created_at")
             .IsRequired();
 
+        builder.Property(i => i.StatusChangedAt)
+            .HasColumnName("status_changed_at")
+            .IsRequired();
+
+        builder.Property(i => i.ActivatedAt)
+            .HasColumnName("activated_at");
+
+        builder.Property(i => i.SystemSizeKw)
+            .HasColumnName("system_size_kw")
+            .HasPrecision(5, 2);
+
+        builder.Property(i => i.PanelCount)
+            .HasColumnName("panel_count");
+
+        builder.Property(i => i.InverterType)
+            .HasColumnName("inverter_type")
+            .HasMaxLength(Installation.MaxInverterTypeLength);
+
+        builder.Ignore(i => i.IsClosed);
+        builder.Ignore(i => i.IsFixed);
+        builder.Ignore(i => i.NextStage);
+        builder.Ignore(i => i.CanCancel);
+        builder.Ignore(i => i.CanDeactivate);
+
+        // The list's order: the last status change first
+        builder.HasIndex(i => new { i.StatusChangedAt, i.Id })
+            .HasDatabaseName("ix_installations_status_changed_at_id");
+
         builder.HasIndex(i => i.CustomerId)
             .HasDatabaseName("ix_installations_customer_id");
 
