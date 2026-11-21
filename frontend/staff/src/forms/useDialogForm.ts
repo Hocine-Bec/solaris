@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm, type DefaultValues, type FieldValues, type Path } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
-import { formErrors } from './forms';
+import { formErrors } from './formErrors';
 
 type Options<T extends FieldValues> = {
   schema: z.ZodType<T, T>;
@@ -14,10 +14,10 @@ type Options<T extends FieldValues> = {
 };
 
 /**
- * An account form in a dialog: its own checks first, then the request, and the API's refusal shown where it belongs:
- * under the fields it names, focus on the first, or as one notice. One press sends one request.
+ * A form in a dialog (an account's, a lead's): its own checks first, then the request, and the API's refusal shown
+ * where it belongs: under the fields it names, focus on the first, or as one notice. One press sends one request.
  */
-export function useAccountForm<T extends FieldValues>({ schema, defaultValues, send, emailTaken }: Options<T>) {
+export function useDialogForm<T extends FieldValues>({ schema, defaultValues, send, emailTaken }: Options<T>) {
   const [notice, setNotice] = useState<string | null>(null);
   const form = useForm<T>({ resolver: zodResolver(schema), defaultValues });
   const fields = Object.keys(defaultValues ?? {});

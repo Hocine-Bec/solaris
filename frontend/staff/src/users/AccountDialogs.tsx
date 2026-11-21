@@ -10,7 +10,7 @@ import { NewPasswordField } from '../components/NewPasswordField';
 import { FormNotice, SubmitButton } from '../components/SubmitButton';
 import { TextField } from '../components/TextField';
 import { changePasswordSchema, editSchema, newPasswordSchema, RULE_HELP, technicianSchema } from './forms';
-import { useAccountForm } from './useAccountForm';
+import { useDialogForm } from '../forms/useDialogForm';
 
 /*
  * The account dialogs, from the approved Users design: New technician (then its password, once), Edit, Set a new
@@ -45,7 +45,7 @@ export function NewTechnicianDialog({ onClose }: { onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const heading = useFocusOnShow(created !== null);
   const mutation = useMutation({ mutationFn: createTechnician });
-  const { form, notice, onSubmit } = useAccountForm({
+  const { form, notice, onSubmit } = useDialogForm({
     schema: technicianSchema,
     defaultValues: { name: '', email: '', password: '' },
     emailTaken: 'An account already uses this email.',
@@ -104,7 +104,7 @@ export function NewTechnicianDialog({ onClose }: { onClose: () => void }) {
 export function EditDialog({ user, onClose, onSaved }: { user: User; onClose: () => void; onSaved: () => void }) {
   const refresh = useRefreshUsers();
   const mutation = useMutation({ mutationFn: (values: { name: string; email: string }) => updateUser(user.id, values) });
-  const { form, notice, onSubmit } = useAccountForm({
+  const { form, notice, onSubmit } = useDialogForm({
     schema: editSchema,
     defaultValues: { name: user.name, email: user.email },
     emailTaken: 'Another account uses this email.',
@@ -136,7 +136,7 @@ export function EditDialog({ user, onClose, onSaved }: { user: User; onClose: ()
 /** Set a new password, from their page: it signs them out everywhere. */
 export function SetPasswordDialog({ user, onClose, onSaved }: { user: User; onClose: () => void; onSaved: () => void }) {
   const mutation = useMutation({ mutationFn: (password: string) => setPassword(user.id, password) });
-  const { form, notice, onSubmit } = useAccountForm({
+  const { form, notice, onSubmit } = useDialogForm({
     schema: newPasswordSchema,
     defaultValues: { password: '' },
     send: async ({ password }) => {
@@ -204,7 +204,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
   const [changed, setChanged] = useState(false);
   const heading = useFocusOnShow(changed);
   const mutation = useMutation({ mutationFn: (v: { currentPassword: string; newPassword: string }) => changePassword(v.currentPassword, v.newPassword) });
-  const { form, notice, onSubmit } = useAccountForm({
+  const { form, notice, onSubmit } = useDialogForm({
     schema: changePasswordSchema,
     defaultValues: { currentPassword: '', newPassword: '' },
     send: async values => {

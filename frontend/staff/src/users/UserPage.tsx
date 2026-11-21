@@ -6,6 +6,7 @@ import { fetchUser, reactivateUser, userKey, USERS_KEY, type User } from '../api
 import { Icon } from '../components/Icon';
 import { FormNotice } from '../components/SubmitButton';
 import { formatDay, formatMoment } from '../lib/dates';
+import { idFrom } from '../lib/ids';
 import { useCurrentUser } from '../session/session';
 import { opensFor } from '../shell/sections';
 import { NotAllowed, NotFound } from '../states/States';
@@ -16,12 +17,6 @@ import { StatusChip } from './StatusChip';
 type Open = 'edit' | 'password' | 'deactivate' | 'change' | null;
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0];
-
-/** An address's ID, if it is one: a whole number from 1 */
-const idFrom = (value: string | undefined) => {
-  const id = Number(value);
-  return Number.isInteger(id) && id >= 1 && String(id) === value ? id : null;
-};
 
 /**
  * One account (FR-U4): its details and what the Admin can do with it. A technician's assignments join this page with

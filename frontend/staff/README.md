@@ -3,8 +3,11 @@
 The app [Solaris](../../README.md)'s staff work in: the office (Admin) runs leads, customers, installations,
 production, failed notifications and accounts; technicians see the installations they're assigned to.
 
-**Status:** signing in, the app's frame, the Users screens and Failed notifications are built: the session, the navigation by role, the
-account menu, the themes, the states every screen shares, the client that talks to the API, the staff accounts, and the failed emails. The other screens come with their features; until then each section shows what it will hold.
+**Status:** signing in, the app's frame, the Leads and Customers screens, the Users screens and Failed notifications are built: the
+session, the navigation by role, the account menu, the themes, the states every screen shares, the client that talks to the API, the
+leads and their conversion, the customers, the staff accounts, and the failed emails. The other screens come with their features; until
+then each section shows what it will hold, and an installation's page (`/installations/:id`, which a converted lead links to) says
+what it will hold.
 
 ## Pages
 
@@ -13,6 +16,8 @@ account menu, the themes, the states every screen shares, the client that talks 
 | `/login` | Signing in (`?returnTo=` remembers the page to come back to) |
 | `/` | Opens the account's landing page: Leads for the office, My work for technicians |
 | `/leads`, `/customers`, `/installations`, `/production`, `/notifications`, `/users` | The office's six sections, in the side bar; a technician who opens one sees Not allowed |
+| `/leads`, `/leads/:id` | The leads, and one lead with its moves (see Leads and customers below) |
+| `/customers`, `/customers/:id` | The customers, and one customer with their installations |
 | `/users`, `/users/:id` | The staff accounts, and one account (see Users below) |
 | `/notifications` | The emails that failed for good, and retrying them (see Failed notifications below) |
 | `/my-work` | A technician's work; an Admin who opens it sees Not allowed |
@@ -42,6 +47,27 @@ Every page but `/login` needs a session: without one, the sign-in page opens and
   opens, says "Your session ended", and comes back to the page after signing in.
 - **Signing out:** from the account menu, at once. The API clears the cookie and the sign-in page says "You're signed
   out." If the API doesn't answer, the person stays signed in, as the cookie can only be cleared by the API.
+
+## Leads and customers
+
+The Admin's screens for the quote requests and the customers they become (FR-L3–L5, FR-L7, FR-C1), from the approved
+Leads design.
+
+- **The list** (`/leads`, `?status=` and `?page=` in the address): every lead, newest first, opening on All; New,
+  Contacted and Closed (Converted, Disqualified and Lost) beside it. Each row: the name and email, the property, its
+  type, the status and when it came. Below 768 px the rows become cards.
+- **One lead** (`/leads/:id`): the contact details, the property and the bill, the visitor's note as they wrote it,
+  and its progress (received, contacted, then converted or closed, with each time). The buttons are what the API
+  says the lead can become now: Mark as contacted happens at once and says Saved, then focus goes to Convert;
+  Disqualify, Mark as lost and Convert ask first, as they close the lead for good. Edit corrects an open lead's name,
+  email and phone; an email another open lead has shows under the field. If another Admin moved the lead meanwhile,
+  the page says what it is now and loads it again.
+- **Convert** names what it makes: a customer (or the existing customer with this email, whose account the
+  installation joins), an installation at Survey at the property, and the time zone the API proposes from the state.
+  It then opens the customer's page, until the installation's page is built.
+- **Customers** (`/customers`, `?q=` and `?page=`): newest first, searched by part of a name or an email as you type
+  (the address follows once typing pauses). One customer (`/customers/:id`): the contact, the status and why (it
+  follows the installations), and the installations, each linking to its page and to the request it came from.
 
 ## Users
 
