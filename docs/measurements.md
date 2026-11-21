@@ -382,7 +382,8 @@ flaky network), how many leads, notifications and errors result?
 
 **Steps:** 20 rounds. Each round uses a fresh email and address, and fires **50 identical `POST /api/leads` at
 once** (released together). Rate limiter off. The 50 submissions share one address, so in the before version
-address creation must not fail first, or it would hide the lead race being measured.
+address creation must not fail first, or it would hide the lead race being measured: the address insert is
+concurrency-safe (`ON CONFLICT`) in both versions, and only the duplicate-lead rule differs.
 
 **Per round, counted:** leads created for that email (target 1), notifications created (target 2), and
 responses by status code (after, expected: 1 × 201 + 49 × 200, and 0 × 5xx).

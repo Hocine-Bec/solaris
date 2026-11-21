@@ -88,15 +88,15 @@ note stays in the office's alert (the welcome email says it was sent to the offi
 
 ## 4. Data model
 
-Today the code has `Lead`, `Address`, `Customer`, `User` and the outbox's `OutboxMessage` (§6). The other entities are *(planned)*, each built with its
-feature.
+Today the code has `Lead`, `Address`, `Customer`, `Installation` (as a conversion creates it, §7), `User` and the
+outbox's `OutboxMessage` (§6). The other entities are *(planned)*, each built with its feature.
 
 | Entity | What it is | Key rules |
 |---|---|---|
-| **Lead** | A quote request | One open lead per email: `NormalizedEmail` with a partial unique index over the open statuses (BR-L1) *(planned)*; an `xmin` concurrency token *(planned)* |
+| **Lead** | A quote request | Its status and when it moved: `ContactedAt`, then `ClosedAt` (Converted, Disqualified or Lost), set by the server (BR-L2); the visitor's note, never replaced. One open lead per email: checked in the service today, on purpose (P3's before, §7); `NormalizedEmail` with a partial unique index over the open statuses (BR-L1) *(planned)*; an `xmin` concurrency token *(planned)* |
 | **Address** | A property, stored once | `UniqueAddressHash` with a unique index ([ADR 5](adr/0005-address-natural-key.md)) |
-| **Customer** | A converted lead | Email unique; status derived from its installations (BR-C1) *(planned)* |
-| **Installation** | One project at one address | Its status is its stage; design data (size, panel count, inverter type); its time zone (an IANA name, BR-P4); an `xmin` concurrency token and the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` *(planned)* |
+| **Customer** | A converted lead | `NormalizedEmail` unique: a later conversion for the same email reuses the customer (BR-L3); its address is its first lead's property; status derived from its installations (BR-C1) *(planned)* |
+| **Installation** | One project at one address | Its customer, its address and the lead it came from; its status is its stage (Survey at conversion); its time zone (an IANA name, proposed from its state, BR-P4). *(Planned:)* design data (size, panel count, inverter type), the Admin's confirmation of its time zone, an `xmin` concurrency token and the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` |
 | **InstallationStatusHistory** | One row per status change | From, to, who, when, note; append-only, never updated or deleted |
 | **InstallationTechnician** | A technician's assignment | Role Surveyor, Installer or Inspector (an enum); completion date |
 | **User** | A staff account | Name; email, unique whatever its case (`NormalizedEmail`, a unique index); password hash ([ADR 8](adr/0008-password-hashing.md)); role (Admin or Technician); active flag; last sign-in; the time its sessions are valid from, moved by a new password |
@@ -148,10 +148,10 @@ installation's own time zone (BR-P4).
   | Code | Status | When |
   |---|---|---|
   | `lead.not_found` | 404 | No lead has this ID |
-  | `lead.already_converted` | 409 | The lead is already converted |
-  | `lead.concurrent_change` | 409 | Someone else changed the lead since it was read |
-  | `address.already_exists` | 409 | An address with the same key exists ([ADR 5](adr/0005-address-natural-key.md)) |
-  | `customer.email_taken` | 409 | A customer already has this email |
+  | `lead.transition_not_allowed` | 409 | A move BR-L2 doesn't allow from the lead's status now (a conversion of a lead that isn't Contacted, or one already moved by another Admin); the message names its status |
+  | `lead.closed` | 409 | Correcting a lead that is no longer open (FR-L7) |
+  | `lead.email_taken` | 409 | Correcting a lead's email to one another open lead has (BR-L1) |
+  | `customer.not_found` | 404 | No customer has this ID |
   | `user.not_found` | 404 | No staff account has this ID |
   | `user.email_taken` | 409 | Another account has this email, whatever its case or spaces; a deactivated one keeps it |
   | `user.cannot_deactivate_self` | 409 | The Admin deactivating their own account |
@@ -176,7 +176,7 @@ installation's own time zone (BR-P4).
   be UTC or local time. Responses are always UTC, with `Z`.
 - **Pagination:** every list takes `?page=1&pageSize=20` (maximum 100) and returns
   `{ items, page, pageSize, totalCount }`. Each list has a total order, ending with the ID, so no row moves between
-  pages: leads newest first; staff accounts active first, then by name.
+  pages: leads and customers newest first; staff accounts active first, then by name.
 - **Cancellation:** every async path takes a `CancellationToken` *(planned)*.
 
 ---
@@ -250,21 +250,34 @@ All `Admin`; the staff app's Failed notifications screen uses them.
 
 ---
 
-## 7. Leads and installations *(planned)*
+## 7. Leads and installations *(partly planned)*
 
-### Duplicate-safe lead capture (BR-L1)
-- The database enforces the rule: a partial unique index on `NormalizedEmail` for the open statuses.
-- One transaction: insert or reuse the address, insert the lead, insert its outbox messages, commit (the outbox
-  messages are built, §6).
-- On a unique violation of the open-lead index (SQLSTATE `23505`), the transaction rolls back, so no duplicate
-  emails exist; the existing open lead is loaded and returned with **200**.
-- Addresses are inserted with `ON CONFLICT (UniqueAddressHash) DO NOTHING`, then selected by hash: never
-  check-then-insert.
+### Lead capture (BR-L1)
+- **Today, on purpose:** the service checks for an open lead with the email (compared trimmed and case-insensitive),
+  then inserts. It is the "before" P3a measures: two requests sent at the same moment can both pass the check
+  (`measurements.md` §8).
+- *(Planned, the fix:)* the database enforces the rule, with a partial unique index on `NormalizedEmail` for the open
+  statuses. On a unique violation of that index (SQLSTATE `23505`), the transaction rolls back, so no duplicate
+  emails exist; the existing open lead's id is returned with **200**.
+- One transaction: insert or reuse the address, insert the lead, insert its outbox messages (§6), commit. The quote
+  form's answer is the lead's id only (`{ id }`, 201 or 200): it never carries an existing lead's details.
+- Addresses are inserted with `ON CONFLICT (unique_address_hash) DO NOTHING`, then read by their key, in that
+  transaction: never check-then-insert ([ADR 5](adr/0005-address-natural-key.md)). Two leads at one property share
+  its row.
+
+### A lead's moves (BR-L2)
+`Lead.TryMoveTo` holds the allowed moves as data, and records the time: `ContactedAt`, or `ClosedAt` for Converted,
+Disqualified and Lost. The lead's page gets them as `next`, so the staff app shows only what is allowed now. Converted
+is reached only through the conversion. An open lead's name, email and phone can be corrected (FR-L7); the email
+then gets the same naive check as the form's.
 
 ### Conversion (BR-L3)
-One transaction: check that the lead is Contacted, create the customer (Prospect) and the installation (Survey)
-at the lead's address, set the lead to Converted and link the customer. The lead's `xmin` token makes a
-simultaneous second conversion fail with 409.
+One transaction, opened before anything is written: check that the lead is Contacted, insert the customer with
+`ON CONFLICT (normalized_email) DO NOTHING` and read it (a customer that already has the email is reused, so two
+conversions for one email at once make one customer), add the installation at Survey at the lead's address, in the
+time zone proposed from its state (`UsTimeZones`: one of 8 US zones, the one most of the state lives in), and set
+the lead to Converted, linked to the customer. *(Planned:)* the lead's `xmin` token makes a simultaneous second
+conversion of one lead fail with 409.
 
 ### The installation state machine (BR-I1–BR-I3)
 - The allowed transitions and their conditions live in the `Domain` as data plus one method,

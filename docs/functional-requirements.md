@@ -15,6 +15,8 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
 - **FR-L4** — Admin can change a lead's status within the allowed transitions (BR-L2).
 - **FR-L5** — Admin can convert a lead (BR-L3).
 - **FR-L6** — A new lead triggers two notifications: a welcome email to the lead and a new-lead alert to sales.
+- **FR-L7** — Admin can correct an open lead's name, email and phone (a typo, or an email that bounced). The
+  property and the visitor's note stay as they were sent.
 
 ### Customers
 - **FR-C1** — Admin can list customers (paginated, searched by name or email) and view one with its installations.
@@ -65,13 +67,15 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
 ### Leads
 - **BR-L1 Duplicate leads.** A lead is *open* while its status is New or Contacted. Only one open lead may exist
   per email address (case-insensitive). A submission for an email that already has an open lead returns the
-  existing lead (HTTP 200, same id): no new lead, no new emails. This holds even when the same form is submitted
+  existing lead's id (HTTP 200): no new lead, no new emails. This holds even when the same form is submitted
   many times at the same moment. A new lead *is* allowed once the previous one is Converted, Disqualified or Lost.
 - **BR-L2 Lead transitions.** New → Contacted; New or Contacted → Disqualified or Lost; Contacted → Converted
   (only through conversion). Converted, Disqualified and Lost are final. Each transition records its timestamp.
 - **BR-L3 Conversion.** Converting a Contacted lead creates, in **one transaction**, a customer (status Prospect)
-  and an installation (status Survey) at the lead's address, and links the lead to the customer. A lead can be
-  converted once; a second attempt is rejected, even if both arrive at the same moment.
+  and an installation (status Survey) at the lead's address, and links the lead to the customer. If a customer
+  already has the lead's email (whatever its case), the installation is added to that customer, whose details stay
+  as they are: a returning customer is one customer. A lead can be converted once; a second attempt is rejected,
+  even if both arrive at the same moment.
 
 ### Installations
 - **BR-I1 Stage transitions and their conditions.**
