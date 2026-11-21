@@ -54,51 +54,21 @@ public class ErrorResponseTests(PostgresFixture database) : ApiTestBase(database
         var response = await CreateClient().PostAsJsonAsync("/api/leads", ValidLead(), Ct);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var lead = await response.Content.ReadFromJsonAsync<LeadResponse>(Ct);
+        var lead = await response.Content.ReadFromJsonAsync<LeadCreatedResponse>(Ct);
         response.Headers.Location!.AbsolutePath.Should().Be($"/api/leads/{lead!.Id}");
     }
 
     [Fact]
-    public async Task CreateLead_AtAnExistingAddress_Returns409AddressAlreadyExists()
-    {
-        var client = CreateClient();
-        (await client.PostAsJsonAsync("/api/leads", ValidLead(), Ct)).StatusCode.Should().Be(HttpStatusCode.Created);
-
-        var response = await client.PostAsJsonAsync("/api/leads", ValidLead(email: "john.roe@example.com"), Ct);
-
-        await ShouldBeProblemAsync(response, HttpStatusCode.Conflict, "address.already_exists");
-    }
-
-    [Fact]
-    public async Task ConvertLead_AlreadyConverted_Returns409LeadAlreadyConverted()
+    public async Task ConvertLead_AlreadyConverted_Returns409TransitionNotAllowed()
     {
         var client = await CreateClientAsAsync(UserRole.Admin);
         await SeedLeadAsync(LeadStatus.Contacted);
-        (await client.PostAsJsonAsync("/api/leads/convert", new ConvertLeadRequest { LeadId = 1 }, Ct))
-            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.PostAsync("/api/leads/1/convert", null, Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var response = await client.PostAsJsonAsync("/api/leads/convert", new ConvertLeadRequest { LeadId = 1 }, Ct);
+        var response = await client.PostAsync("/api/leads/1/convert", null, Ct);
 
-        await ShouldBeProblemAsync(response, HttpStatusCode.Conflict, "lead.already_converted");
-    }
-
-    [Fact]
-    public async Task ConvertLead_CustomerEmailTaken_Returns409CustomerEmailTaken()
-    {
-        var lead = await SeedLeadAsync(LeadStatus.Contacted);
-        await SeedAsync(new Customer
-        {
-            FirstName = "Existing",
-            LastName = "Customer",
-            Email = lead.Email,
-            PhoneNumber = "512-555-0101",
-            ContactAddressId = 1
-        });
-
-        var response = await (await CreateClientAsAsync(UserRole.Admin)).PostAsJsonAsync("/api/leads/convert",
-            new ConvertLeadRequest { LeadId = 1 }, Ct);
-
-        await ShouldBeProblemAsync(response, HttpStatusCode.Conflict, "customer.email_taken");
+        var body = await ShouldBeProblemAsync(response, HttpStatusCode.Conflict, "lead.transition_not_allowed");
+        body.GetProperty("detail").GetString().Should().Be("This lead is Converted: only a Contacted lead can be converted.");
     }
 
     [Fact]
@@ -169,10 +139,11 @@ public class ErrorResponseTests(PostgresFixture database) : ApiTestBase(database
     {
         public const string Secret = "internal detail that must not leave the server";
 
-        public Task<PagedResponse<LeadResponse>> GetPageAsync(PageRequest request) => throw new InvalidOperationException(Secret);
+        public Task<PagedResponse<LeadSummaryResponse>> GetPageAsync(LeadPageRequest request) => throw new InvalidOperationException(Secret);
         public Task<Result<LeadResponse>> GetByIdAsync(int id) => throw new InvalidOperationException(Secret);
-        public Task<Result<LeadResponse>> CreateAsync(CreateLeadRequest request) => throw new InvalidOperationException(Secret);
-        public Task<Result> UpdateLeadStatusAsync(int id, UpdateLeadStatusRequest request) => throw new InvalidOperationException(Secret);
-        public Task<Result> ConvertLeadToCustomerAsync(ConvertLeadRequest request) => throw new InvalidOperationException(Secret);
+        public Task<LeadCreated> CreateAsync(CreateLeadRequest request) => throw new InvalidOperationException(Secret);
+        public Task<Result<LeadResponse>> UpdateStatusAsync(int id, UpdateLeadStatusRequest request) => throw new InvalidOperationException(Secret);
+        public Task<Result<LeadResponse>> ConvertAsync(int id) => throw new InvalidOperationException(Secret);
+        public Task<Result<LeadResponse>> UpdateAsync(int id, UpdateLeadRequest request) => throw new InvalidOperationException(Secret);
     }
 }

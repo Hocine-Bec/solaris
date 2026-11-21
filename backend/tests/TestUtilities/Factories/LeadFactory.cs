@@ -22,7 +22,7 @@ public static class LeadFactory
             .RuleFor(l => l.Status, f => f.PickRandom<LeadStatus>())
             .RuleFor(l => l.CreatedAt, f => f.Date.Past(1).ToUniversalTime())
             .RuleFor(l => l.ContactedAt, f => f.Random.Bool() ? f.Date.Recent(30).ToUniversalTime() : null)
-            .RuleFor(l => l.ConvertedAt, f => null)
+            .RuleFor(l => l.ClosedAt, f => null)
             .RuleFor(l => l.MonthlyBillRange, f => f.PickRandom("$50-$100", "$100-$200", "$200-$300", "$300+"))
             .RuleFor(l => l.BestTimeToContact, f => f.PickRandom("Morning", "Afternoon", "Evening"))
             .RuleFor(l => l.Notes, f => f.Random.Bool() ? f.Lorem.Sentence() : null)
@@ -41,7 +41,7 @@ public static class LeadFactory
         LeadStatus? status = null,
         DateTime? createdAt = null,
         DateTime? contactedAt = null,
-        DateTime? convertedAt = null,
+        DateTime? closedAt = null,
         string? monthlyBillRange = null,
         string? bestTimeToContact = null,
         string? notes = null,
@@ -61,7 +61,7 @@ public static class LeadFactory
         if (status.HasValue) lead.Status = status.Value;
         if (createdAt.HasValue) lead.CreatedAt = createdAt.Value;
         if (contactedAt.HasValue) lead.ContactedAt = contactedAt.Value;
-        if (convertedAt.HasValue) lead.ConvertedAt = convertedAt.Value;
+        if (closedAt.HasValue) lead.ClosedAt = closedAt.Value;
         if (!string.IsNullOrEmpty(monthlyBillRange)) lead.MonthlyBillRange = monthlyBillRange;
         if (!string.IsNullOrEmpty(bestTimeToContact)) lead.BestTimeToContact = bestTimeToContact;
         if (notes != null) lead.Notes = notes;

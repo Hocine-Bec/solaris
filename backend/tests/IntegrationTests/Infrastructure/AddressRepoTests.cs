@@ -214,68 +214,75 @@ public class AddressRepoTests(PostgresFixture database) : IntegrationTestBase(da
 
     #endregion
 
-    #region ExistsAsync (UniqueAddressHash) Tests
+    #region GetOrAddAsync (UniqueAddressHash) Tests
+
+    // Addresses made by the factory carry IDs; these are cleared, so PostgreSQL's sequence gives them.
+    private static Address NewAddress(string street = "2104 Oak Hollow Dr")
+    {
+        var address = AddressFactory.CreateFakeAddress(street: street);
+        address.Id = 0;
+        return address;
+    }
 
     [Fact]
-    public async Task ExistsAsync_ByHash_ExistingHash_ReturnsTrue()
+    public async Task GetOrAddAsync_NewKey_InsertsTheAddressAndReturnsItTracked()
     {
         // Arrange
-        var address = AddressFactory.CreateFakeAddress();
-        await SeedAsync(address);
+        var address = NewAddress();
 
         // Act
-        var exists = await Repo.ExistsAsync(address.UniqueAddressHash);
+        var stored = await Repo.GetOrAddAsync(address);
 
         // Assert
-        exists.Should().BeTrue();
+        stored.Id.Should().BeGreaterThan(0);
+        (stored.Street, stored.City, stored.State, stored.ZipCode, stored.Latitude, stored.Longitude).Should()
+            .Be((address.Street, address.City, address.State, address.ZipCode, address.Latitude, address.Longitude));
+        Context.Entry(stored).State.Should().Be(EntityState.Unchanged);
+        (await Context.Addresses.CountAsync(TestContext.Current.CancellationToken)).Should().Be(1);
     }
 
     [Fact]
-    public async Task ExistsAsync_ByHash_NonExistingHash_ReturnsFalse()
+    public async Task GetOrAddAsync_StoredKey_ReturnsTheStoredAddressAndInsertsNothing()
     {
+        // Arrange - the same key, sent again with other coordinates: the stored row stays as it is (ADR 5)
+        var first = NewAddress();
+        await SeedAsync(first);
+        var again = NewAddress();
+        again.Street = first.Street; again.City = first.City; again.State = first.State; again.ZipCode = first.ZipCode;
+        again.Country = first.Country; again.UniqueAddressHash = first.UniqueAddressHash;
+        again.Latitude = 1m; again.Longitude = 2m;
+
         // Act
-        var exists = await Repo.ExistsAsync("nonexistent-hash-12345");
+        var stored = await Repo.GetOrAddAsync(again);
 
         // Assert
-        exists.Should().BeFalse();
+        stored.Id.Should().Be(first.Id);
+        stored.Latitude.Should().Be(first.Latitude);
+        (await Context.Addresses.CountAsync(TestContext.Current.CancellationToken)).Should().Be(1);
     }
 
     [Fact]
-    public async Task ExistsAsync_ByHash_EmptyHash_ReturnsFalse()
+    public async Task GetOrAddAsync_ManyAtOnceForOneKey_StoreOneRowAndAllReturnIt()
     {
-        // Act
-        var exists = await Repo.ExistsAsync("");
-
-        // Assert
-        exists.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task ExistsAsync_ByHash_MultipleAddresses_FindsCorrectOne()
-    {
-        // Arrange
-        var addresses = AddressFactory.CreateFakeAddresses(3);
-        await SeedAsync(addresses.ToArray());
+        // Arrange - one context per request, released together
+        var address = NewAddress();
+        var contexts = Enumerable.Range(0, 8).Select(_ => CreateContext()).ToList();
+        using var start = new SemaphoreSlim(0);
+        var calls = contexts.Select(context => Task.Run(async () =>
+        {
+            await start.WaitAsync(TestContext.Current.CancellationToken);
+            return (await new AddressRepo(context).GetOrAddAsync(address)).Id;
+        }, TestContext.Current.CancellationToken)).ToList();
 
         // Act
-        var exists = await Repo.ExistsAsync(addresses[1].UniqueAddressHash);
+        start.Release(contexts.Count);
+        var ids = await Task.WhenAll(calls);
 
         // Assert
-        exists.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task ExistsAsync_ByHash_DoesNotTrackEntities()
-    {
-        // Arrange
-        var address = AddressFactory.CreateFakeAddress();
-        await SeedAsync(address);
-
-        // Act
-        await Repo.ExistsAsync(address.UniqueAddressHash);
-
-        // Assert
-        Context.ChangeTracker.Entries().Should().BeEmpty();
+        ids.Distinct().Should().ContainSingle();
+        (await Context.Addresses.CountAsync(TestContext.Current.CancellationToken)).Should().Be(1);
+        foreach (var context in contexts)
+            await context.DisposeAsync();
     }
 
     #endregion
