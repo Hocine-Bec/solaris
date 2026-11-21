@@ -113,7 +113,7 @@ export function NotificationsPage() {
                         >
                           <td>
                             <span className="two">
-                              <span className="email"><Icon icon={n.type === 'LeadWelcome' ? Mail : Inbox} />{emailName(n)}</span>
+                              <span className="email"><Icon icon={n.type === 'SalesNewLeadAlert' ? Inbox : Mail} />{emailName(n)}</span>
                               <small>{toLine(n)}</small>
                             </span>
                           </td>
@@ -208,13 +208,14 @@ function Details({ n }: { n: FailedNotification }) {
   return (
     <dl className="why">
       <dt>Why it failed</dt><dd><code>{n.lastError ?? 'No error was recorded.'}</code></dd>
-      <dt>Lead</dt><dd><Link to={`/leads/${n.lead.id}`}>{n.lead.name}</Link>, <span className="num">#{n.lead.id}</span></dd>
+      {n.lead && <><dt>Lead</dt><dd><Link to={`/leads/${n.lead.id}`}>{n.lead.name}</Link>, <span className="num">#{n.lead.id}</span></dd></>}
+      {n.installation && <><dt>Installation</dt><dd><Link to={`/installations/${n.installation.id}`}>{n.installation.street}</Link></dd></>}
       <dt>First tried</dt><dd className="num">{formatMoment(n.retriedAt ?? n.createdAt)}{n.retriedAt && ', when it was retried'}</dd>
       <dt>Last tried</dt><dd className="num">{n.lastAttemptAt ? formatMoment(n.lastAttemptAt) : '—'}</dd>
       <dt>Tries</dt><dd className="num">{n.attempts}{n.retriedAt && ' since the retry'}, over 24 hours</dd>
       {n.retriedAt
         ? <><dt>Retried</dt><dd>By {n.retriedBy ?? 'an account that no longer exists'}, {formatMoment(n.retriedAt)}. First saved {formatMoment(n.createdAt)}.</dd></>
-        : <><dt>Saved</dt><dd className="num">{formatMoment(n.createdAt)}, with the lead</dd></>}
+        : <><dt>Saved</dt><dd className="num">{formatMoment(n.createdAt)}, with the {n.installation ? 'switch-on' : 'lead'}</dd></>}
     </dl>
   );
 }

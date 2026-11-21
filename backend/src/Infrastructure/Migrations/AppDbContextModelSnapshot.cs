@@ -165,6 +165,10 @@ namespace Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("activated_at");
+
                     b.Property<int>("AddressId")
                         .HasColumnType("integer")
                         .HasColumnName("address_id");
@@ -177,15 +181,33 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("customer_id");
 
+                    b.Property<string>("InverterType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("inverter_type");
+
                     b.Property<int>("LeadId")
                         .HasColumnType("integer")
                         .HasColumnName("lead_id");
+
+                    b.Property<int?>("PanelCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("panel_count");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("status");
+
+                    b.Property<DateTime>("StatusChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("status_changed_at");
+
+                    b.Property<decimal?>("SystemSizeKw")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("system_size_kw");
 
                     b.Property<string>("TimeZone")
                         .IsRequired()
@@ -208,7 +230,117 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_installations_status");
 
+                    b.HasIndex("StatusChangedAt", "Id")
+                        .HasDatabaseName("ix_installations_status_changed_at_id");
+
                     b.ToTable("installations", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.InstallationAssignment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<int>("AssignedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("assigned_by_user_id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<int?>("CompletedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("completed_by_user_id");
+
+                    b.Property<int>("InstallationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("installation_id");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("role");
+
+                    b.Property<int>("TechnicianId")
+                        .HasColumnType("integer")
+                        .HasColumnName("technician_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_installation_assignments");
+
+                    b.HasIndex("AssignedByUserId")
+                        .HasDatabaseName("ix_installation_assignments_assigned_by_user_id");
+
+                    b.HasIndex("CompletedByUserId")
+                        .HasDatabaseName("ix_installation_assignments_completed_by_user_id");
+
+                    b.HasIndex("TechnicianId")
+                        .HasDatabaseName("ix_installation_assignments_technician_id");
+
+                    b.HasIndex("InstallationId", "TechnicianId", "Role")
+                        .IsUnique()
+                        .HasDatabaseName("ux_installation_assignments_installation_technician_role");
+
+                    b.ToTable("installation_assignments", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.InstallationStatusChange", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<int?>("ChangedByUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("changed_by_user_id");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("from_status");
+
+                    b.Property<int>("InstallationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("installation_id");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("to_status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_installation_status_history");
+
+                    b.HasIndex("ChangedByUserId")
+                        .HasDatabaseName("ix_installation_status_history_changed_by_user_id");
+
+                    b.HasIndex("InstallationId", "ChangedAt")
+                        .HasDatabaseName("ix_installation_status_history_installation_id_changed_at");
+
+                    b.ToTable("installation_status_history", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Lead", b =>
@@ -335,6 +467,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("give_up_at");
 
+                    b.Property<int?>("InstallationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("installation_id");
+
                     b.Property<DateTime?>("LastAttemptAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_attempt_at");
@@ -344,7 +480,7 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("last_error");
 
-                    b.Property<int>("LeadId")
+                    b.Property<int?>("LeadId")
                         .HasColumnType("integer")
                         .HasColumnName("lead_id");
 
@@ -394,11 +530,18 @@ namespace Infrastructure.Migrations
                         .HasDatabaseName("ix_outbox_messages_sent")
                         .HasFilter("status = 'Sent'");
 
+                    b.HasIndex("InstallationId", "Type")
+                        .IsUnique()
+                        .HasDatabaseName("ux_outbox_messages_installation_id_type");
+
                     b.HasIndex("LeadId", "Type")
                         .IsUnique()
                         .HasDatabaseName("ux_outbox_messages_lead_id_type");
 
-                    b.ToTable("outbox_messages", (string)null);
+                    b.ToTable("outbox_messages", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_outbox_messages_one_subject", "num_nonnulls(lead_id, installation_id) = 1");
+                        });
                 });
 
             modelBuilder.Entity("Domain.Entities.User", b =>
@@ -545,6 +688,62 @@ namespace Infrastructure.Migrations
                     b.Navigation("Lead");
                 });
 
+            modelBuilder.Entity("Domain.Entities.InstallationAssignment", b =>
+                {
+                    b.HasOne("Domain.Entities.User", "AssignedBy")
+                        .WithMany()
+                        .HasForeignKey("AssignedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_installation_assignments_users_assigned_by_user_id");
+
+                    b.HasOne("Domain.Entities.User", "CompletedBy")
+                        .WithMany()
+                        .HasForeignKey("CompletedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_installation_assignments_users_completed_by_user_id");
+
+                    b.HasOne("Domain.Entities.Installation", "Installation")
+                        .WithMany("Assignments")
+                        .HasForeignKey("InstallationId")
+                        .OnDelete(DeleteBehavior.ClientCascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_installation_assignments_installations_installation_id");
+
+                    b.HasOne("Domain.Entities.User", "Technician")
+                        .WithMany()
+                        .HasForeignKey("TechnicianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_installation_assignments_users_technician_id");
+
+                    b.Navigation("AssignedBy");
+
+                    b.Navigation("CompletedBy");
+
+                    b.Navigation("Installation");
+
+                    b.Navigation("Technician");
+                });
+
+            modelBuilder.Entity("Domain.Entities.InstallationStatusChange", b =>
+                {
+                    b.HasOne("Domain.Entities.User", "ChangedBy")
+                        .WithMany()
+                        .HasForeignKey("ChangedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_installation_status_history_users_changed_by_user_id");
+
+                    b.HasOne("Domain.Entities.Installation", null)
+                        .WithMany("History")
+                        .HasForeignKey("InstallationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_installation_status_history_installations_installation_id");
+
+                    b.Navigation("ChangedBy");
+                });
+
             modelBuilder.Entity("Domain.Entities.Lead", b =>
                 {
                     b.HasOne("Domain.Entities.Address", "Address")
@@ -567,11 +766,16 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Entities.OutboxMessage", b =>
                 {
+                    b.HasOne("Domain.Entities.Installation", "Installation")
+                        .WithMany()
+                        .HasForeignKey("InstallationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_outbox_messages_installations_installation_id");
+
                     b.HasOne("Domain.Entities.Lead", "Lead")
                         .WithMany()
                         .HasForeignKey("LeadId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_outbox_messages_leads_lead_id");
 
                     b.HasOne("Domain.Entities.User", "RetriedBy")
@@ -579,6 +783,8 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("RetriedByUserId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_outbox_messages_users_retried_by_user_id");
+
+                    b.Navigation("Installation");
 
                     b.Navigation("Lead");
 
@@ -588,6 +794,13 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Entities.Customer", b =>
                 {
                     b.Navigation("Installations");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Installation", b =>
+                {
+                    b.Navigation("Assignments");
+
+                    b.Navigation("History");
                 });
 #pragma warning restore 612, 618
         }

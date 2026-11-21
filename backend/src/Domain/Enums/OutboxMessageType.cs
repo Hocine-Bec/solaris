@@ -7,5 +7,8 @@ public enum OutboxMessageType
     LeadWelcome,
 
     /// <summary>To the office: a new lead, who, where and when to call.</summary>
-    SalesNewLeadAlert
+    SalesNewLeadAlert,
+
+    /// <summary>To the customer: their system is switched on (FR-I7).</summary>
+    InstallationActivated
 }

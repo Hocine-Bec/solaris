@@ -26,8 +26,13 @@ public class OutboxMessageConfig : IEntityTypeConfiguration<OutboxMessage>
             .IsRequired();
 
         builder.Property(m => m.LeadId)
-            .HasColumnName("lead_id")
-            .IsRequired();
+            .HasColumnName("lead_id");
+
+        builder.Property(m => m.InstallationId)
+            .HasColumnName("installation_id");
+
+        // A message is about a lead or an installation, never both or neither
+        builder.ToTable(t => t.HasCheckConstraint("ck_outbox_messages_one_subject", "num_nonnulls(lead_id, installation_id) = 1"));
 
         builder.Property(m => m.Status)
             .HasColumnName("status")
@@ -90,6 +95,18 @@ public class OutboxMessageConfig : IEntityTypeConfiguration<OutboxMessage>
         builder.HasIndex(m => new { m.LeadId, m.Type })
             .IsUnique()
             .HasDatabaseName("ux_outbox_messages_lead_id_type");
+
+        // An installation with notifications to send can't be deleted (nothing deletes installations)
+        builder.HasOne(m => m.Installation)
+            .WithMany()
+            .HasForeignKey(m => m.InstallationId)
+            .HasConstraintName("fk_outbox_messages_installations_installation_id")
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // One message of each kind per installation: a second switch-on email can't be saved
+        builder.HasIndex(m => new { m.InstallationId, m.Type })
+            .IsUnique()
+            .HasDatabaseName("ux_outbox_messages_installation_id_type");
 
         // What the dispatcher reads: the pending messages, by when they are due; sent and failed ones aren't in it
         builder.HasIndex(m => m.NextAttemptAt)

@@ -1,16 +1,18 @@
 import { z } from 'zod';
 import { request } from './client';
 
-export const NOTIFICATION_TYPES = ['LeadWelcome', 'SalesNewLeadAlert'] as const;
+export const NOTIFICATION_TYPES = ['LeadWelcome', 'SalesNewLeadAlert', 'InstallationActivated'] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 /** An email the outbox couldn't send in its 24 hours of tries (GET /api/notifications/failed) */
 export const failedNotificationSchema = z.object({
   id: z.guid(),
   type: z.enum(NOTIFICATION_TYPES),
-  /** The person, or for the office's alert, the office */
+  /** The person, or for the office's alert, the office; for a switch-on email, the customer */
   to: z.object({ name: z.string(), address: z.string() }),
-  lead: z.object({ id: z.number().int(), name: z.string() }),
+  /** What it is about: a lead's emails name the lead; a switch-on email, its installation */
+  lead: z.object({ id: z.number().int(), name: z.string() }).nullable(),
+  installation: z.object({ id: z.number().int(), street: z.string() }).nullable(),
   createdAt: z.iso.datetime(),
   lastAttemptAt: z.iso.datetime().nullable(),
   /** Since it was saved, or since its last retry */

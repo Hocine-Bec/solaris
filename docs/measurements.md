@@ -370,6 +370,11 @@ Duplicates are reported as they are, whatever they are.
 
 ## 8. P3 — Duplicates and lost updates under concurrency
 
+**Scripts:** `perf/p3/run.sh <a|b> <run number> [before|after]`, on a fresh database and the API's Release build, as
+P1's and P2's (§3). The design is whatever is checked out: the before at the tag `p3-before`, the after once the
+fixes are merged. Results: `perf/results/p3/<date>-<before|after>/<a|b>-run<N>/` (`results.json`, `env.md`, k6's
+summary and output, the API's log).
+
 ### P3a — Duplicate leads
 
 **Question.** When the same form is submitted many times at the same moment (double-clicks, browser retries, a
@@ -381,7 +386,7 @@ flaky network), how many leads, notifications and errors result?
 | **After** | the partial unique index on open leads; a conflict returns the existing lead |
 
 **Steps:** 20 rounds. Each round uses a fresh email and address, and fires **50 identical `POST /api/leads` at
-once** (released together). Rate limiter off. The 50 submissions share one address, so in the before version
+once** (released together: one k6 `http.batch`, each copy on its own connection). Rate limiter off. The 50 submissions share one address, so in the before version
 address creation must not fail first, or it would hide the lead race being measured: the address insert is
 concurrency-safe (`ON CONFLICT`) in both versions, and only the duplicate-lead rule differs.
 
@@ -402,10 +407,13 @@ responses by status code (after, expected: 1 × 201 + 49 × 200, and 0 × 5xx).
 | **Before** | tag `p3-before`: no concurrency token; each change reads the installation, modifies it and saves it |
 | **After** | `xmin` + `If-Match` |
 
-**Setup:** 200 installations at **Design**, with their design data recorded, so both moves below are valid.
+**Setup:** 200 installations at **Design**, with their design data recorded, so both moves below are valid. They are
+made through the API, as the office makes them: a lead, contacted, converted, a surveyor's part completed, moved to
+Design, the design recorded.
 
 **Steps:** for each installation, send **at the same moment** A = a transition to Permits and B = a
-cancellation with a reason. Before: no `If-Match`. After: both send the `ETag` they read first.
+cancellation with a reason (one k6 `http.batch`, two connections). Before: no `If-Match`. After: both send the `ETag`
+they read first.
 
 **Counted:**
 - **lost updates:** installations where *both* requests got a 2xx

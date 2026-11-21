@@ -88,17 +88,17 @@ note stays in the office's alert (the welcome email says it was sent to the offi
 
 ## 4. Data model
 
-Today the code has `Lead`, `Address`, `Customer`, `Installation` (as a conversion creates it, §7), `User` and the
-outbox's `OutboxMessage` (§6). The other entities are *(planned)*, each built with its feature.
+Today the code has `Lead`, `Address`, `Customer`, `Installation` with its history and assignments (§7), `User` and
+the outbox's `OutboxMessage` (§6). The other entities are *(planned)*, each built with its feature.
 
 | Entity | What it is | Key rules |
 |---|---|---|
 | **Lead** | A quote request | Its status and when it moved: `ContactedAt`, then `ClosedAt` (Converted, Disqualified or Lost), set by the server (BR-L2); the visitor's note, never replaced. One open lead per email: checked in the service today, on purpose (P3's before, §7); `NormalizedEmail` with a partial unique index over the open statuses (BR-L1) *(planned)*; an `xmin` concurrency token *(planned)* |
 | **Address** | A property, stored once | `UniqueAddressHash` with a unique index ([ADR 5](adr/0005-address-natural-key.md)) |
-| **Customer** | A converted lead | `NormalizedEmail` unique: a later conversion for the same email reuses the customer (BR-L3); its address is its first lead's property; status derived from its installations (BR-C1) *(planned)* |
-| **Installation** | One project at one address | Its customer, its address and the lead it came from; its status is its stage (Survey at conversion); its time zone (an IANA name, proposed from its state, BR-P4). *(Planned:)* design data (size, panel count, inverter type), the Admin's confirmation of its time zone, an `xmin` concurrency token and the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` |
-| **InstallationStatusHistory** | One row per status change | From, to, who, when, note; append-only, never updated or deleted |
-| **InstallationTechnician** | A technician's assignment | Role Surveyor, Installer or Inspector (an enum); completion date |
+| **Customer** | A converted lead | `NormalizedEmail` unique: a later conversion for the same email reuses the customer (BR-L3); its address is its first lead's property; its status recalculated from its installations' at every status change, in the same save (BR-C1) |
+| **Installation** | One project at one address | Its customer, its address and the lead it came from; its status is its stage (Survey at conversion), with when it last changed; its time zone (an IANA name, proposed from its state, confirmed in the switch-on dialog, BR-P4); its design (size, panel count, inverter type); when it was switched on. Design and time zone fixed once Active. *(Planned:)* an `xmin` concurrency token and the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` |
+| **InstallationStatusChange** | One row per status change (`installation_status_history`) | From (none for the conversion's first row), to, who, when, note (a cancellation's reason); append-only, never updated or deleted |
+| **InstallationAssignment** | A technician's part (`installation_assignments`) | Role Surveyor, Installer or Inspector (an enum); who assigned and when; who completed it (the technician, or an Admin for them) and when; unique per installation, technician and role. One not completed can be removed |
 | **User** | A staff account | Name; email, unique whatever its case (`NormalizedEmail`, a unique index); password hash ([ADR 8](adr/0008-password-hashing.md)); role (Admin or Technician); active flag; last sign-in; the time its sessions are valid from, moved by a new password |
 | **EnergyProduction** | The daily production rollup | One row per installation and local day, enforced by a unique index; `ReadingCount` and `ComputedAt` *(planned)* |
 
@@ -106,11 +106,13 @@ Tables for the mechanisms below (the outbox is built; the others are *(planned)*
 
 ```
 outbox_messages        id uuid PK (version 7, made by the app; the email's Message-ID), type text
-                       (LeadWelcome | SalesNewLeadAlert), lead_id int FK → leads, status (Pending | Sent | Failed),
+                       (LeadWelcome | SalesNewLeadAlert | InstallationActivated), lead_id int FK → leads,
+                       installation_id int FK → installations (exactly one of the two is set: a check constraint),
+                       status (Pending | Sent | Failed),
                        attempts int, created_at, give_up_at (the end of its 24 hours), next_attempt_at,
                        last_attempt_at, sent_at, retried_at timestamptz, retried_by_user_id int FK → users
                        (SET NULL), last_error text
-                       unique (lead_id, type); indexes (next_attempt_at) WHERE status = 'Pending',
+                       unique (lead_id, type), unique (installation_id, type); indexes (next_attempt_at) WHERE status = 'Pending',
                        (last_attempt_at) WHERE status = 'Failed', (sent_at) WHERE status = 'Sent'
 
 energy_readings        installation_id int, slot_start timestamptz, energy_wh int
@@ -152,6 +154,15 @@ installation's own time zone (BR-P4).
   | `lead.closed` | 409 | Correcting a lead that is no longer open (FR-L7) |
   | `lead.email_taken` | 409 | Correcting a lead's email to one another open lead has (BR-L1) |
   | `customer.not_found` | 404 | No customer has this ID |
+  | `installation.not_found` | 404 | No installation has this ID; to a technician, also one they aren't assigned to |
+  | `installation.transition_not_allowed` | 409 | A move the stages or its condition don't allow now (BR-I1, BR-I2); the message says what it waits for |
+  | `installation.fixed` | 409 | Changing the design or the time zone of an installation that is Active or closed |
+  | `installation.closed` | 409 | Assigning to, or removing from, an installation that is Active or closed |
+  | `assignment.not_found` | 404 | No such assignment on this installation; to a technician, also one that isn't theirs |
+  | `assignment.not_a_technician` | 409 | Assigning an account that isn't an active technician, or doesn't exist |
+  | `assignment.duplicate` | 409 | The technician already has this role on this installation |
+  | `assignment.completed` | 409 | Completing a part twice, or removing a completed one |
+  | `assignment.not_at_its_stage` | 409 | Completing a part before or after its stage (a survey at Survey, and so on) |
   | `user.not_found` | 404 | No staff account has this ID |
   | `user.email_taken` | 409 | Another account has this email, whatever its case or spaces; a deactivated one keeps it |
   | `user.cannot_deactivate_self` | 409 | The Admin deactivating their own account |
@@ -191,8 +202,9 @@ background dispatcher sends it (BR-N1, BR-N2; [ADR 10](adr/0010-transactional-ou
 The event and its notifications are saved in **one save, which is one transaction**:
 - **Lead created:** the lead (+ its address) and two outbox messages, `LeadWelcome` and `SalesNewLeadAlert`, due at
   once. If the save fails, neither exists.
-- **Installation activated** *(planned)*: the status change, its history row, the device key and an
-  `InstallationActivated` message.
+- **Installation switched on:** the status change, its history row, the customer's new status, and an
+  `InstallationActivated` message, the customer's switch-on email (FR-I7). *(Planned:)* the device key, in the same
+  save.
 
 The HTTP request never talks to the mail server. `Notifications:Mode` picks the path: `Outbox`, the default, or
 `Synchronous`, the P1 "before" kept in the measurement harness, Development only, which writes no outbox messages and
@@ -238,7 +250,8 @@ Development default, refused in Production. Development wraps the provider's sen
 ### Administration (FR-N2)
 All `Admin`; the staff app's Failed notifications screen uses them.
 - `GET /api/notifications/failed` (paginated) lists the Failed messages, newest failure first: which email, to whom
-  (the person, or the office for its alert, as the email service addresses them), the lead, when it was saved and
+  (the person, or the office for its alert, or for a switch-on email the customer, as the email service addresses
+  them), the lead or the installation it is about, when it was saved and
   last tried, the attempts, the last error, and who retried it before.
 - `POST /api/notifications/{id}/retry` retries one; `POST /api/notifications/failed/retry` retries every message
   Failed at that moment and answers how many. A retry is one conditional `UPDATE … WHERE status = 'Failed'`:
@@ -250,7 +263,7 @@ All `Admin`; the staff app's Failed notifications screen uses them.
 
 ---
 
-## 7. Leads and installations *(partly planned)*
+## 7. Leads and installations
 
 ### Lead capture (BR-L1)
 - **Today, on purpose:** the service checks for an open lead with the email (compared trimmed and case-insensitive),
@@ -280,12 +293,23 @@ the lead to Converted, linked to the customer. *(Planned:)* the lead's `xmin` to
 conversion of one lead fail with 409.
 
 ### The installation state machine (BR-I1–BR-I3)
-- The allowed transitions and their conditions live in the `Domain` as data plus one method,
-  `Installation.TransitionTo(target, actor, note)`, which returns a `Result`. It checks the transition and its
-  condition (assignments, design data), appends the history row and sets the dates.
-- The service recalculates the customer's status (BR-C1) in the same transaction.
+- The stages, their conditions and every other rule (cancelling, deactivating, the design, the time zone, the
+  assignments) live in `Installation`. Each change returns a `Refusal` (a code and a message, defined in the `Domain`)
+  or null when it was made: `Result` lives in `Application`, which the `Domain` doesn't reference
+  ([ADR 1](adr/0001-layered-solution.md)). A status change appends its history row and sets its dates. The service
+  turns a refusal into a 409.
+- What the next move waits for (`WaitingFor`) is the same text the 409 gives and the page shows: the screen never
+  repeats a rule.
+- The service recalculates the customer's status (BR-C1) in the same save, from this installation's new status and
+  the others' stored ones; switching on adds the customer's email to the same save (§6).
+- A technician reaches installations only through `/api/my-work`: their own, with the customer's name, phone and
+  address; anything else answers 404. They complete only their own parts; an Admin can complete any, for them
+  (FR-I6).
 
-### Optimistic concurrency (BR-I4)
+### Optimistic concurrency (BR-I4) *(planned: the fixes after P3's before)*
+- **Today, on purpose:** no token. Each change reads the installation, changes it and saves it, so two changes at the
+  same moment can both succeed (the before P3b measures). The staff app already sends `If-Match` with every change,
+  from the `ETag` it last read, and the API ignores it.
 - Installation and Lead map PostgreSQL's `xmin` system column as their concurrency token; no extra column is
   needed.
 - `GET /api/installations/{id}` returns `ETag: "<xmin>"`. Every change (transition, cancellation, design,
@@ -385,11 +409,12 @@ Staff sign-in, sessions and the roles' checks are built; the parts marked *(plan
   only, the API reference (`/scalar`, `/openapi/v1.json`), the measurement harness's email fault switch, and the
   Hangfire dashboard. Signed
   out, an address that doesn't exist answers `401`, like one that does.
-- **Policies:** `Admin`, `Technician`, and `Staff` (either role), reading the `role` claim. The leads, the staff
-  accounts and the failed notifications are `Admin` (the quote form excepted); a technician calling them gets `403 forbidden`. The staff app shows a "Not allowed"
+- **Policies:** `Admin`, `Technician`, and `Staff` (either role), reading the `role` claim. The leads, customers,
+  installations, staff accounts and failed notifications are `Admin` (the quote form excepted); My work
+  (`/api/my-work`) is `Technician`. A caller with the other role gets `403 forbidden`. The staff app shows a "Not allowed"
   screen for another role's page, and the API refuses the data anyway.
-- **Technician scoping** *(planned)*: a technician lists and sees only the installations they are assigned to,
-  enforced in the service query.
+- **Technician scoping:** a technician lists and sees only the installations they are assigned to, through My work,
+  checked in the service: another installation, or another technician's part, answers `404`, as if it didn't exist.
 - **Devices** *(planned)*: a separate authentication scheme reads `X-Device-Key: <prefix>.<secret>`. The prefix finds
   the installation; the secret is checked against `DeviceKeyHash` (SHA-256, constant-time comparison), which is
   adequate because the secret is 32 random bytes, not a human password. The key is shown once at activation and

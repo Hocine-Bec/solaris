@@ -143,7 +143,7 @@ public class ErrorResponseTests(PostgresFixture database) : ApiTestBase(database
         public Task<Result<LeadResponse>> GetByIdAsync(int id) => throw new InvalidOperationException(Secret);
         public Task<LeadCreated> CreateAsync(CreateLeadRequest request) => throw new InvalidOperationException(Secret);
         public Task<Result<LeadResponse>> UpdateStatusAsync(int id, UpdateLeadStatusRequest request) => throw new InvalidOperationException(Secret);
-        public Task<Result<LeadResponse>> ConvertAsync(int id) => throw new InvalidOperationException(Secret);
+        public Task<Result<LeadResponse>> ConvertAsync(int id, int actingUserId) => throw new InvalidOperationException(Secret);
         public Task<Result<LeadResponse>> UpdateAsync(int id, UpdateLeadRequest request) => throw new InvalidOperationException(Secret);
     }
 }

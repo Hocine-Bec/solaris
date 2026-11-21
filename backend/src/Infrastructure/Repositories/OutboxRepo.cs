@@ -15,6 +15,8 @@ public class OutboxRepo(AppDbContext context) : IOutboxRepo
         // The ID last (time-ordered), so messages that failed at the same moment keep their place between pages
         var items = await failed.AsNoTracking()
             .Include(m => m.Lead)
+            .Include(m => m.Installation).ThenInclude(i => i!.Customer)
+            .Include(m => m.Installation).ThenInclude(i => i!.Address)
             .Include(m => m.RetriedBy)
             .OrderByDescending(m => m.LastAttemptAt).ThenByDescending(m => m.Id)
             .Skip(skip).Take(take)
@@ -23,6 +25,8 @@ public class OutboxRepo(AppDbContext context) : IOutboxRepo
     }
 
     public Task<bool> ExistsAsync(Guid id) => context.OutboxMessages.AnyAsync(m => m.Id == id);
+
+    public void Add(OutboxMessage message) => context.OutboxMessages.Add(message);
 
     public Task<int> RetryFailedAsync(Guid? id, DateTime now, int retriedByUserId)
     {

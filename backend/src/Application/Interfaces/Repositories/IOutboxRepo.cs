@@ -10,6 +10,9 @@ public interface IOutboxRepo
 
     Task<bool> ExistsAsync(Guid id);
 
+    /// <summary>A notification saved with the event that causes it, in the same save (BR-N1).</summary>
+    void Add(OutboxMessage message);
+
     /// <summary>
     /// Retries the Failed message with this id, or every Failed message when <paramref name="id"/> is null, in one
     /// statement: Pending, due now, its attempts back to 0, and another 24 hours from now; recording when and by whom.

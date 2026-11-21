@@ -57,12 +57,18 @@ public sealed class OutboxProcessor(AppDbContext context, IEmailService emails, 
             return new OutboxBatch(0, 0, false);
         }
 
-        var leadIds = batch.Select(m => m.LeadId).Distinct().ToList();
+        var leadIds = batch.Where(m => m.LeadId is not null).Select(m => m.LeadId!.Value).Distinct().ToList();
         var leads = await context.Leads.AsNoTracking().Include(l => l.Address)
             .Where(l => leadIds.Contains(l.Id))
             .ToDictionaryAsync(l => l.Id, stopping);
+        var installationIds = batch.Where(m => m.InstallationId is not null).Select(m => m.InstallationId!.Value).Distinct().ToList();
+        var installations = installationIds.Count == 0
+            ? []
+            : await context.Installations.AsNoTracking().Include(i => i.Address).Include(i => i.Customer)
+                .Where(i => installationIds.Contains(i.Id))
+                .ToDictionaryAsync(i => i.Id, stopping);
 
-        var outcomes = await SendAllAsync(batch, leads, stopping);
+        var outcomes = await SendAllAsync(batch, new Subjects(leads, installations), stopping);
 
         // Applied in the batch's order, once every send has ended: the entities aren't shared between sends
         var sent = 0;
@@ -98,13 +104,15 @@ public sealed class OutboxProcessor(AppDbContext context, IEmailService emails, 
         return new OutboxBatch(batch.Count, sent, retryAt is not null);
     }
 
+    /// <summary>What the batch's emails are about, read once for the batch.</summary>
+    private sealed record Subjects(Dictionary<int, Lead> Leads, Dictionary<int, Installation> Installations);
+
     private abstract record Outcome(DateTime At);
     private sealed record Sent(DateTime At, long ElapsedMs) : Outcome(At);
     private sealed record Failed(DateTime At, string Error, Exception Exception, bool Unreachable) : Outcome(At);
 
     /// <summary>Each message's outcome, in the batch's order; null for one not tried, or abandoned while stopping.</summary>
-    private async Task<Outcome?[]> SendAllAsync(List<OutboxMessage> batch, Dictionary<int, Lead> leads,
-        CancellationToken stopping)
+    private async Task<Outcome?[]> SendAllAsync(List<OutboxMessage> batch, Subjects subjects, CancellationToken stopping)
     {
         var outcomes = new Outcome?[batch.Count];
         var unreachable = 0;
@@ -115,7 +123,7 @@ public sealed class OutboxProcessor(AppDbContext context, IEmailService emails, 
         {
             try
             {
-                outcomes[index] = await AttemptAsync(batch[index], leads.GetValueOrDefault(batch[index].LeadId), stopping);
+                outcomes[index] = await AttemptAsync(batch[index], subjects, stopping);
                 if (outcomes[index] is Failed { Unreachable: true })
                     Interlocked.Exchange(ref unreachable, 1);
             }
@@ -146,14 +154,14 @@ public sealed class OutboxProcessor(AppDbContext context, IEmailService emails, 
         return outcomes;
     }
 
-    private async Task<Outcome?> AttemptAsync(OutboxMessage message, Lead? lead, CancellationToken stopping)
+    private async Task<Outcome?> AttemptAsync(OutboxMessage message, Subjects subjects, CancellationToken stopping)
     {
         var started = time.GetTimestamp();
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stopping);
             timeout.CancelAfter(SendTimeout);
-            await SendAsync(message, lead, timeout.Token);
+            await SendAsync(message, subjects, timeout.Token);
             return new Sent(Now(), (long)time.GetElapsedTime(started).TotalMilliseconds);
         }
         catch (OperationCanceledException) when (stopping.IsCancellationRequested)
@@ -177,18 +185,25 @@ public sealed class OutboxProcessor(AppDbContext context, IEmailService emails, 
         }
     }
 
-    private Task SendAsync(OutboxMessage message, Lead? lead, CancellationToken cancellationToken)
+    private Task SendAsync(OutboxMessage message, Subjects subjects, CancellationToken cancellationToken)
     {
-        if (lead is null)
-            throw new InvalidOperationException($"Lead {message.LeadId} no longer exists.");
-
         return message.Type switch
         {
-            OutboxMessageType.LeadWelcome => emails.SendLeadWelcomeAsync(lead, message.Id, cancellationToken),
-            OutboxMessageType.SalesNewLeadAlert => emails.SendNewLeadAlertAsync(lead, message.Id, cancellationToken),
+            OutboxMessageType.LeadWelcome => emails.SendLeadWelcomeAsync(LeadOf(message, subjects), message.Id, cancellationToken),
+            OutboxMessageType.SalesNewLeadAlert => emails.SendNewLeadAlertAsync(LeadOf(message, subjects), message.Id, cancellationToken),
+            OutboxMessageType.InstallationActivated => emails.SendInstallationActivatedAsync(
+                message.InstallationId is { } id && subjects.Installations.TryGetValue(id, out var installation)
+                    ? installation
+                    : throw new InvalidOperationException($"Installation {message.InstallationId} no longer exists."),
+                message.Id, cancellationToken),
             var other => throw new UnreachableException($"No email for the outbox message type {other}.")
         };
     }
+
+    private static Lead LeadOf(OutboxMessage message, Subjects subjects) =>
+        message.LeadId is { } id && subjects.Leads.TryGetValue(id, out var lead)
+            ? lead
+            : throw new InvalidOperationException($"Lead {message.LeadId} no longer exists.");
 
     private void Fail(OutboxMessage message, Failed failure)
     {

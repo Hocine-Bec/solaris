@@ -83,6 +83,39 @@ public class OutboxTests(PostgresFixture database) : IntegrationTestBase(databas
     }
 
     [Fact]
+    public async Task FR_I7_SwitchOnEmail_IsSentToTheCustomer_WithItsKeyAndId()
+    {
+        // An installation switched on, its message saved with the move
+        var address = AddressFactory.CreateFakeAddress(street: "61 Pecan St", state: "TX");
+        address.Id = 0;
+        var lead = LeadFactory.CreateFakeLeadWithAddress(address: address);
+        lead.Id = 0;
+        var installation = new Installation
+        {
+            Lead = lead, Address = address, Status = InstallationStatus.Active, TimeZone = "America/Chicago",
+            SystemSizeKw = 8.4m, PanelCount = 21, CreatedAt = _clock.UtcNow, StatusChangedAt = _clock.UtcNow, ActivatedAt = _clock.UtcNow,
+            Customer = new Customer
+            {
+                FirstName = "Grace", LastName = "Kim", Email = "grace.kim@example.com", NormalizedEmail = "GRACE.KIM@EXAMPLE.COM",
+                PhoneNumber = "(512) 555-0110", Status = CustomerStatus.Active, RegistrationDate = _clock.UtcNow
+            }
+        };
+        var message = OutboxMessage.ForInstallation(installation, OutboxMessageType.InstallationActivated, _clock.UtcNow);
+        await SeedAsync(message);
+        var sender = new RecordingSender();
+
+        var batch = await Processor(sender).SendDueAsync(Ct);
+
+        batch.Should().Be(new OutboxBatch(1, 1, false));
+        sender.Accepted.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            NotificationKey = $"InstallationActivated:{installation.Id}", OutboxMessageId = (Guid?)message.Id,
+            ToAddress = "grace.kim@example.com", Subject = "Your solar system is on"
+        }, o => o.ExcludingMissingMembers());
+        (await RowsAsync()).Single().Status.Should().Be(OutboxMessageStatus.Sent);
+    }
+
+    [Fact]
     public async Task Batch_SentOnce_IsNotTakenAgain()
     {
         await SeedLeadsAsync(1);

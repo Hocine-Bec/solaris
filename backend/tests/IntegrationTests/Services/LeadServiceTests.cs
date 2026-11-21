@@ -72,6 +72,22 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         return lead;
     }
 
+    private int? _adminId;
+
+    /// <summary>The Admin who converts: an installation's history names who made each change.</summary>
+    private async Task<int> AdminIdAsync()
+    {
+        if (_adminId is { } id)
+            return id;
+        var admin = new User
+        {
+            Name = "Rosa Castillo", Email = "rosa@solaris.test", NormalizedEmail = "ROSA@SOLARIS.TEST", PasswordHash = "unused",
+            Role = UserRole.Admin, IsActive = true, CreatedAt = Earlier
+        };
+        await SeedAsync(admin);
+        return (_adminId = admin.Id).Value;
+    }
+
     private async Task<Customer> SeedCustomerAsync(string email)
     {
         var customer = new Customer
@@ -280,7 +296,7 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         var lead = await SeedLeadAsync(LeadStatus.Contacted, state: "TX");
 
         // Act
-        var result = await CreateService().ConvertAsync(lead.Id);
+        var result = await CreateService().ConvertAsync(lead.Id, await AdminIdAsync());
 
         // Assert - the customer from the lead; the installation at the lead's property, in Texas's proposed zone
         result.IsSuccess.Should().BeTrue();
@@ -309,7 +325,7 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         var lead = await SeedLeadAsync(LeadStatus.Contacted, email: "Luis.Ortega@example.com");
 
         // Act
-        var result = await CreateService().ConvertAsync(lead.Id);
+        var result = await CreateService().ConvertAsync(lead.Id, await AdminIdAsync());
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -331,7 +347,7 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         var lead = await SeedLeadAsync(status);
 
         // Act
-        var result = await CreateService().ConvertAsync(lead.Id);
+        var result = await CreateService().ConvertAsync(lead.Id, await AdminIdAsync());
 
         // Assert
         result.Error.Should().Be(LeadErrors.TransitionNotAllowed(status, LeadStatus.Converted));
@@ -348,7 +364,8 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         var lead = await SeedLeadAsync(LeadStatus.Contacted, state: "XX");
 
         // Act - it fails after the customer is inserted
-        var act = () => CreateService().ConvertAsync(lead.Id);
+        var adminId = await AdminIdAsync();
+        var act = () => CreateService().ConvertAsync(lead.Id, adminId);
 
         // Assert - one transaction: the customer is rolled back, the lead is still Contacted
         await act.Should().ThrowAsync<ArgumentException>();
@@ -365,13 +382,14 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
         // sent at the same moment), converted by two Admins at once
         var first = await SeedLeadAsync(LeadStatus.Contacted, email: "evan.price@example.com");
         var second = await SeedLeadAsync(LeadStatus.Contacted, email: "EVAN.PRICE@example.com");
+        var adminId = await AdminIdAsync();
         await using var context1 = CreateContext();
         await using var context2 = CreateContext();
         using var start = new SemaphoreSlim(0);
         Task<Application.Common.Models.Result<LeadResponse>> Convert(AppDbContext context, int id) => Task.Run(async () =>
         {
             await start.WaitAsync(Ct);
-            return await CreateService(context).ConvertAsync(id);
+            return await CreateService(context).ConvertAsync(id, adminId);
         }, Ct);
         var conversions = new[] { Convert(context1, first.Id), Convert(context2, second.Id) };
 

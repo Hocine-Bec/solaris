@@ -1,11 +1,12 @@
 import type { FailedNotification } from '../api/notifications';
 
-/** "Welcome email", "New lead alert": the email, in the office's words */
-export const emailName = (n: FailedNotification) => (n.type === 'LeadWelcome' ? 'Welcome email' : 'New lead alert');
+/** "Welcome email", "New lead alert", "Switch-on email": the email, in the office's words */
+export const emailName = (n: FailedNotification) =>
+  ({ LeadWelcome: 'Welcome email', SalesNewLeadAlert: 'New lead alert', InstallationActivated: 'Switch-on email' })[n.type];
 
 /** To whom: the person and their address, or for the alert, the office and the lead it is about */
 export const toLine = (n: FailedNotification) =>
-  n.type === 'LeadWelcome' ? `To ${n.to.name}, ${n.to.address}` : `To the office, about ${n.lead.name}`;
+  n.type === 'SalesNewLeadAlert' ? `To the office, about ${n.lead?.name ?? 'a lead'}` : `To ${n.to.name}, ${n.to.address}`;
 
 /** The error on one line, for the row: its line breaks and runs of spaces as single spaces */
 export const oneLine = (error: string | null) => (error ?? 'No error was recorded.').replace(/\s+/g, ' ').trim();

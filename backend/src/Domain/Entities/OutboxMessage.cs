@@ -31,8 +31,13 @@ public class OutboxMessage
 
     public OutboxMessageType Type { get; private set; }
 
-    public int LeadId { get; private set; }
+    /// <summary>The lead a lead's email is about; null for an installation's email. Exactly one of the two is set.</summary>
+    public int? LeadId { get; private set; }
     public Lead? Lead { get; private set; }
+
+    /// <summary>The installation a switch-on email is about; null for a lead's email.</summary>
+    public int? InstallationId { get; private set; }
+    public Installation? Installation { get; private set; }
 
     public OutboxMessageStatus Status { get; private set; }
 
@@ -59,7 +64,7 @@ public class OutboxMessage
     public User? RetriedBy { get; private set; }
 
     /// <summary>The notification it delivers, as the measurement harness counts them: <c>LeadWelcome:123</c>.</summary>
-    public string NotificationKey => $"{Type}:{LeadId}";
+    public string NotificationKey => $"{Type}:{LeadId ?? InstallationId}";
 
     private OutboxMessage() { }
 
@@ -70,6 +75,19 @@ public class OutboxMessage
         Type = type,
         Lead = lead,
         LeadId = lead.Id,
+        Status = OutboxMessageStatus.Pending,
+        CreatedAt = now,
+        GiveUpAt = now + DeliveryWindow,
+        NextAttemptAt = now
+    };
+
+    /// <summary>A notification about an installation (its switch-on email), due now; saved with the move to Active.</summary>
+    public static OutboxMessage ForInstallation(Installation installation, OutboxMessageType type, DateTime now) => new()
+    {
+        Id = Guid.CreateVersion7(new DateTimeOffset(now, TimeSpan.Zero)),
+        Type = type,
+        Installation = installation,
+        InstallationId = installation.Id,
         Status = OutboxMessageStatus.Pending,
         CreatedAt = now,
         GiveUpAt = now + DeliveryWindow,

@@ -16,8 +16,8 @@ public interface ILeadService
     /// <summary>Contacted, Disqualified or Lost, as BR-L2 allows; the time is now.</summary>
     Task<Result<LeadResponse>> UpdateStatusAsync(int id, UpdateLeadStatusRequest request);
 
-    /// <summary>A Contacted lead becomes a customer and an installation, in one transaction (BR-L3).</summary>
-    Task<Result<LeadResponse>> ConvertAsync(int id);
+    /// <summary>A Contacted lead becomes a customer and an installation, in one transaction (BR-L3); the installation's first history row names who.</summary>
+    Task<Result<LeadResponse>> ConvertAsync(int id, int actingUserId);
 
     /// <summary>An open lead's corrected name, email and phone (FR-L7).</summary>
     Task<Result<LeadResponse>> UpdateAsync(int id, UpdateLeadRequest request);

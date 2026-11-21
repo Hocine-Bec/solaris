@@ -3,11 +3,10 @@
 The app [Solaris](../../README.md)'s staff work in: the office (Admin) runs leads, customers, installations,
 production, failed notifications and accounts; technicians see the installations they're assigned to.
 
-**Status:** signing in, the app's frame, the Leads and Customers screens, the Users screens and Failed notifications are built: the
-session, the navigation by role, the account menu, the themes, the states every screen shares, the client that talks to the API, the
-leads and their conversion, the customers, the staff accounts, and the failed emails. The other screens come with their features; until
-then each section shows what it will hold, and an installation's page (`/installations/:id`, which a converted lead links to) says
-what it will hold.
+**Status:** signing in, the app's frame, the Leads, Customers and Installations screens, My work, the Users screens and Failed
+notifications are built: the session, the navigation by role, the account menu, the themes, the states every screen shares, the client
+that talks to the API, the leads and their conversion, the customers, the installations, a technician's own work, the staff accounts,
+and the failed emails. Production comes with its feature; until then its section shows what it will hold.
 
 ## Pages
 
@@ -18,9 +17,10 @@ what it will hold.
 | `/leads`, `/customers`, `/installations`, `/production`, `/notifications`, `/users` | The office's six sections, in the side bar; a technician who opens one sees Not allowed |
 | `/leads`, `/leads/:id` | The leads, and one lead with its moves (see Leads and customers below) |
 | `/customers`, `/customers/:id` | The customers, and one customer with their installations |
+| `/installations`, `/installations/:id` | The installations, and one installation (see Installations below) |
 | `/users`, `/users/:id` | The staff accounts, and one account (see Users below) |
 | `/notifications` | The emails that failed for good, and retrying them (see Failed notifications below) |
-| `/my-work` | A technician's work; an Admin who opens it sees Not allowed |
+| `/my-work`, `/my-work/:id` | A technician's work, and one installation they're assigned to (see My work below); an Admin who opens it sees Not allowed |
 | Any other | Page not found, inside the frame |
 
 Every page but `/login` needs a session: without one, the sign-in page opens and remembers the address.
@@ -64,10 +64,45 @@ Leads design.
   the page says what it is now and loads it again.
 - **Convert** names what it makes: a customer (or the existing customer with this email, whose account the
   installation joins), an installation at Survey at the property, and the time zone the API proposes from the state.
-  It then opens the customer's page, until the installation's page is built.
+  It then opens the new installation.
 - **Customers** (`/customers`, `?q=` and `?page=`): newest first, searched by part of a name or an email as you type
   (the address follows once typing pauses). One customer (`/customers/:id`): the contact, the status and why (it
   follows the installations), and the installations, each linking to its page and to the request it came from.
+
+## Installations
+
+The Admin's screens for the projects (FR-I1–I7), from the approved Installations design.
+
+- **The list** (`/installations`, `?status=` and `?page=`): the last change first, opening on All; In progress, each
+  stage, Active and Closed (Cancelled and Deactivated) beside it. Below 768 px the rows become cards.
+- **One installation** (`/installations/:id`): its address, its customer and their status, a link to the request it
+  came from, and four tabs (the arrow keys move between them):
+  - **Overview:** the stages (the tracker), the next move, and the design and the time zone. The next move is a button
+    when its condition is met; otherwise it is disabled, with the API's reason ("Record the system size and the panel
+    count first."). Moving on happens at once and says Saved; Switch on asks first, naming the time zone the days will
+    be counted in (its confirmation), and says the customer gets an email. The design (size, panels, inverter) and the
+    time zone are edited in place, until the system is switched on; then each says Fixed at switch-on.
+  - **Assignments:** each technician, their role, when assigned, and whether their part is complete (and, when an
+    Admin marked it for them, who). Assign a technician picks an active technician and a role. Mark complete is
+    offered at the part's stage; a part not completed can be removed.
+  - **History:** every change, newest first: the status changes (who, when, a cancellation's reason), and the
+    assignments made and completed.
+  - **Production:** says it comes with the production screens.
+- **Cancel** (before Active, with a reason, which the history keeps) and **Deactivate** (once Active) ask first.
+- **Every change sends the version it was made on** (`If-Match`, from the `ETag` the page last read) and keeps the
+  answer's. A change the installation's state refuses (another Admin moved it meanwhile, say) shows why and loads it
+  again; once the API checks versions, a change made meanwhile keeps the page as it is and offers Reload (BR-I4).
+
+## My work
+
+A technician's whole app, phone first (FR-I6), from the approved design.
+
+- **The list** (`/my-work`): the installations they're assigned to, open work first: the property, the customer, their
+  role, the stage, or when their part was completed.
+- **One installation** (`/my-work/:id`): the property, the customer's name and phone (a link that calls), the stage,
+  and their part: what it means, who else shares it, and a 48 px Mark my … complete button at its stage; otherwise,
+  why not yet. An installation they aren't assigned to doesn't exist for them.
+- **Under Users,** a technician's page lists their assignments for the Admin (FR-U4).
 
 ## Users
 
@@ -83,8 +118,8 @@ The Admin's screens for staff accounts (FR-U2, FR-U4), from the approved Users d
 - **One account** (`/users/:id`): its email, role, creation day and last sign-in. For someone else: Edit (name and
   email), Set a new password (which signs them out everywhere) and Deactivate (asked first); a deactivated account
   shows why it can't sign in and Reactivate. A saved change says so beside the buttons. Your own page has only Change
-  password, so the office can't lock itself out. A technician's assignments are marked as not built yet: they come
-  with the installations.
+  password, so the office can't lock itself out. A technician's page lists their assignments: each installation,
+  their role, its stage, and whether their part is complete.
 - **Change password,** in the account menu for everyone: the current password and a new one. A wrong current one
   shows under its field and the session goes on; on success the dialog says so, you stay signed in here, and your
   other sessions end. It shares sign-in's limit of 10 password checks a minute; beyond it, the dialog asks to wait a

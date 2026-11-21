@@ -23,7 +23,25 @@ type Options = {
  */
 export function request<T>(path: string, options: Options & { schema: z.ZodType<T> }): Promise<T>;
 export function request(path: string, options?: Options): Promise<void>;
-export async function request<T>(path: string, { method = 'GET', body, headers, signal, schema }: Options & { schema?: z.ZodType<T> } = {}): Promise<T | void> {
+export async function request<T>(path: string, options: Options & { schema?: z.ZodType<T> } = {}): Promise<T | void> {
+  const response = await send(path, options);
+  if (!options.schema) return;
+  return parse(response, options.schema);
+}
+
+/** An answer with the version of the record it describes: its `ETag`, null when the API sends none. */
+export type Tagged<T> = { data: T; etag: string | null };
+
+/**
+ * As {@link request}, for a record changed with `If-Match` (BR-I4): sends `ifMatch` when there is one, and returns the
+ * answer with its `ETag`, for the next change to send. An API that doesn't check versions sends none, and is sent none.
+ */
+export async function requestTagged<T>(path: string, { ifMatch, ...options }: Options & { schema: z.ZodType<T>; ifMatch?: string | null }): Promise<Tagged<T>> {
+  const response = await send(path, { ...options, headers: { ...options.headers, ...(ifMatch && { 'If-Match': ifMatch }) } });
+  return { data: await parse(response, options.schema), etag: response.headers.get('ETag') };
+}
+
+async function send(path: string, { method = 'GET', body, headers, signal }: Options): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(BASE + path, {
@@ -36,10 +54,11 @@ export async function request<T>(path: string, { method = 'GET', body, headers, 
     if (signal?.aborted) throw error;
     throw new ApiError('unreachable', MESSAGES.unreachable);
   }
-
   if (!response.ok) throw toApiError(response.status, await readJson(response));
-  if (!schema) return;
+  return response;
+}
 
+async function parse<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
   const parsed = schema.safeParse(await readJson(response));
   if (!parsed.success) throw new ApiError('unexpected', MESSAGES.unexpected, { status: response.status });
   return parsed.data;
