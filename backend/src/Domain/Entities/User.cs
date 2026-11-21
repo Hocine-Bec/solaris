@@ -1,3 +1,4 @@
+using Domain.Common;
 using Domain.Enums;
 
 namespace Domain.Entities;
@@ -45,6 +46,6 @@ public class User
         SessionsValidFrom = new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc);
     }
 
-    /// <summary>How an email is compared: trimmed and upper-cased, the same for every culture.</summary>
-    public static string NormalizeEmail(string email) => email.Trim().ToUpperInvariant();
+    /// <summary>How an email is compared: <see cref="Emails.Normalize"/>.</summary>
+    public static string NormalizeEmail(string email) => Emails.Normalize(email);
 }
