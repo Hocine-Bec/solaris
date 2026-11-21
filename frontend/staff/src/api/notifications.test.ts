@@ -9,7 +9,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 // A failed email as the API returns it (GET /api/notifications/failed)
 const FAILED = {
   id: '01a1f8c2-4d1e-7b3a-9c51-6e0d2f4a8b17', type: 'LeadWelcome',
-  to: { name: 'Maya Brooks', address: 'maya.brooks@example.com' }, lead: { id: 128, name: 'Maya Brooks' },
+  to: { name: 'Maya Brooks', address: 'maya.brooks@example.com' }, lead: { id: 128, name: 'Maya Brooks' }, installation: null,
   createdAt: '2026-11-14T08:51:00.1234560Z', lastAttemptAt: '2026-11-15T08:51:00.2000000Z', attempts: 14,
   lastError: "The mail server smtp.gmail.com:587 can't be reached.", retriedAt: null, retriedBy: null,
 };
@@ -23,7 +23,7 @@ describe('fetchFailed', () => {
   });
 
   it('fails as unexpected for an email type the app does not know', async () => {
-    vi.stubGlobal('fetch', answer(json(200, { items: [{ ...FAILED, type: 'InstallationActivated' }], page: 1, pageSize: 20, totalCount: 1 })));
+    vi.stubGlobal('fetch', answer(json(200, { items: [{ ...FAILED, type: 'InvoiceReminder' }], page: 1, pageSize: 20, totalCount: 1 })));
     await expect(fetchFailed(1)).rejects.toMatchObject({ kind: 'unexpected' });
   });
 });

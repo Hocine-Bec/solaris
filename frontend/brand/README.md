@@ -7,7 +7,7 @@ the logo and the line drawings. The [marketing site](../marketing/README.md) and
 |---|---|
 | `tokens.css` | The palette, the roles each theme gives it, type, space, radii and motion, for Tailwind CSS 4 (`@theme`) |
 | `components.css` | The base styles and the core components: text styles, links, buttons (danger ones included), fields, notices |
-| `app-components.css` | The components for the staff app, on top of `components.css`: the app's text scale, the segmented choice, the menu, avatars, status chips, tables and their pager, key-value lists, dialogs, and the loading, empty and failed states |
+| `app-components.css` | The components for the staff app, on top of `components.css`: the app's text scale, the segmented choice, the menu, avatars, status chips, tables and their pager, key-value lists, dialogs, the stage tracker, tabs, and the loading, empty and failed states |
 | `fonts.css`, `fonts/` | The fonts, as WOFF2, with their licences |
 | `logo/` | The wordmark, on dark and on light, and its outlines as JSON |
 | `drawings/iso.ts` | The line drawings, in isometric projection, as data: the house with one layer per step, and the figures (a panel, the inverter, the paperwork, someone watching) |

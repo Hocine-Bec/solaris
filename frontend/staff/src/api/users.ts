@@ -55,3 +55,10 @@ export const setPassword = (id: number, password: string) =>
 export const deactivateUser = (id: number) => request(`/users/${id}/deactivate`, { method: 'POST' });
 
 export const reactivateUser = (id: number) => request(`/users/${id}/reactivate`, { method: 'POST' });
+
+/** The active technicians, by name, for an installation's Assign dialog: an office has a few, so one page of 100. */
+export async function fetchTechnicians(signal?: AbortSignal) {
+  const page = await request('/users?page=1&pageSize=100', { schema: usersPageSchema, signal });
+  return page.items.filter(u => u.role === 'Technician' && u.isActive);
+}
+export const TECHNICIANS_KEY = [...USERS_KEY, 'technicians'] as const;

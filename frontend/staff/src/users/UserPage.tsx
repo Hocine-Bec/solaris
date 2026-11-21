@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CircleCheck, ClipboardCheck, Info, KeyRound, LoaderCircle, Pencil, RotateCcw, UserX } from 'lucide-react';
+import { ArrowLeft, CircleCheck, Info, KeyRound, LoaderCircle, Pencil, RotateCcw, UserX } from 'lucide-react';
 import { fetchUser, reactivateUser, userKey, USERS_KEY, type User } from '../api/users';
 import { Icon } from '../components/Icon';
 import { FormNotice } from '../components/SubmitButton';
@@ -12,6 +12,7 @@ import { opensFor } from '../shell/sections';
 import { NotAllowed, NotFound } from '../states/States';
 import { QueryView } from '../states/QueryView';
 import { ChangePasswordDialog, DeactivateDialog, EditDialog, SetPasswordDialog } from './AccountDialogs';
+import { TechnicianAssignments } from './TechnicianAssignments';
 import { StatusChip } from './StatusChip';
 
 type Open = 'edit' | 'password' | 'deactivate' | 'change' | null;
@@ -111,19 +112,7 @@ function Account({ user, isYou }: { user: User; isYou: boolean }) {
         </dl>
       </div>
 
-      {user.role === 'Technician' && (
-        <section className="assignments" aria-labelledby="assignments-title">
-          <div className="section-title">
-            <h2 className="a-heading" id="assignments-title">Assignments</h2>
-            <span className="a-label">Their part on each installation</span>
-          </div>
-          <div className="state">
-            <span className="ring"><Icon icon={ClipboardCheck} /></span>
-            <p className="a-heading">Not built yet</p>
-            <p>The installations {firstName(user.name)} is assigned to, their role on each, and whether their part is done.</p>
-          </div>
-        </section>
-      )}
+      {user.role === 'Technician' && <TechnicianAssignments userId={user.id} name={firstName(user.name)} />}
 
       {open === 'edit' && <EditDialog user={user} onClose={close} onSaved={savedAs('Saved')} />}
       {open === 'password' && <SetPasswordDialog user={user} onClose={close} onSaved={savedAs('Password set')} />}
