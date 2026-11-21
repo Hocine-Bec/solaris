@@ -1,6 +1,7 @@
 using Application.Common.Models;
 using Application.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
 namespace Infrastructure.Data;
@@ -23,5 +24,15 @@ public sealed class UnitOfWork(AppDbContext context) : IUnitOfWork
         {
             return SaveOutcome.Duplicate;
         }
+    }
+
+    public async Task<ITransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        new Transaction(await context.Database.BeginTransactionAsync(cancellationToken));
+
+    private sealed class Transaction(IDbContextTransaction inner) : ITransaction
+    {
+        public Task CommitAsync(CancellationToken cancellationToken = default) => inner.CommitAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
     }
 }

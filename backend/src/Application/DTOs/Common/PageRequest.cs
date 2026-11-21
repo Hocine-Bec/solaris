@@ -1,7 +1,7 @@
 namespace Application.DTOs.Common;
 
 /// <summary>Which page of a list to return: <c>?page=1&amp;pageSize=20</c>, at most 100 items per page.</summary>
-public sealed class PageRequest
+public class PageRequest
 {
     public const int MaxPageSize = 100;
 

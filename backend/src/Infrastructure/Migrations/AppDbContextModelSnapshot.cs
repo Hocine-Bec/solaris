@@ -112,15 +112,17 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("first_name");
 
-                    b.Property<DateTime?>("LastActivityDate")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_activity_date");
-
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("last_name");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("normalized_email");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
@@ -144,14 +146,69 @@ namespace Infrastructure.Migrations
                     b.HasIndex("ContactAddressId")
                         .HasDatabaseName("ix_customers_contact_address_id");
 
-                    b.HasIndex("Email")
+                    b.HasIndex("NormalizedEmail")
                         .IsUnique()
-                        .HasDatabaseName("ix_customers_email");
+                        .HasDatabaseName("ix_customers_normalized_email");
 
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_customers_status");
 
                     b.ToTable("customers", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Installation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AddressId")
+                        .HasColumnType("integer")
+                        .HasColumnName("address_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("customer_id");
+
+                    b.Property<int>("LeadId")
+                        .HasColumnType("integer")
+                        .HasColumnName("lead_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("time_zone");
+
+                    b.HasKey("Id")
+                        .HasName("pk_installations");
+
+                    b.HasIndex("AddressId")
+                        .HasDatabaseName("ix_installations_address_id");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_installations_customer_id");
+
+                    b.HasIndex("LeadId")
+                        .HasDatabaseName("ix_installations_lead_id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_installations_status");
+
+                    b.ToTable("installations", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Lead", b =>
@@ -173,13 +230,13 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("best_time_to_contact");
 
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
                     b.Property<DateTime?>("ContactedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("contacted_at");
-
-                    b.Property<DateTime?>("ConvertedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("converted_at");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -458,6 +515,36 @@ namespace Infrastructure.Migrations
                     b.Navigation("ContactAddress");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Installation", b =>
+                {
+                    b.HasOne("Domain.Entities.Address", "Address")
+                        .WithMany()
+                        .HasForeignKey("AddressId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_installations_addresses_address_id");
+
+                    b.HasOne("Domain.Entities.Customer", "Customer")
+                        .WithMany("Installations")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_installations_customers_customer_id");
+
+                    b.HasOne("Domain.Entities.Lead", "Lead")
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_installations_leads_lead_id");
+
+                    b.Navigation("Address");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Lead");
+                });
+
             modelBuilder.Entity("Domain.Entities.Lead", b =>
                 {
                     b.HasOne("Domain.Entities.Address", "Address")
@@ -496,6 +583,11 @@ namespace Infrastructure.Migrations
                     b.Navigation("Lead");
 
                     b.Navigation("RetriedBy");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Customer", b =>
+                {
+                    b.Navigation("Installations");
                 });
 #pragma warning restore 612, 618
         }

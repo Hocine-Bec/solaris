@@ -8,10 +8,16 @@ namespace Infrastructure.Repositories;
 
 public class AddressRepo(AppDbContext context) : GenericRepo<Address>(context), IAddressRepo
 {
-    public async Task<bool> ExistsAsync(string uniqueAddressHash)
+    // Never check, then insert: another request can insert between the two. The unique index decides instead; a
+    // request that loses waits for the winner's commit, then reads its row.
+    public async Task<Address> GetOrAddAsync(Address address)
     {
-        return await Context.Addresses
-            .AsNoTracking()
-            .AnyAsync(a => a.UniqueAddressHash == uniqueAddressHash);
+        await Context.Database.ExecuteSqlAsync($"""
+            INSERT INTO addresses (street, city, state, zip_code, country, latitude, longitude, unique_address_hash)
+            VALUES ({address.Street}, {address.City}, {address.State}, {address.ZipCode}, {address.Country},
+                    {address.Latitude}, {address.Longitude}, {address.UniqueAddressHash})
+            ON CONFLICT (unique_address_hash) DO NOTHING
+            """);
+        return await Context.Addresses.SingleAsync(a => a.UniqueAddressHash == address.UniqueAddressHash);
     }
 }
