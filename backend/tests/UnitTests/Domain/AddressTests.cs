@@ -33,4 +33,28 @@ public class AddressTests
         // Assert
         hash1.Should().Be(hash2);
     }
+
+    [Fact]
+    public void BuildHash_IgnoresWhiteSpaceAroundAndInsideFields()
+    {
+        // Arrange & Act - the same property typed with spaces around, a double space and a tab
+        var tidy = Address.BuildHash("2104 Oak Hollow Dr", "Austin", "TX", "78704", "US");
+        var untidy = Address.BuildHash("  2104  Oak Hollow\tDr ", " Austin", "TX ", " 78704", "US\n");
+
+        // Assert
+        untidy.Should().Be(tidy);
+    }
+
+    [Fact]
+    public void BuildHash_SpaceBetweenWordsStillCounts_AndFieldsDontRunTogether()
+    {
+        // Arrange & Act
+        var spaced = Address.BuildHash("2104 Oak Hollow Dr", "Austin", "TX", "78704", "US");
+        var joined = Address.BuildHash("2104 OakHollow Dr", "Austin", "TX", "78704", "US");
+        var shifted = Address.BuildHash("2104 Oak Hollow Dr Austin", "", "TX", "78704", "US");
+
+        // Assert
+        joined.Should().NotBe(spaced);
+        shifted.Should().NotBe(spaced);
+    }
 }

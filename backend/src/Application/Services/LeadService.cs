@@ -13,7 +13,8 @@ using Mapster;
 namespace Application.Services;
 
 // Expected failures are returned as Result errors; anything else is a bug and reaches the API's exception handler.
-// A lead read by ID is tracked, so saving writes only the columns a move or a correction changed.
+// A lead read by ID is tracked, so saving writes only the columns a move or a correction changed, and only if nobody
+// saved the lead since it was read (its version, BR-L3): otherwise the change is refused as a concurrent one.
 public class LeadService(
     ILeadRepo leads,
     IAddressRepo addresses,
@@ -41,12 +42,8 @@ public class LeadService(
 
     public async Task<LeadCreated> CreateAsync(CreateLeadRequest request)
     {
-        // BR-L1, checked here and not by the database, on purpose: this is the naive version P3a measures, which lets
-        // duplicates through when the same form is sent many times at once. The fix is a unique index.
-        if (await leads.FindOpenIdByEmailAsync(request.Email) is { } openId)
-            return new LeadCreated(openId, IsNew: false);
-
         var lead = request.Adapt<Lead>();
+        lead.NormalizedEmail = Emails.Normalize(lead.Email);
         lead.Status = LeadStatus.New;
         lead.CreatedAt = Now();
         var address = lead.Address;
@@ -54,17 +51,23 @@ public class LeadService(
             address.Country);
 
         // The property (stored once, by its key), the lead and its two notifications commit together, or not at all
-        // (BR-N1).
+        // (BR-N1). BR-L1 is the database's: a second open lead for this email breaks a partial unique index, even when
+        // the same form is sent many times at once; then everything rolls back, so no duplicate email exists either.
+        SaveOutcome outcome;
         await using (var transaction = await unitOfWork.BeginTransactionAsync())
         {
             lead.Address = await addresses.GetOrAddAsync(address);
             leads.Add(lead);
             notifier.OnSaving(lead);
-            var outcome = await unitOfWork.SaveAsync();
-            if (outcome != SaveOutcome.Saved)
-                throw new UnreachableException($"Adding a lead can't end as {outcome}: nothing it writes is unique.");
-            await transaction.CommitAsync();
+            outcome = await unitOfWork.SaveAsync();
+            if (outcome == SaveOutcome.Saved)
+                await transaction.CommitAsync();
         }
+
+        if (outcome == SaveOutcome.Duplicate)
+            return new LeadCreated(await leads.GetIdOfExistingAsync(lead.NormalizedEmail), IsNew: false);
+        if (outcome != SaveOutcome.Saved)
+            throw new UnreachableException($"Adding a lead can't end as {outcome}.");
 
         await notifier.OnSavedAsync(lead);
         return new LeadCreated(lead.Id, IsNew: true);
@@ -103,7 +106,7 @@ public class LeadService(
 
         var outcome = await unitOfWork.SaveAsync();
         if (outcome != SaveOutcome.Saved)
-            return Failure(outcome, id);
+            return Failure(outcome);
         await transaction.CommitAsync();
         return Result.Success(LeadResponse.From(lead, customer, installation.Id));
     }
@@ -116,14 +119,12 @@ public class LeadService(
         if (!lead.IsOpen)
             return Result.Failure<LeadResponse>(LeadErrors.Closed(lead.Status));
 
-        // BR-L1, checked in the service like the quote form's (the naive version; the fix is a unique index).
-        if (await leads.FindOpenIdByEmailAsync(request.Email, exceptId: id) is not null)
-            return Result.Failure<LeadResponse>(LeadErrors.EmailTaken);
-
         lead.FirstName = request.FirstName.Trim();
         lead.LastName = request.LastName.Trim();
         lead.Email = request.Email.Trim();
+        lead.NormalizedEmail = Emails.Normalize(request.Email);
         lead.PhoneNumber = request.Phone.Trim();
+        // BR-L1: another open lead with this email breaks the partial unique index
         return await SaveAsync(lead);
     }
 
@@ -132,13 +133,14 @@ public class LeadService(
         var outcome = await unitOfWork.SaveAsync();
         return outcome == SaveOutcome.Saved
             ? Result.Success(await DetailsAsync(lead))
-            : Failure(outcome, lead.Id);
+            : Failure(outcome);
     }
 
-    // Leads are never deleted by the API and nothing a move writes is unique, so a save fails only if the row is gone.
-    private static Result<LeadResponse> Failure(SaveOutcome outcome, int id) => outcome switch
+    // A version that moved: someone saved the lead since it was read. A unique index: only the open-email one (BR-L1).
+    private static Result<LeadResponse> Failure(SaveOutcome outcome) => outcome switch
     {
-        SaveOutcome.Conflict => Result.Failure<LeadResponse>(LeadErrors.NotFound(id)),
+        SaveOutcome.Conflict => Result.Failure<LeadResponse>(LeadErrors.ConcurrentChange),
+        SaveOutcome.Duplicate => Result.Failure<LeadResponse>(LeadErrors.EmailTaken),
         _ => throw new UnreachableException($"Changing a lead can't end as {outcome}.")
     };
 

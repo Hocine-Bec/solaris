@@ -1,12 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Domain.Entities;
 
 /// <summary>
 /// Reusable address entity for customers and installations
 /// </summary>
-public class Address
+public partial class Address
 {
     public int Id { get; set; }
     public string Street { get; set; } = string.Empty;
@@ -33,7 +34,14 @@ public class Address
     /// <returns>A hexadecimal string representing the hash of the normalized address.</returns>
     public static string BuildHash(string street, string city, string state, string zipCode, string country)
     {
-        var normalized = $"{street}|{city}|{state}|{zipCode}|{country}".ToUpperInvariant();
+        var normalized = string.Join('|', new[] { street, city, state, zipCode, country }.Select(Normalize))
+            .ToUpperInvariant();
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)));
     }
+
+    /// <summary>A field as it is compared (ADR 5): trimmed, and every run of white space one space.</summary>
+    private static string Normalize(string field) => Spaces().Replace(field.Trim(), " ");
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex Spaces();
 }

@@ -376,32 +376,31 @@ public class LeadServiceTests(PostgresFixture database) : IntegrationTestBase(da
     }
 
     [Fact]
-    public async Task BR_L3_TwoLeadsWithOneEmailConvertedAtOnce_MakeOneCustomer()
+    public async Task BR_L3_OneLeadConvertedByTwoAdminsAtOnce_IsConvertedOnce_TheOtherIsRefused()
     {
-        // Arrange - two leads with one email (the naive BR-L1 check lets a second one through when both requests are
-        // sent at the same moment), converted by two Admins at once
-        var first = await SeedLeadAsync(LeadStatus.Contacted, email: "evan.price@example.com");
-        var second = await SeedLeadAsync(LeadStatus.Contacted, email: "EVAN.PRICE@example.com");
+        // Arrange - one contacted lead, converted by two Admins at the same moment
+        var lead = await SeedLeadAsync(LeadStatus.Contacted, email: "evan.price@example.com");
         var adminId = await AdminIdAsync();
         await using var context1 = CreateContext();
         await using var context2 = CreateContext();
         using var start = new SemaphoreSlim(0);
-        Task<Application.Common.Models.Result<LeadResponse>> Convert(AppDbContext context, int id) => Task.Run(async () =>
+        Task<Application.Common.Models.Result<LeadResponse>> Convert(AppDbContext context) => Task.Run(async () =>
         {
             await start.WaitAsync(Ct);
-            return await CreateService(context).ConvertAsync(id, adminId);
+            return await CreateService(context).ConvertAsync(lead.Id, adminId);
         }, Ct);
-        var conversions = new[] { Convert(context1, first.Id), Convert(context2, second.Id) };
+        var conversions = new[] { Convert(context1), Convert(context2) };
 
         // Act - released together
         start.Release(2);
         var results = await Task.WhenAll(conversions);
 
-        // Assert - both converted, into the one customer the unique index allowed
-        results.Should().OnlyContain(r => r.IsSuccess);
+        // Assert - one conversion: one customer, one installation; the other is refused, as made on an old version or,
+        // when it read the lead after the first was saved, as a lead already converted
+        results.Count(r => r.IsSuccess).Should().Be(1);
+        results.Single(r => !r.IsSuccess).Error!.Code.Should().BeOneOf("lead.concurrent_change", "lead.transition_not_allowed");
         (await Context.Customers.CountAsync(Ct)).Should().Be(1);
-        var customerId = await Context.Customers.Select(c => c.Id).SingleAsync(Ct);
-        (await Context.Installations.Select(i => i.CustomerId).ToListAsync(Ct)).Should().Equal(customerId, customerId);
+        (await Context.Installations.CountAsync(i => i.LeadId == lead.Id, Ct)).Should().Be(1);
     }
 
     #endregion

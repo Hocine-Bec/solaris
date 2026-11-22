@@ -20,6 +20,12 @@ public class Lead
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The email as it is compared (<see cref="Common.Emails.Normalize"/>): only one open lead may have it, which a
+    /// partial unique index enforces (BR-L1).
+    /// </summary>
+    public string NormalizedEmail { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
     // Property Info
     public int AddressId { get; set; }
@@ -40,6 +46,12 @@ public class Lead
     // Relationships
     public int? CustomerId { get; set; }
     public Customer? Customer { get; set; }
+
+    /// <summary>
+    /// PostgreSQL's <c>xmin</c>, the row's version: a save made on an older version is refused, so two moves made at
+    /// the same moment (a conversion and a disqualification, two conversions) can't both succeed (BR-L3).
+    /// </summary>
+    public uint Version { get; set; }
 
     public string FullName => $"{FirstName} {LastName}";
 

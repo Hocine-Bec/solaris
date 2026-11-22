@@ -15,8 +15,8 @@ public interface ILeadRepo : IGenericRepo<Lead>
         int take);
 
     /// <summary>
-    /// The ID of an open lead (New or Contacted) with this email, compared as <c>Emails.Normalize</c> does, other than
-    /// <paramref name="exceptId"/>; null if there is none (BR-L1).
+    /// The lead a refused request duplicates (BR-L1): the open lead with this normalized email or, if it was closed
+    /// since the refusal, the newest lead with it.
     /// </summary>
-    Task<int?> FindOpenIdByEmailAsync(string email, int? exceptId = null);
+    Task<int> GetIdOfExistingAsync(string normalizedEmail);
 }
