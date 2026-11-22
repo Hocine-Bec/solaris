@@ -26,6 +26,19 @@ OUT="${RESULTS_DIR:-$REPO/perf/results/p3/$(date +%F)-$DESIGN}/$PART-run$RUN"
 mkdir -p "$OUT"
 trap 'stop_api; stop_database' EXIT
 
+# run_k6 <output dir> <k6 arguments…>: runs k6 in the background, and samples the CPU clock (into $mhz) SAMPLE_AFTER
+# seconds after the script says its measured load starts (a line in its output), then waits for it to end.
+SAMPLE_AFTER=${SAMPLE_AFTER:-0.3}
+run_k6() {
+  local out=$1; shift
+  k6 run --quiet --no-color "$@" >"$out/k6-output.txt" 2>&1 &
+  local pid=$!
+  until grep -q 'P3 load starts' "$out/k6-output.txt" 2>/dev/null || ! kill -0 "$pid" 2>/dev/null; do sleep 0.05; done
+  sleep "$SAMPLE_AFTER"
+  mhz=$(cpu_mhz)
+  wait "$pid"
+}
+
 build_api
 start_database
 start_api "$OUT/api.log" Outbox__MaxConcurrentSends=20
@@ -34,9 +47,8 @@ warm_up
 case "$PART" in
   a)
     log "P3a, run $RUN ($DESIGN): $ROUNDS rounds of $COPIES identical requests"
-    k6 run --quiet --no-color -e BASE_URL="$BASE_URL" -e ROUNDS="$ROUNDS" -e COPIES="$COPIES" -e RUN_ID="a$RUN" \
-      --summary-export "$OUT/k6-summary.json" "$REPO/perf/p3/leads.js" >"$OUT/k6-output.txt" 2>&1
-    mhz=$(cpu_mhz)
+    run_k6 "$OUT" -e BASE_URL="$BASE_URL" -e ROUNDS="$ROUNDS" -e COPIES="$COPIES" -e RUN_ID="a$RUN" \
+      --summary-export "$OUT/k6-summary.json" "$REPO/perf/p3/leads.js"
     sql "with per_round as (
            select l.email, count(distinct l.id) as leads, count(m.id) as notifications
            from leads l left join outbox_messages m on m.lead_id = l.id
@@ -61,10 +73,9 @@ case "$PART" in
     ;;
   b)
     log "P3b, run $RUN ($DESIGN): $INSTALLATIONS installations, a move and a cancellation at once"
-    k6 run --quiet --no-color -e BASE_URL="$BASE_URL" -e INSTALLATIONS="$INSTALLATIONS" -e MODE="$DESIGN" -e RUN_ID="b$RUN" \
+    run_k6 "$OUT" -e BASE_URL="$BASE_URL" -e INSTALLATIONS="$INSTALLATIONS" -e MODE="$DESIGN" -e RUN_ID="b$RUN" \
       -e ADMIN_EMAIL="$PERF_ADMIN_EMAIL" -e ADMIN_PASSWORD="$PERF_ADMIN_PASSWORD" \
-      --summary-export "$OUT/k6-summary.json" "$REPO/perf/p3/installations.js" >"$OUT/k6-output.txt" 2>&1
-    mhz=$(cpu_mhz)
+      --summary-export "$OUT/k6-summary.json" "$REPO/perf/p3/installations.js"
     sql "with measured as (
            select i.id, i.status from installations i join leads l on l.id = i.lead_id where l.email like 'p3b-b$RUN-%'),
          last_row as (
