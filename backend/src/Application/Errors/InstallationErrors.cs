@@ -8,6 +8,15 @@ public static class InstallationErrors
     public static Error NotFound(int id) =>
         new(ErrorKind.NotFound, "installation.not_found", $"Installation with ID {id} not found.");
 
+    /// <summary>Someone saved the installation after the version this change was made on (BR-I4).</summary>
+    public static readonly Error ConcurrentChange =
+        new(ErrorKind.Conflict, "installation.concurrent_change", "This installation was changed by someone else. Reload and try again.");
+
+    /// <summary>A change that didn't send the version it was made on (If-Match).</summary>
+    public static readonly Error VersionRequired =
+        new(ErrorKind.PreconditionRequired, "installation.version_required",
+            "Send the version of the installation this change was made on, in If-Match: read the installation first.");
+
     public static Error AssignmentNotFound(int id) =>
         new(ErrorKind.NotFound, "assignment.not_found", $"Assignment with ID {id} not found.");
 

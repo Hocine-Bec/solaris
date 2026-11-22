@@ -373,7 +373,9 @@ Duplicates are reported as they are, whatever they are.
 **Scripts:** `perf/p3/run.sh <a|b> <run number> [before|after]`, on a fresh database and the API's Release build, as
 P1's and P2's (§3). The design is whatever is checked out: the before at the tag `p3-before`, the after once the
 fixes are merged. Results: `perf/results/p3/<date>-<before|after>/<a|b>-run<N>/` (`results.json`, `env.md`, k6's
-summary and output, the API's log).
+summary and output, the API's log). The environment record's CPU frequency is read 0.3 s (`SAMPLE_AFTER`) after the
+k6 script prints that its measured load starts, past P3b's setup. The before was run with the scripts at
+`p3-before`, which read it after the load (below).
 
 ### P3a — Duplicate leads
 
@@ -395,8 +397,20 @@ responses by status code (after, expected: 1 × 201 + 49 × 200, and 0 × 5xx).
 
 | Design | Rounds | Rounds with > 1 lead | Max leads in one round | Extra notifications | 5xx responses |
 |---|---|---|---|---|---|
-| Before | 20 | | | | |
+| Before | 20 | 20 | 50 | 1,950 | 0 |
 | After | 20 | | | | |
+
+**Before, as measured** (2026-11-21, tag `p3-before`, no uncommitted change; mains power, no browser; the dev
+database's container running idle). 3 runs; the median run by extra notifications is reported (run 3). Raw results
+in `perf/results/p3/2026-11-21-before/a-run1` … `a-run3`.
+- Every round of every run made more than one lead; in each run, at least one round turned all 50 requests into
+  leads.
+- Extra notifications: 1,822, 1,960 and 1,950 (runs 1–3), from 931, 1,000 and 995 leads: each duplicate lead got its
+  own welcome email and office alert.
+- Answers: runs 1–3 got 931, 1,000 and 995 `201`s and 69, 0 and 5 `200`s (a request that found an earlier copy
+  already saved); no `5xx`, no other status.
+- The environment records' "CPU MHz during the run" is wrong for P3: the script read it just after the load
+  ended (P1's and P2's read it during the load). It doesn't show the frequency during the runs.
 
 ### P3b — Lost updates on installations
 
@@ -409,7 +423,8 @@ responses by status code (after, expected: 1 × 201 + 49 × 200, and 0 × 5xx).
 
 **Setup:** 200 installations at **Design**, with their design data recorded, so both moves below are valid. They are
 made through the API, as the office makes them: a lead, contacted, converted, a surveyor's part completed, moved to
-Design, the design recorded.
+Design, the design recorded. Each of these changes sends the `ETag` of the answer before it, when the API sends one,
+since the after requires it (the before's API sends none, so none is sent back).
 
 **Steps:** for each installation, send **at the same moment** A = a transition to Permits and B = a
 cancellation with a reason (one k6 `http.batch`, two connections). Before: no `If-Match`. After: both send the `ETag`
@@ -423,8 +438,20 @@ they read first.
 
 | Design | Installations | Lost updates | Invalid histories | Inconsistent | 409 responses |
 |---|---|---|---|---|---|
-| Before | 200 | | | | |
+| Before | 200 | 200 | 199 | 50 | 0 |
 | After | 200 | | | | |
+
+**Before, as measured** (2026-11-21, tag `p3-before`, the same conditions as P3a). 3 runs; lost updates and invalid
+histories are the same in every run, so the median run is by inconsistent installations (run 3). Raw results in
+`perf/results/p3/2026-11-21-before/b-run1` … `b-run3`.
+- In every run, both requests got a `2xx` for all 200 installations, and no `409`, `5xx` or other status.
+- Invalid histories: 199 in every run. On the remaining installation of each run, the cancellation's history row
+  starts from Permits: its two requests didn't overlap, the move finishing before the cancellation read the
+  installation, so nothing was overwritten there. Counted as the method defines it (both `2xx`), it is still among
+  the 200 lost updates.
+- Inconsistent (the status differs from the last history row): 47, 53 and 50. Final statuses: Permits 68, 47 and
+  55; Cancelled 132, 153 and 145.
+- The environment records' CPU frequency has the same error as P3a's.
 
 The after target is 0 / 0 / 0, with exactly one success per installation.
 

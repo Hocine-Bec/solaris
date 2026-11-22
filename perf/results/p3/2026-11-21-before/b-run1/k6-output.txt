@@ -1,0 +1,25 @@
+
+
+  █ TOTAL RESULTS 
+
+    CUSTOM
+    p3b_both_2xx...................: 200    10.059894/s
+
+    HTTP
+    http_req_duration..............: p(50)=8.31ms p(95)=34.58ms max=180.38ms count=1802
+      { expected_response:true }...: p(50)=8.31ms p(95)=34.58ms max=180.38ms count=1802
+    http_req_failed................: 0.00%  0 out of 1802
+    http_reqs......................: 1802   90.639643/s
+
+    EXECUTION
+    iteration_duration.............: p(50)=2.43s  p(95)=2.43s   max=2.43s    count=1   
+    iterations.....................: 1      0.050299/s
+    vus............................: 1      min=0         max=1
+    vus_max........................: 1      min=1         max=1
+
+    NETWORK
+    data_received..................: 2.8 MB 141 kB/s
+    data_sent......................: 1.3 MB 66 kB/s
+
+
+

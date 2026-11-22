@@ -10,7 +10,7 @@ import { TextField } from '../components/TextField';
 import { useDialogForm } from '../forms/useDialogForm';
 import { formatDay } from '../lib/dates';
 import { editLeadSchema } from './forms';
-import { cityLine, isMovedMeanwhile } from './view';
+import { cityLine, isChangedMeanwhile } from './view';
 
 /*
  * The lead's dialogs, from the approved Leads design: the three that close it for good (Disqualify, Mark as lost,
@@ -26,7 +26,7 @@ type ChangeProps = {
   onClose: () => void;
   /** The lead as the API answered it */
   onDone: (lead: Lead) => void;
-  /** Refused because the lead moved meanwhile: the page shows why and loads it again */
+  /** Refused because someone else changed the lead meanwhile: the page says so */
   onMovedMeanwhile: (error: ApiError) => void;
 };
 
@@ -52,7 +52,7 @@ function ConfirmDialog({ title, children, action, danger, send, onClose, onDone,
     try {
       onDone(await mutation.mutateAsync());
     } catch (error) {
-      if (isMovedMeanwhile(error)) onMovedMeanwhile(error);
+      if (isChangedMeanwhile(error)) onMovedMeanwhile(error);
       else setNotice(error instanceof ApiError ? error.message : UNEXPECTED);
     }
   };

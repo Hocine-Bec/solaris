@@ -18,6 +18,10 @@ public static class LeadErrors
     public static Error Closed(LeadStatus status) =>
         new(ErrorKind.Conflict, "lead.closed", $"This lead is {status}: only an open lead (New or Contacted) can be edited.");
 
+    /// <summary>Someone saved the lead after this request read it (a conversion and a move at the same moment, BR-L3).</summary>
+    public static readonly Error ConcurrentChange =
+        new(ErrorKind.Conflict, "lead.concurrent_change", "This lead was changed by someone else meanwhile. Reload it to see it as it is now.");
+
     /// <summary>One open lead per email (BR-L1).</summary>
     public static readonly Error EmailTaken =
         new(ErrorKind.Conflict, "lead.email_taken", "Another open lead has this email.");

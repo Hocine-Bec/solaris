@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../api/errors';
-import { actionsFor, billLabel, cityLine, filterFrom, FILTERS, isMovedMeanwhile, leadsHref, propertyLabel } from './view';
+import { actionsFor, billLabel, cityLine, filterFrom, FILTERS, isChangedMeanwhile, isMovedMeanwhile, leadsHref, propertyLabel } from './view';
 
 describe('the lead list filters', () => {
   it('opens on All, also for an unknown filter', () => {
@@ -50,5 +50,13 @@ describe('a move refused because the lead moved meanwhile', () => {
     expect(isMovedMeanwhile(new ApiError('conflict', 'This lead is Lost: it can\'t become Contacted.', { status: 409, code: 'lead.transition_not_allowed' }))).toBe(true);
     expect(isMovedMeanwhile(new ApiError('conflict', 'Another open lead has this email.', { status: 409, code: 'lead.email_taken' }))).toBe(false);
     expect(isMovedMeanwhile(new Error('boom'))).toBe(false);
+  });
+
+  it('counts a save made at the same moment as changed meanwhile too, but not a taken email', () => {
+    const concurrent = new ApiError('conflict', 'This lead was changed by someone else meanwhile.', { status: 409, code: 'lead.concurrent_change' });
+    expect(isMovedMeanwhile(concurrent)).toBe(false);
+    expect(isChangedMeanwhile(concurrent)).toBe(true);
+    expect(isChangedMeanwhile(new ApiError('conflict', 'This lead is Lost.', { status: 409, code: 'lead.transition_not_allowed' }))).toBe(true);
+    expect(isChangedMeanwhile(new ApiError('conflict', 'Another open lead has this email.', { status: 409, code: 'lead.email_taken' }))).toBe(false);
   });
 });

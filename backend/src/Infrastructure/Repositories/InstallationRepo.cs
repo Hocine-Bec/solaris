@@ -56,4 +56,11 @@ public class InstallationRepo(AppDbContext context) : GenericRepo<Installation>(
             .Where(i => i.Assignments.Any(a => a.TechnicianId == technicianId))
             .AsSplitQuery()
             .ToListAsync();
+
+    public void MarkChanged(Installation installation)
+    {
+        var entry = Context.Entry(installation);
+        if (entry.State == EntityState.Unchanged)
+            entry.State = EntityState.Modified;
+    }
 }

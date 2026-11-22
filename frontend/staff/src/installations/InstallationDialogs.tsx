@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Ban, CircleAlert, Globe, Lock, Mail, PowerOff, UserPlus, Zap } from 'lucide-react';
 import type { Tagged } from '../api/client';
-import { ApiError } from '../api/errors';
+import { ApiError, isStale } from '../api/errors';
 import { ASSIGNMENT_ROLES, type AssignmentRole, type Installation } from '../api/installations';
 import { fetchTechnicians, TECHNICIANS_KEY } from '../api/users';
 import { Dialog } from '../components/Dialog';
@@ -12,8 +12,8 @@ import { isRefusal, kw } from './view';
 
 /*
  * The installation's dialogs, from the approved design: switching on, cancelling and deactivating ask first; assigning
- * picks a technician and a role. A refusal because of the installation's state closes the dialog and the page says
- * why; any other failure stays in the dialog.
+ * picks a technician and a role. A refusal because of the installation's state, or because it changed since the page
+ * read it, closes the dialog and the page says why; any other failure stays in the dialog.
  */
 
 const TITLE = 'dlg-title';
@@ -23,7 +23,7 @@ type Props = {
   installation: Installation;
   onClose: () => void;
   onDone: (changed: Tagged<Installation>) => void;
-  /** Refused by the installation's state: the page shows why and loads it again */
+  /** Refused by the installation's state, or made on an old version of it: the page says why */
   onRefused: (error: ApiError) => void;
 };
 
@@ -36,7 +36,7 @@ function useSend(send: () => Promise<Tagged<Installation>>, { onDone, onRefused 
     try {
       onDone(await mutation.mutateAsync());
     } catch (error) {
-      if (isRefusal(error)) onRefused(error);
+      if (isRefusal(error) || isStale(error)) onRefused(error);
       else setNotice(error instanceof ApiError ? error.message : UNEXPECTED);
     }
   };

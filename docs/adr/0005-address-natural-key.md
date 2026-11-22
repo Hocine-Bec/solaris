@@ -1,7 +1,7 @@
 # 5. Addresses deduplicated by a normalized natural key
 
-**Status:** Accepted, recorded retroactively; trimming and space collapsing were added on 2026-10-31 ·
-**Last changed:** 2026-11-20
+**Status:** Accepted, recorded retroactively; trimming and collapsing white space, decided on 2026-10-31, are
+applied since 2026-11-21 (until then the hash only upper-cased) · **Last changed:** 2026-11-21
 
 **Context:** The same property arrives many times: repeat quote requests, and later the lead's address reused
 for its installation. It must be stored once, and "the same address" has to be defined in one place.
@@ -16,7 +16,7 @@ for its installation. It must be stored once, and "the same address" has to be d
 
 ## Decision
 **A.** The database enforces uniqueness, so concurrent requests can't create two rows for one address.
-"Same address" is defined once, in `Address.BuildHash`: each field is trimmed, repeated spaces are collapsed,
+"Same address" is defined once, in `Address.BuildHash`: each field is trimmed, each run of white space in it becomes one space,
 and the result is upper-cased before hashing. One fixed-size indexed column replaces an index over five long
 text columns. A new address is inserted with `ON CONFLICT (unique_address_hash) DO NOTHING`, then read by its key,
 inside the lead's transaction: a request for a property already stored reuses its row, and two requests for one
@@ -24,7 +24,8 @@ property at the same moment share one row, where checking first and then inserti
 
 ## Trade-offs
 The normalization is still basic: "St." and "Street" give different hashes. Changing the normalization means
-recomputing every stored hash.
+recomputing the stored hashes it changes, in the migration that ships it, and stopping it if two addresses become
+one: the white-space change did that in SQL, and a test checks its hashes against `BuildHash`'s.
 
 ## Alternative that could also work
 **D.** It handles abbreviations and typos, but puts an external service in the write path; it could later feed

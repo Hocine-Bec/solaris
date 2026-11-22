@@ -93,10 +93,10 @@ the outbox's `OutboxMessage` (§6). The other entities are *(planned)*, each bui
 
 | Entity | What it is | Key rules |
 |---|---|---|
-| **Lead** | A quote request | Its status and when it moved: `ContactedAt`, then `ClosedAt` (Converted, Disqualified or Lost), set by the server (BR-L2); the visitor's note, never replaced. One open lead per email: checked in the service today, on purpose (P3's before, §7); `NormalizedEmail` with a partial unique index over the open statuses (BR-L1) *(planned)*; an `xmin` concurrency token *(planned)* |
+| **Lead** | A quote request | Its status and when it moved: `ContactedAt`, then `ClosedAt` (Converted, Disqualified or Lost), set by the server (BR-L2); the visitor's note, never replaced. One open lead per email: `NormalizedEmail` with a partial unique index over the open statuses (BR-L1, §7); `xmin` as its version (§7) |
 | **Address** | A property, stored once | `UniqueAddressHash` with a unique index ([ADR 5](adr/0005-address-natural-key.md)) |
 | **Customer** | A converted lead | `NormalizedEmail` unique: a later conversion for the same email reuses the customer (BR-L3); its address is its first lead's property; its status recalculated from its installations' at every status change, in the same save (BR-C1) |
-| **Installation** | One project at one address | Its customer, its address and the lead it came from; its status is its stage (Survey at conversion), with when it last changed; its time zone (an IANA name, proposed from its state, confirmed in the switch-on dialog, BR-P4); its design (size, panel count, inverter type); when it was switched on. Design and time zone fixed once Active. *(Planned:)* an `xmin` concurrency token and the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` |
+| **Installation** | One project at one address | Its customer, its address and the lead it came from; its status is its stage (Survey at conversion), with when it last changed; its time zone (an IANA name, proposed from its state, confirmed in the switch-on dialog, BR-P4); its design (size, panel count, inverter type); when it was switched on. Design and time zone fixed once Active. `xmin` as its version (BR-I4, §7). *(Planned:)* the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` |
 | **InstallationStatusChange** | One row per status change (`installation_status_history`) | From (none for the conversion's first row), to, who, when, note (a cancellation's reason); append-only, never updated or deleted |
 | **InstallationAssignment** | A technician's part (`installation_assignments`) | Role Surveyor, Installer or Inspector (an enum); who assigned and when; who completed it (the technician, or an Admin for them) and when; unique per installation, technician and role. One not completed can be removed |
 | **User** | A staff account | Name; email, unique whatever its case (`NormalizedEmail`, a unique index); password hash ([ADR 8](adr/0008-password-hashing.md)); role (Admin or Technician); active flag; last sign-in; the time its sessions are valid from, moved by a new password |
@@ -141,7 +141,7 @@ installation's own time zone (BR-P4).
 - **Outcomes:** expected failures are `Result` values carrying an `Error` (a kind, a stable code and a message);
   unexpected errors are exceptions, handled once by a global handler
   ([ADR 3](adr/0003-result-objects-for-expected-outcomes.md)). The kinds are `NotFound` (404), `Conflict` (409),
-  `Unauthorized` (401) and `Invalid` (400: a well-formed field only the service can find wrong, such as a current
+  `PreconditionRequired` (428: a change sent without the version it was made on), `Unauthorized` (401) and `Invalid` (400: a well-formed field only the service can find wrong, such as a current
   password that doesn't match, answered like validation, on that field); a new kind is added when a service first
   needs it. Controllers choose the success status (200, 201 with
   the new resource's URL, 204).
@@ -153,8 +153,11 @@ installation's own time zone (BR-P4).
   | `lead.transition_not_allowed` | 409 | A move BR-L2 doesn't allow from the lead's status now (a conversion of a lead that isn't Contacted, or one already moved by another Admin); the message names its status |
   | `lead.closed` | 409 | Correcting a lead that is no longer open (FR-L7) |
   | `lead.email_taken` | 409 | Correcting a lead's email to one another open lead has (BR-L1) |
+  | `lead.concurrent_change` | 409 | Another save of the lead at the same moment won, such as a second conversion (ADR 13) |
   | `customer.not_found` | 404 | No customer has this ID |
   | `installation.not_found` | 404 | No installation has this ID; to a technician, also one they aren't assigned to |
+  | `installation.concurrent_change` | 409 | The change's `If-Match` names a version the installation is no longer at, or isn't a quoted version (BR-I4) |
+  | `installation.version_required` | 428 | A change to an installation sent without `If-Match` (BR-I4) |
   | `installation.transition_not_allowed` | 409 | A move the stages or its condition don't allow now (BR-I1, BR-I2); the message says what it waits for |
   | `installation.fixed` | 409 | Changing the design or the time zone of an installation that is Active or closed |
   | `installation.closed` | 409 | Assigning to, or removing from, an installation that is Active or closed |
@@ -266,12 +269,11 @@ All `Admin`; the staff app's Failed notifications screen uses them.
 ## 7. Leads and installations
 
 ### Lead capture (BR-L1)
-- **Today, on purpose:** the service checks for an open lead with the email (compared trimmed and case-insensitive),
-  then inserts. It is the "before" P3a measures: two requests sent at the same moment can both pass the check
-  (`measurements.md` §8).
-- *(Planned, the fix:)* the database enforces the rule, with a partial unique index on `NormalizedEmail` for the open
-  statuses. On a unique violation of that index (SQLSTATE `23505`), the transaction rolls back, so no duplicate
-  emails exist; the existing open lead's id is returned with **200**.
+- The database enforces the rule ([ADR 12](adr/0012-natural-keys-enforced-by-the-database.md)): a partial unique
+  index, `ux_leads_open_normalized_email`, on `NormalizedEmail` (`Emails.Normalize`: trimmed, upper-cased) for the
+  open statuses, New and Contacted. On a violation of that index the transaction rolls back, so no duplicate emails
+  exist; the open lead's id is answered with **200**. Fifty copies of one form sent at once make one lead (P3a,
+  `measurements.md` §8). The first version checked in the service, then inserted: that is the before P3a measured.
 - One transaction: insert or reuse the address, insert the lead, insert its outbox messages (§6), commit. The quote
   form's answer is the lead's id only (`{ id }`, 201 or 200): it never carries an existing lead's details.
 - Addresses are inserted with `ON CONFLICT (unique_address_hash) DO NOTHING`, then read by their key, in that
@@ -282,15 +284,16 @@ All `Admin`; the staff app's Failed notifications screen uses them.
 `Lead.TryMoveTo` holds the allowed moves as data, and records the time: `ContactedAt`, or `ClosedAt` for Converted,
 Disqualified and Lost. The lead's page gets them as `next`, so the staff app shows only what is allowed now. Converted
 is reached only through the conversion. An open lead's name, email and phone can be corrected (FR-L7); the email
-then gets the same naive check as the form's.
+then meets the same index: another open lead's email is refused with 409 `lead.email_taken`.
 
 ### Conversion (BR-L3)
 One transaction, opened before anything is written: check that the lead is Contacted, insert the customer with
 `ON CONFLICT (normalized_email) DO NOTHING` and read it (a customer that already has the email is reused, so two
 conversions for one email at once make one customer), add the installation at Survey at the lead's address, in the
 time zone proposed from its state (`UsTimeZones`: one of 8 US zones, the one most of the state lives in), and set
-the lead to Converted, linked to the customer. *(Planned:)* the lead's `xmin` token makes a simultaneous second
-conversion of one lead fail with 409.
+the lead to Converted, linked to the customer. The lead's version (`xmin`,
+[ADR 13](adr/0013-optimistic-concurrency-with-xmin.md)) makes a second conversion of one lead at the same moment fail
+with 409 `lead.concurrent_change`; one that reads it after the first is saved gets `lead.transition_not_allowed`.
 
 ### The installation state machine (BR-I1–BR-I3)
 - The stages, their conditions and every other rule (cancelling, deactivating, the design, the time zone, the
@@ -306,15 +309,24 @@ conversion of one lead fail with 409.
   address; anything else answers 404. They complete only their own parts; an Admin can complete any, for them
   (FR-I6).
 
-### Optimistic concurrency (BR-I4) *(planned: the fixes after P3's before)*
-- **Today, on purpose:** no token. Each change reads the installation, changes it and saves it, so two changes at the
-  same moment can both succeed (the before P3b measures). The staff app already sends `If-Match` with every change,
-  from the `ETag` it last read, and the API ignores it.
-- Installation and Lead map PostgreSQL's `xmin` system column as their concurrency token; no extra column is
-  needed.
-- `GET /api/installations/{id}` returns `ETag: "<xmin>"`. Every change (transition, cancellation, design,
-  assignment) requires `If-Match: "<xmin>"`: 428 if the header is missing, 409 if it is stale. The 409 says:
-  *"This installation was changed by someone else. Reload and try again."*
+### Optimistic concurrency (BR-I4)
+[ADR 13](adr/0013-optimistic-concurrency-with-xmin.md).
+- Installation and Lead map PostgreSQL's `xmin` system column as their version (`Version`, EF Core's row version);
+  no extra column.
+- `GET /api/installations/{id}`, `GET /api/my-work/{id}` and every change's answer carry `ETag: "<xmin>"`. Every
+  change (a move, a cancellation, a deactivation, the design, the time zone, assigning, removing or completing an
+  assignment, a technician completing their part) requires `If-Match: "<xmin>"`: 428
+  `installation.version_required` if the header is missing, 409 `installation.concurrent_change` if the version is
+  old, or isn't a quoted version. The 409 says: *"This installation was changed by someone else. Reload and try
+  again."*
+- The service compares the version sent with the one it read, and refuses before trying the change; a change that
+  loses a race after that read is refused by the save, whose `UPDATE` matches only the version read. Every change
+  saves the installation's row, an assignment-only one too, so the version moves with any change the page shows.
+- Leads have no `If-Match`: their version catches two saves at the same moment (409 `lead.concurrent_change`); an old
+  page is caught by the lead's state.
+- The staff app sends the `ETag` it last read; on a 409 `…concurrent_change` it keeps the page as it was and offers to
+  reload it. The first version had no version: two changes at the same moment both succeeded (the before P3b
+  measured).
 
 ---
 
@@ -460,5 +472,7 @@ Architecture decisions are recorded as ADRs, one file each, in [`adr/`](adr/):
 | [9](adr/0009-closed-by-default.md) | Closed by default: every endpoint needs a signed-in account unless it opens itself |
 | [10](adr/0010-transactional-outbox.md) | A new lead's emails through a transactional outbox |
 | [11](adr/0011-outbox-dispatcher.md) | The outbox dispatcher: a background service with `FOR UPDATE SKIP LOCKED` |
+| [12](adr/0012-natural-keys-enforced-by-the-database.md) | Duplicates refused by the database, through natural keys |
+| [13](adr/0013-optimistic-concurrency-with-xmin.md) | Optimistic concurrency: PostgreSQL's `xmin`, sent as `ETag` and back as `If-Match` |
 
 Decisions for parts not built yet are added as ADRs when those parts are built.

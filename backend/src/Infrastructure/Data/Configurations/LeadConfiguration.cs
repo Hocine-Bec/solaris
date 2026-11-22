@@ -6,6 +6,9 @@ namespace Infrastructure.Data.Configurations;
 
 public class LeadConfiguration : IEntityTypeConfiguration<Lead>
 {
+    /// <summary>The partial unique index behind BR-L1: a lead refused by it is a duplicate of an open one.</summary>
+    public const string OpenEmailIndex = "ux_leads_open_normalized_email";
+
     public void Configure(EntityTypeBuilder<Lead> builder)
     {
         builder.ToTable("leads");
@@ -34,6 +37,15 @@ public class LeadConfiguration : IEntityTypeConfiguration<Lead>
             .HasColumnName("email")
             .HasMaxLength(255)
             .IsRequired();
+
+        builder.Property(l => l.NormalizedEmail)
+            .HasColumnName("normalized_email")
+            .HasMaxLength(255)
+            .IsRequired();
+
+        // PostgreSQL's xmin system column: a save made on an older version fails (no column of its own)
+        builder.Property(l => l.Version)
+            .IsRowVersion();
 
         builder.Property(l => l.PhoneNumber)
             .HasColumnName("phone_number")
@@ -90,6 +102,12 @@ public class LeadConfiguration : IEntityTypeConfiguration<Lead>
         // Indexes
         builder.HasIndex(l => l.Status)
             .HasDatabaseName("ix_leads_status");
+
+        // BR-L1, enforced by the database: one open lead per email, even when the form is sent many times at once
+        builder.HasIndex(l => l.NormalizedEmail)
+            .IsUnique()
+            .HasFilter("status IN ('New', 'Contacted')")
+            .HasDatabaseName(OpenEmailIndex);
 
         builder.HasIndex(l => l.CreatedAt)
             .HasDatabaseName("ix_leads_created_at");

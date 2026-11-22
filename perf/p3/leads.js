@@ -22,7 +22,11 @@ export const options = {
 // Every answer is counted below; none is a failure to k6
 http.setResponseCallback(http.expectedStatuses({ min: 100, max: 599 }));
 
+// The line the run's script waits for, to sample the CPU clock during the load
+const LOAD_STARTS = 'P3 load starts';
+
 export default function () {
+  console.log(LOAD_STARTS);
   for (let round = 1; round <= rounds; round++) {
     const body = JSON.stringify({
       firstName: 'Lead',

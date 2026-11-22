@@ -51,6 +51,34 @@ public class LeadsTests(PostgresFixture database) : ApiTestBase(database)
     }
 
     [Fact]
+    public async Task BR_L1_TheSameFormSentFiftyTimesAtOnce_MakesOneLead_AndTheOthersAnswerItsId()
+    {
+        // Arrange - fifty copies of one form, as a double-clicking visitor or a retrying proxy would send them, without
+        // the limit per address, as the measurement runs send them
+        var client = CreateClient(environment: "Development",
+            settings: new Dictionary<string, string> { ["RateLimiting:Enabled"] = "false" });
+        using var start = new SemaphoreSlim(0);
+        var requests = Enumerable.Range(0, 50).Select(_ => Task.Run(async () =>
+        {
+            await start.WaitAsync(Ct);
+            return await client.PostAsJsonAsync("/api/leads", ErrorResponseTests.ValidLead(), Ct);
+        }, Ct)).ToList();
+
+        // Act - released together
+        start.Release(requests.Count);
+        var responses = await Task.WhenAll(requests);
+
+        // Assert - the partial unique index let one insert through: one 201, forty-nine 200s, all with its id, and
+        // its two emails only
+        responses.Count(r => r.StatusCode == HttpStatusCode.Created).Should().Be(1);
+        responses.Count(r => r.StatusCode == HttpStatusCode.OK).Should().Be(49);
+        var ids = await Task.WhenAll(responses.Select(async r => (await JsonAsync(r)).GetProperty("id").GetInt32()));
+        var lead = await Context.Leads.SingleAsync(Ct);
+        ids.Should().AllBeEquivalentTo(lead.Id);
+        (await Context.OutboxMessages.CountAsync(Ct)).Should().Be(2);
+    }
+
+    [Fact]
     public async Task CreateLead_TwoPeopleAtOneProperty_BothSaved()
     {
         // Regression: the second answered 409 address.already_exists

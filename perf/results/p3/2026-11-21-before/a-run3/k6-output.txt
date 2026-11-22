@@ -1,0 +1,26 @@
+
+
+  █ TOTAL RESULTS 
+
+    CUSTOM
+    p3a_200........................: 5      4.919696/s
+    p3a_201........................: 995    979.019586/s
+
+    HTTP
+    http_req_duration..............: p(50)=26.93ms p(95)=72.32ms max=408.14ms count=1000
+      { expected_response:true }...: p(50)=26.93ms p(95)=72.32ms max=408.14ms count=1000
+    http_req_failed................: 0.00%  0 out of 1000
+    http_reqs......................: 1000   983.939282/s
+
+    EXECUTION
+    iteration_duration.............: p(50)=1.01s   p(95)=1.01s   max=1.01s    count=1   
+    iterations.....................: 1      0.983939/s
+    vus............................: 1      min=1         max=1
+    vus_max........................: 1      min=1         max=1
+
+    NETWORK
+    data_received..................: 220 kB 216 kB/s
+    data_sent......................: 476 kB 468 kB/s
+
+
+

@@ -1,4 +1,6 @@
+using System.Globalization;
 using Bogus;
+using Domain.Common;
 using Domain.Entities;
 using Domain.Enums;
 
@@ -14,7 +16,9 @@ public static class LeadFactory
             .RuleFor(l => l.Id, f => f.IndexFaker)
             .RuleFor(l => l.FirstName, f => f.Name.FirstName())
             .RuleFor(l => l.LastName, f => f.Name.LastName())
-            .RuleFor(l => l.Email, f => f.Internet.Email())
+            // Unique, as open leads' emails must be (BR-L1)
+            .RuleFor(l => l.Email, f => f.Internet.Email(uniqueSuffix: f.UniqueIndex.ToString(CultureInfo.InvariantCulture)))
+            .RuleFor(l => l.NormalizedEmail, (_, l) => Emails.Normalize(l.Email))
             .RuleFor(l => l.PhoneNumber, f => f.Phone.PhoneNumber("###-###-####"))
             .RuleFor(l => l.AddressId, f => f.Random.Int(1, 1000))
             .RuleFor(l => l.PropertyType, f => f.PickRandom<PropertyType>())
@@ -53,7 +57,7 @@ public static class LeadFactory
         if (id.HasValue) lead.Id = id.Value;
         if (!string.IsNullOrEmpty(firstName)) lead.FirstName = firstName;
         if (!string.IsNullOrEmpty(lastName)) lead.LastName = lastName;
-        if (!string.IsNullOrEmpty(email)) lead.Email = email;
+        if (!string.IsNullOrEmpty(email)) (lead.Email, lead.NormalizedEmail) = (email, Emails.Normalize(email));
         if (!string.IsNullOrEmpty(phoneNumber)) lead.PhoneNumber = phoneNumber;
         if (addressId.HasValue) lead.AddressId = addressId.Value;
         if (propertyType.HasValue) lead.PropertyType = propertyType.Value;

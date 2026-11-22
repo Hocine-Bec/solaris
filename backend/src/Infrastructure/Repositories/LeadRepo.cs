@@ -1,5 +1,4 @@
 using Application.Interfaces.Repositories;
-using Domain.Common;
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.Data;
@@ -30,15 +29,13 @@ public class LeadRepo(AppDbContext context) : GenericRepo<Lead>(context), ILeadR
             .FirstOrDefaultAsync(x => x.Id == id);
     }
 
-    public async Task<int?> FindOpenIdByEmailAsync(string email, int? exceptId = null)
+    public async Task<int> GetIdOfExistingAsync(string normalizedEmail)
     {
-        var normalized = Emails.Normalize(email);
         return await Context.Leads
-            .Where(x => (x.Status == LeadStatus.New || x.Status == LeadStatus.Contacted)
-                        && x.Email.Trim().ToUpper() == normalized
-                        && x.Id != exceptId)
-            .OrderBy(x => x.Id)
-            .Select(x => (int?)x.Id)
-            .FirstOrDefaultAsync();
+            .Where(x => x.NormalizedEmail == normalizedEmail)
+            .OrderByDescending(x => x.Status == LeadStatus.New || x.Status == LeadStatus.Contacted)
+            .ThenByDescending(x => x.Id)
+            .Select(x => x.Id)
+            .FirstAsync();
     }
 }
