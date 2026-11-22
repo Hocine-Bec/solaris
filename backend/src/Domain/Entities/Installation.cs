@@ -48,6 +48,13 @@ public class Installation
     /// <summary>When it was switched on.</summary>
     public DateTime? ActivatedAt { get; set; }
 
+    /// <summary>
+    /// PostgreSQL's <c>xmin</c>, the row's version (BR-I4): the staff app sends the one it read with every change
+    /// (<c>If-Match</c>), and a save made on an older version is refused. Every change saves this row, so its version
+    /// moves even when only an assignment changed.
+    /// </summary>
+    public uint Version { get; set; }
+
     public List<InstallationStatusChange> History { get; set; } = [];
     public List<InstallationAssignment> Assignments { get; set; } = [];
 

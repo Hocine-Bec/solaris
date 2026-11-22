@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Application.DTOs.Common;
 using Domain.Common;
 using Domain.Entities;
@@ -28,7 +29,8 @@ public sealed record InstallationSummaryResponse(
 /// <summary>
 /// One installation, as its page shows it (FR-I1–I6): its customer and their status, its stage and the next move with
 /// the API's reason while it waits (BR-I1), what can be done now, its design and time zone (and whether they are fixed),
-/// its assignments, and its history, newest first: the status changes, and the assignments made and completed.
+/// its assignments, and its history, newest first: the status changes, and the assignments made and completed. Its
+/// <see cref="Version"/> goes in the <c>ETag</c> header, for the next change to send back (BR-I4).
 /// </summary>
 public sealed record InstallationResponse(
     int Id,
@@ -45,7 +47,8 @@ public sealed record InstallationResponse(
     bool CanCancel,
     bool CanDeactivate,
     IReadOnlyList<AssignmentResponse> Assignments,
-    IReadOnlyList<HistoryEntryResponse> History)
+    IReadOnlyList<HistoryEntryResponse> History,
+    [property: JsonIgnore] uint Version)
 {
     public static InstallationResponse From(Installation i)
     {
@@ -62,7 +65,7 @@ public sealed record InstallationResponse(
             new InstallationDesignResponse(i.SystemSizeKw, i.PanelCount, i.InverterType, i.IsFixed),
             next, i.CanCancel, i.CanDeactivate,
             i.Assignments.OrderBy(a => a.AssignedAt).ThenBy(a => a.Id).Select(a => AssignmentResponse.From(i, a)).ToList(),
-            HistoryOf(i));
+            HistoryOf(i), i.Version);
     }
 
     // The status changes and the assignments' events, newest first; at one moment, the status change first
@@ -139,7 +142,8 @@ public sealed record MyWorkInstallationResponse(
     MyWorkCustomerResponse Customer,
     string Status,
     IReadOnlyList<MyAssignmentResponse> MyAssignments,
-    IReadOnlyList<TeamMemberResponse> Team)
+    IReadOnlyList<TeamMemberResponse> Team,
+    [property: JsonIgnore] uint Version)
 {
     public static MyWorkInstallationResponse From(Installation i, int technicianId) =>
         new(i.Id, AddressResponse.From(i.Address), new MyWorkCustomerResponse(i.Customer.FullName, i.Customer.PhoneNumber),
@@ -149,7 +153,8 @@ public sealed record MyWorkInstallationResponse(
                     a.IsCompleted ? null : i.WhyNotComplete(a)?.Message))
                 .ToList(),
             i.Assignments.Where(a => a.TechnicianId != technicianId).OrderBy(a => a.Id)
-                .Select(a => new TeamMemberResponse(a.Technician.Name, a.Role.ToString(), a.CompletedAt)).ToList());
+                .Select(a => new TeamMemberResponse(a.Technician.Name, a.Role.ToString(), a.CompletedAt)).ToList(),
+            i.Version);
 }
 
 public sealed record MyWorkCustomerResponse(string Name, string Phone);

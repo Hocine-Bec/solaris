@@ -215,6 +215,12 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("time_zone");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id")
                         .HasName("pk_installations");
 

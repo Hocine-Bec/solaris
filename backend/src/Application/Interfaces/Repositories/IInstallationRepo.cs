@@ -27,4 +27,10 @@ public interface IInstallationRepo : IGenericRepo<Installation>
 
     /// <summary>The installations this technician is assigned to, with their address, customer and assignments.</summary>
     Task<IReadOnlyList<Installation>> GetForTechnicianAsync(int technicianId);
+
+    /// <summary>
+    /// Saves the installation's row with the next save even when only its assignments changed, so the save checks its
+    /// version and moves it (BR-I4).
+    /// </summary>
+    void MarkChanged(Installation installation);
 }

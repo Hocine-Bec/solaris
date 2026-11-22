@@ -16,6 +16,9 @@ public enum ErrorKind
     /// <summary>The resource doesn't exist.</summary>
     NotFound,
 
+    /// <summary>A change that must say which version it was made on didn't (an installation's <c>If-Match</c>, BR-I4).</summary>
+    PreconditionRequired,
+
     /// <summary>The request conflicts with the current state: a duplicate, a final state, or a change made meanwhile.</summary>
     Conflict,
 

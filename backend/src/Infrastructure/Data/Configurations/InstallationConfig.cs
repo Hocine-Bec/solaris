@@ -41,6 +41,10 @@ public class InstallationConfig : IEntityTypeConfiguration<Installation>
             .HasColumnName("created_at")
             .IsRequired();
 
+        // PostgreSQL's xmin system column: a save made on an older version fails (BR-I4; no column of its own)
+        builder.Property(i => i.Version)
+            .IsRowVersion();
+
         builder.Property(i => i.StatusChangedAt)
             .HasColumnName("status_changed_at")
             .IsRequired();
