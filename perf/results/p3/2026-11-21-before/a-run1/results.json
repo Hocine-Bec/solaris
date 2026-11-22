@@ -1,0 +1,17 @@
+{
+  "part": "P3a",
+  "run": 1,
+  "design": "before",
+  "rounds": 20,
+  "copies": 50,
+  "rounds_seen": 20,
+  "rounds_with_more_than_one_lead": 20,
+  "max_leads_in_one_round": 50,
+  "leads": 931,
+  "notifications": 1862,
+  "extra_notifications": 1822,
+  "responses_201": 931,
+  "responses_200": 69,
+  "responses_5xx": 0,
+  "responses_other": 0
+}

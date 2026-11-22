@@ -1,0 +1,100 @@
+{
+    "metrics": {
+        "http_req_duration": {
+            "p(50)": 26.0786155,
+            "p(95)": 86.890634399987,
+            "max": 361.104216,
+            "count": 1000
+        },
+        "http_reqs": {
+            "count": 1000,
+            "rate": 988.2788702862479
+        },
+        "vus_max": {
+            "value": 1,
+            "min": 1,
+            "max": 1
+        },
+        "http_req_connecting": {
+            "p(50)": 0,
+            "p(95)": 0.0020887999999981,
+            "max": 1.371636,
+            "count": 1000
+        },
+        "http_req_sending": {
+            "max": 1.075781,
+            "count": 1000,
+            "p(50)": 0.006626,
+            "p(95)": 0.10060714999999999
+        },
+        "http_req_waiting": {
+            "p(50)": 26.000957,
+            "p(95)": 86.67936079998698,
+            "max": 360.890197,
+            "count": 1000
+        },
+        "data_sent": {
+            "count": 475650,
+            "rate": 470074.8446516538
+        },
+        "iteration_duration": {
+            "p(95)": 1011.75443,
+            "max": 1011.75443,
+            "count": 1,
+            "p(50)": 1011.75443
+        },
+        "iterations": {
+            "count": 1,
+            "rate": 0.9882788702862478
+        },
+        "http_req_blocked": {
+            "p(50)": 0.0028865,
+            "p(95)": 0.15879599999999938,
+            "max": 1.55604,
+            "count": 1000
+        },
+        "p3a_201": {
+            "count": 1000,
+            "rate": 988.2788702862479
+        },
+        "vus": {
+            "value": 1,
+            "min": 1,
+            "max": 1
+        },
+        "http_req_tls_handshaking": {
+            "max": 0,
+            "count": 1000,
+            "p(50)": 0,
+            "p(95)": 0
+        },
+        "data_received": {
+            "count": 219786,
+            "rate": 217209.85978473327
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(50)": 26.0786155,
+            "p(95)": 86.890634399987,
+            "max": 361.104216,
+            "count": 1000
+        },
+        "http_req_receiving": {
+            "p(50)": 0.0607625,
+            "p(95)": 0.7632910999999999,
+            "max": 3.255163,
+            "count": 1000
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 1000,
+            "value": 0
+        }
+    },
+    "root_group": {
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {},
+        "name": ""
+    }
+}
