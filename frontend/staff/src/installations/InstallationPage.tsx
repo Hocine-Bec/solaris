@@ -89,6 +89,12 @@ function InstallationView({ tagged }: { tagged: Tagged<Installation> }) {
     void queryClient.invalidateQueries({ queryKey: installationKey(i.id) });
     document.getElementById('page-title')?.focus();
   };
+  /** A dialog's change refused by the state, or made on an old version: the dialog closes and the page says so. */
+  const onDialogRefused = (error: ApiError) => {
+    if (!isStale(error)) { onRefused(error); return; }
+    flushSync(() => { setOpen(null); setStale(true); });
+    document.getElementById('page-title')?.focus();
+  };
   const onFailed = (error: unknown) => {
     if (isStale(error)) setStale(true);
     else if (isRefusal(error)) onRefused(error);
@@ -195,10 +201,10 @@ function InstallationView({ tagged }: { tagged: Tagged<Installation> }) {
         )}
       </div>
 
-      {open === 'switchOn' && <SwitchOnDialog installation={i} send={() => moveInstallation(current, 'Active')} onClose={() => setOpen(null)} onDone={done('Saved')} onRefused={onRefused} />}
-      {open === 'cancel' && <CancelDialog installation={i} send={reason => cancelInstallation(current, reason)} onClose={() => setOpen(null)} onDone={done('Cancelled')} onRefused={onRefused} />}
-      {open === 'deactivate' && <DeactivateDialog installation={i} send={note => deactivateInstallation(current, note)} onClose={() => setOpen(null)} onDone={done('Deactivated')} onRefused={onRefused} />}
-      {open === 'assign' && <AssignDialog installation={i} send={(t, r) => assignTechnician(current, t, r)} onClose={() => setOpen(null)} onDone={done('Assigned', false)} onRefused={onRefused} />}
+      {open === 'switchOn' && <SwitchOnDialog installation={i} send={() => moveInstallation(current, 'Active')} onClose={() => setOpen(null)} onDone={done('Saved')} onRefused={onDialogRefused} />}
+      {open === 'cancel' && <CancelDialog installation={i} send={reason => cancelInstallation(current, reason)} onClose={() => setOpen(null)} onDone={done('Cancelled')} onRefused={onDialogRefused} />}
+      {open === 'deactivate' && <DeactivateDialog installation={i} send={note => deactivateInstallation(current, note)} onClose={() => setOpen(null)} onDone={done('Deactivated')} onRefused={onDialogRefused} />}
+      {open === 'assign' && <AssignDialog installation={i} send={(t, r) => assignTechnician(current, t, r)} onClose={() => setOpen(null)} onDone={done('Assigned', false)} onRefused={onDialogRefused} />}
     </>
   );
 }

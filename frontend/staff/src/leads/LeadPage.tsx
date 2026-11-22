@@ -12,11 +12,11 @@ import { formatDay, formatMoment } from '../lib/dates';
 import { idFrom } from '../lib/ids';
 import { useCurrentUser } from '../session/session';
 import { opensFor } from '../shell/sections';
-import { NotAllowed, NotFound } from '../states/States';
+import { ConflictNotice, NotAllowed, NotFound } from '../states/States';
 import { QueryView } from '../states/QueryView';
 import { ConvertDialog, DisqualifyDialog, EditLeadDialog, LostDialog } from './LeadDialogs';
 import { LeadChip } from './LeadChip';
-import { actionsFor, billLabel, cityLine, firstNameOf, isMovedMeanwhile, propertyLabel } from './view';
+import { actionsFor, billLabel, cityLine, firstNameOf, isChangedMeanwhile, propertyLabel } from './view';
 
 type Open = 'edit' | 'disqualify' | 'lose' | 'convert' | null;
 
@@ -53,6 +53,7 @@ function LeadView({ lead }: { lead: Lead }) {
   const [saved, setSaved] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [movedMeanwhile, setMovedMeanwhile] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
   // After Mark as contacted, focus goes to Convert, the next move, once the answer has drawn it
   const focusConvert = useRef(false);
   const convertButton = (button: HTMLButtonElement | null) => {
@@ -64,7 +65,9 @@ function LeadView({ lead }: { lead: Lead }) {
   const contact = useMutation({ mutationFn: () => moveLead(lead.id, 'Contacted') });
   const can = actionsFor(lead);
 
-  const show = (dialog: Open) => { setSaved(null); setFailed(null); setMovedMeanwhile(null); setOpen(dialog); };
+  const clear = () => { setSaved(null); setFailed(null); setMovedMeanwhile(null); setStale(false); };
+  const show = (dialog: Open) => { clear(); setOpen(dialog); };
+  const reload = () => { clear(); void queryClient.invalidateQueries({ queryKey: leadKey(lead.id) }); };
   const close = () => setOpen(null);
 
   /** The lead as the API answered it: this page shows it at once, and the lists load again when next shown. */
@@ -73,23 +76,30 @@ function LeadView({ lead }: { lead: Lead }) {
     void queryClient.invalidateQueries({ queryKey: [...LEADS_KEY, 'page'] });
   };
 
-  /** Another Admin moved it first: say so, and show the lead as it is now. Nothing was overwritten. */
+  /**
+   * Another Admin changed it first. Moved before this change was tried: say so, and show the lead as it is now.
+   * Saved at the same moment: say so, and offer to reload. Nothing was overwritten either way.
+   */
   const onMovedMeanwhile = (error: ApiError) => {
-    flushSync(() => { setOpen(null); setMovedMeanwhile(error.message); });
-    void queryClient.invalidateQueries({ queryKey: leadKey(lead.id) });
+    if (error.code === 'lead.concurrent_change') {
+      flushSync(() => { setOpen(null); setStale(true); });
+    } else {
+      flushSync(() => { setOpen(null); setMovedMeanwhile(error.message); });
+      void queryClient.invalidateQueries({ queryKey: leadKey(lead.id) });
+    }
     document.getElementById('page-title')?.focus();
   };
 
   const doContact = async () => {
     if (contact.isPending) return;
-    setSaved(null); setFailed(null); setMovedMeanwhile(null);
+    clear();
     try {
       const changed = await contact.mutateAsync();
       focusConvert.current = true;
       keep(changed);
       setSaved('Saved');
     } catch (error) {
-      if (isMovedMeanwhile(error)) onMovedMeanwhile(error);
+      if (isChangedMeanwhile(error)) onMovedMeanwhile(error);
       else setFailed(error instanceof ApiError ? error.message : UNEXPECTED);
     }
   };
@@ -142,6 +152,7 @@ function LeadView({ lead }: { lead: Lead }) {
       </div>
 
       {failed && <div className="page-notice"><FormNotice>{failed}</FormNotice></div>}
+      {stale && <div className="page-notice"><ConflictNotice noun="lead" onReload={reload} /></div>}
       {movedMeanwhile && (
         <div className="notice tone-warning page-notice" role="alert">
           <Icon icon={TriangleAlert} />

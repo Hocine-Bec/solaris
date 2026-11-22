@@ -61,7 +61,8 @@ Leads design.
   says the lead can become now: Mark as contacted happens at once and says Saved, then focus goes to Convert;
   Disqualify, Mark as lost and Convert ask first, as they close the lead for good. Edit corrects an open lead's name,
   email and phone; an email another open lead has shows under the field. If another Admin moved the lead meanwhile,
-  the page says what it is now and loads it again.
+  the page says what it is now and loads it again; if their change was saved at the same moment as this one, the page
+  keeps what it shows, says nothing was overwritten, and offers Reload.
 - **Convert** names what it makes: a customer (or the existing customer with this email, whose account the
   installation joins), an installation at Survey at the property, and the time zone the API proposes from the state.
   It then opens the new installation.
@@ -91,7 +92,8 @@ The Admin's screens for the projects (FR-I1–I7), from the approved Installatio
 - **Cancel** (before Active, with a reason, which the history keeps) and **Deactivate** (once Active) ask first.
 - **Every change sends the version it was made on** (`If-Match`, from the `ETag` the page last read) and keeps the
   answer's. A change the installation's state refuses (another Admin moved it meanwhile, say) shows why and loads it
-  again; once the API checks versions, a change made meanwhile keeps the page as it is and offers Reload (BR-I4).
+  again. A change made on an older version (the API answers 409) keeps the page as it is, says nothing was
+  overwritten, and offers Reload (BR-I4).
 
 ## My work
 

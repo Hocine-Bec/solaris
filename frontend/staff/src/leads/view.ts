@@ -1,4 +1,4 @@
-import { ApiError } from '../api/errors';
+import { ApiError, isStale } from '../api/errors';
 import type { Address, Lead, LeadStatus } from '../api/leads';
 
 /** The list's filters, in its address (`/leads?status=closed`): each one the statuses it asks the API for */
@@ -55,3 +55,9 @@ export const actionsFor = (lead: Pick<Lead, 'next'>) => ({
 /** The move was refused because the lead isn't where this page thought it was: another Admin moved it first. */
 export const isMovedMeanwhile = (error: unknown): error is ApiError =>
   error instanceof ApiError && error.code === 'lead.transition_not_allowed';
+
+/**
+ * Refused because someone else changed the lead first: moved it before this change was tried (the page loads it
+ * again), or saved it at the same moment (`lead.concurrent_change`: the page asks to reload).
+ */
+export const isChangedMeanwhile = (error: unknown): error is ApiError => isMovedMeanwhile(error) || isStale(error);
