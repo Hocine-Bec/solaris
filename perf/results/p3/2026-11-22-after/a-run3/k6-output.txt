@@ -1,0 +1,25 @@
+time="2026-11-22T10:01:04+01:00" level=info msg="P3 load starts" source=console
+
+
+  █ TOTAL RESULTS 
+
+    CUSTOM
+    p3a_200........................: 980    1035.384352/s
+    p3a_201........................: 20     21.130293/s
+
+    HTTP
+    http_req_duration..............: p(50)=25.87ms  p(95)=63.33ms  max=384.26ms count=1000
+      { expected_response:true }...: p(50)=25.87ms  p(95)=63.33ms  max=384.26ms count=1000
+    http_req_failed................: 0.00%  0 out of 1000
+    http_reqs......................: 1000   1056.514645/s
+
+    EXECUTION
+    iteration_duration.............: p(50)=946.38ms p(95)=946.38ms max=946.38ms count=1   
+    iterations.....................: 1      1.056515/s
+
+    NETWORK
+    data_received..................: 169 kB 178 kB/s
+    data_sent......................: 476 kB 503 kB/s
+
+
+

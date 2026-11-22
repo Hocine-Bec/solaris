@@ -1,0 +1,16 @@
+{
+  "part": "P3b",
+  "run": 1,
+  "design": "after",
+  "installations": 200,
+  "invalid_histories": 0,
+  "inconsistent": 0,
+  "final_permits": 129,
+  "final_cancelled": 71,
+  "lost_updates": 0,
+  "one_success": 200,
+  "no_success": 0,
+  "responses_409": 200,
+  "responses_5xx": 0,
+  "responses_other": 0
+}

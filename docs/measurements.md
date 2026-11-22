@@ -398,7 +398,7 @@ responses by status code (after, expected: 1 × 201 + 49 × 200, and 0 × 5xx).
 | Design | Rounds | Rounds with > 1 lead | Max leads in one round | Extra notifications | 5xx responses |
 |---|---|---|---|---|---|
 | Before | 20 | 20 | 50 | 1,950 | 0 |
-| After | 20 | | | | |
+| After | 20 | 0 | 1 | 0 | 0 |
 
 **Before, as measured** (2026-11-21, tag `p3-before`, no uncommitted change; mains power, no browser; the dev
 database's container running idle). 3 runs; the median run by extra notifications is reported (run 3). Raw results
@@ -411,6 +411,15 @@ in `perf/results/p3/2026-11-21-before/a-run1` … `a-run3`.
   already saved); no `5xx`, no other status.
 - The environment records' "CPU MHz during the run" is wrong for P3: the script read it just after the load
   ended (P1's and P2's read it during the load). It doesn't show the frequency during the runs.
+
+**After, as measured** (2026-11-22, `main` at the merge of the fixes, `p3-before-7-gffad1dd`, no uncommitted
+change; the same conditions as the before: mains power, balanced profile, no browser, the dev database's container
+running idle, kernel 7.0.0-44). 3 runs; they counted the same values, so any is the median: run 2 is reported. Raw
+results in `perf/results/p3/2026-11-22-after/a-run1` … `a-run3`.
+- In every run, each round made one lead and its two emails: 20 leads and 40 notifications.
+- Answers in every run: 20 `201`s and 980 `200`s; no `5xx`, no other status.
+- The CPU frequency, sampled 0.3 s into the load: 2,409–3,485, 1,999–2,700 and 1,199–1,600 MHz across the cores
+  (runs 1–3).
 
 ### P3b — Lost updates on installations
 
@@ -439,7 +448,7 @@ they read first.
 | Design | Installations | Lost updates | Invalid histories | Inconsistent | 409 responses |
 |---|---|---|---|---|---|
 | Before | 200 | 200 | 199 | 50 | 0 |
-| After | 200 | | | | |
+| After | 200 | 0 | 0 | 0 | 200 |
 
 **Before, as measured** (2026-11-21, tag `p3-before`, the same conditions as P3a). 3 runs; lost updates and invalid
 histories are the same in every run, so the median run is by inconsistent installations (run 3). Raw results in
@@ -454,6 +463,22 @@ histories are the same in every run, so the median run is by inconsistent instal
 - The environment records' CPU frequency has the same error as P3a's.
 
 The after target is 0 / 0 / 0, with exactly one success per installation.
+
+**After, as measured** (2026-11-22, the same build and conditions as P3a's after). 3 runs; they counted the same
+values, so any is the median: run 2 is reported. Raw results in `perf/results/p3/2026-11-22-after/b-run1` …
+`b-run3`.
+- In every run, exactly one of the two requests succeeded for each of the 200 installations, and the other got
+  `409 installation.concurrent_change`: 200 `409`s, no `5xx`, no other status.
+- No invalid history and no inconsistent installation in any run. Final statuses: Permits 129, 147 and 142;
+  Cancelled 71, 53 and 58 (runs 1–3).
+- Each change now reads the installation first, for its `ETag`, so each pair takes one more request: k6's measured
+  loop took 5.44, 10.27 and 7.02 s (the before's: 2.43, 2.44 and 2.96 s). The requests themselves didn't slow down:
+  p50 8.34, 8.68 and 8.5 ms (before: 8.31, 8.34 and 8.53 ms); run 2 had one request of 1.21 s (the others' slowest:
+  175.76 and 180.11 ms). P3 counts outcomes, not times.
+- The CPU frequency, sampled 0.3 s into the load: 400–3,708, 395–3,700 and 399–512 MHz across the cores (runs 1–3).
+  The loop sends one request or one pair at a time, so most cores are idle at any moment. Run 3's sample shows no
+  core above 512 MHz, but its requests took as long as the other runs' (above), and the counts don't depend on
+  speed, so it wasn't redone.
 
 ---
 
