@@ -72,4 +72,19 @@ public class InstallationRepo(AppDbContext context) : GenericRepo<Installation>(
             .FirstOrDefaultAsync();
         return found?.DeviceKeyHash is { } hash ? (found.Id, hash) : null;
     }
+
+    public async Task<IReadOnlyList<Installation>> GetActiveFleetAsync() =>
+        await Context.Installations
+            .Include(i => i.Address)
+            .Include(i => i.Customer)
+            .AsNoTracking()
+            .Where(i => i.Status == InstallationStatus.Active)
+            .OrderBy(i => i.Id)
+            .ToListAsync();
+
+    public Task<Installation?> GetWithAddressAsync(int id) =>
+        Context.Installations
+            .Include(i => i.Address)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(i => i.Id == id);
 }

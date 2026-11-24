@@ -47,6 +47,9 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
         ["POST api/installations/{id:int}/assignments/{assignmentId:int}/complete"] = Access.Admin,
         ["POST api/installations/{id:int}/device-key"] = Access.Admin,
         ["POST api/telemetry/readings"] = Access.Device,
+        ["GET api/production/fleet"] = Access.Admin,
+        ["GET api/production/installations/{id:int}/years/{year:int}"] = Access.Admin,
+        ["GET api/production/installations/{id:int}/years/{year:int}/months/{month:int}"] = Access.Admin,
         ["GET api/my-work"] = Access.Technician,   // a technician's own work
         ["GET api/my-work/{installationId:int}"] = Access.Technician,
         ["POST api/my-work/{installationId:int}/assignments/{assignmentId:int}/complete"] = Access.Technician,

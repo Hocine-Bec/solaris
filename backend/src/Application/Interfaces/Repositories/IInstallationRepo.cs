@@ -38,4 +38,13 @@ public interface IInstallationRepo : IGenericRepo<Installation>
     /// The Active installation whose device key has this prefix, and the key's stored hash; null when none has (BR-T2).
     /// </summary>
     Task<(int Id, byte[] Hash)?> FindActiveDeviceKeyAsync(string prefix);
+
+    /// <summary>Every Active installation with its address and customer: the fleet the dashboard counts (FR-P2).</summary>
+    Task<IReadOnlyList<Installation>> GetActiveFleetAsync();
+
+    /// <summary>
+    /// One installation with its address, which is all the production views need of it: its state decides how much
+    /// sun a month brings (BR-P1), its zone which readings belong to which day (BR-P4).
+    /// </summary>
+    Task<Installation?> GetWithAddressAsync(int id);
 }
