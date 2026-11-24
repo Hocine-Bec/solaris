@@ -63,4 +63,13 @@ public class InstallationRepo(AppDbContext context) : GenericRepo<Installation>(
         if (entry.State == EntityState.Unchanged)
             entry.State = EntityState.Modified;
     }
+
+    public async Task<(int Id, byte[] Hash)?> FindActiveDeviceKeyAsync(string prefix)
+    {
+        var found = await Context.Installations
+            .Where(i => i.DeviceKeyPrefix == prefix && i.Status == InstallationStatus.Active)
+            .Select(i => new { i.Id, i.DeviceKeyHash })
+            .FirstOrDefaultAsync();
+        return found?.DeviceKeyHash is { } hash ? (found.Id, hash) : null;
+    }
 }

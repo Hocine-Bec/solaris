@@ -33,4 +33,9 @@ public interface IInstallationRepo : IGenericRepo<Installation>
     /// version and moves it (BR-I4).
     /// </summary>
     void MarkChanged(Installation installation);
+
+    /// <summary>
+    /// The Active installation whose device key has this prefix, and the key's stored hash; null when none has (BR-T2).
+    /// </summary>
+    Task<(int Id, byte[] Hash)?> FindActiveDeviceKeyAsync(string prefix);
 }

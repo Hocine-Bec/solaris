@@ -181,6 +181,19 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("customer_id");
 
+                    b.Property<DateTime?>("DeviceKeyCreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("device_key_created_at");
+
+                    b.Property<byte[]>("DeviceKeyHash")
+                        .HasColumnType("bytea")
+                        .HasColumnName("device_key_hash");
+
+                    b.Property<string>("DeviceKeyPrefix")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("device_key_prefix");
+
                     b.Property<string>("InverterType")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -229,6 +242,10 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("CustomerId")
                         .HasDatabaseName("ix_installations_customer_id");
+
+                    b.HasIndex("DeviceKeyPrefix")
+                        .IsUnique()
+                        .HasDatabaseName("ux_installations_device_key_prefix");
 
                     b.HasIndex("LeadId")
                         .HasDatabaseName("ix_installations_lead_id");

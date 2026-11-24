@@ -49,6 +49,14 @@ public class Installation
     public DateTime? ActivatedAt { get; set; }
 
     /// <summary>
+    /// Its device key (BR-T2, ADR 14), while it is Active: the prefix that names it (unique), the SHA-256 of its secret,
+    /// and when it was made. Never the secret itself. All three are null before switch-on and after deactivation.
+    /// </summary>
+    public string? DeviceKeyPrefix { get; set; }
+    public byte[]? DeviceKeyHash { get; set; }
+    public DateTime? DeviceKeyCreatedAt { get; set; }
+
+    /// <summary>
     /// PostgreSQL's <c>xmin</c>, the row's version (BR-I4): the staff app sends the one it read with every change
     /// (<c>If-Match</c>), and a save made on an older version is refused. Every change saves this row, so its version
     /// moves even when only an assignment changed.
@@ -141,12 +149,25 @@ public class Installation
         return null;
     }
 
-    /// <summary>Deactivated, only from Active (BR-I2). The device key is revoked here once keys exist.</summary>
+    /// <summary>Deactivated, only from Active (BR-I2); its device key is deleted with it, so it stops working (BR-T2).</summary>
     public Refusal? Deactivate(string? note, int actingUserId, DateTime now)
     {
         if (!CanDeactivate)
             return NotAllowed($"This installation is {Status}: only an Active one can be deactivated.");
         Record(InstallationStatus.Deactivated, actingUserId, now, string.IsNullOrWhiteSpace(note) ? null : note.Trim());
+        (DeviceKeyPrefix, DeviceKeyHash, DeviceKeyCreatedAt) = (null, null, null);
+        return null;
+    }
+
+    /// <summary>
+    /// Gives it a device key, made at switch-on or replacing the one it has (BR-T2): only while Active. The key it had
+    /// stops working with this save.
+    /// </summary>
+    public Refusal? SetDeviceKey(string prefix, byte[] hash, DateTime now)
+    {
+        if (Status != InstallationStatus.Active)
+            return new Refusal("installation.not_active", $"This installation is {Status}: only an Active one has a device key.");
+        (DeviceKeyPrefix, DeviceKeyHash, DeviceKeyCreatedAt) = (prefix, hash, now);
         return null;
     }
 

@@ -17,7 +17,7 @@ namespace WebAPI.Controllers;
 /// </summary>
 [Route("api/installations")]
 [Authorize(Policy = Policies.Admin)]
-public class InstallationsController(IInstallationService service) : ApiControllerBase
+public class InstallationsController(IInstallationService service, ILogger<InstallationsController> logger) : ApiControllerBase
 {
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -103,12 +103,34 @@ public class InstallationsController(IInstallationService service) : ApiControll
     public Task<ActionResult<InstallationResponse>> Complete(int id, int assignmentId) =>
         AsActingUser((version, me) => service.CompleteAsync(id, version, assignmentId, me));
 
-    /// <summary>The installation, tagged with its version; or the failure.</summary>
+    /// <summary>
+    /// A new device key for an Active installation, shown once in the answer; the one it had stops working (BR-T2). The
+    /// log says who replaced it, never the key.
+    /// </summary>
+    [HttpPost("{id:int}/device-key")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status428PreconditionRequired)]
+    public async Task<ActionResult<InstallationResponse>> ReplaceDeviceKey(int id)
+    {
+        var answer = await Versioned(version => service.ReplaceDeviceKeyAsync(id, version));
+        if (answer.Result is OkObjectResult)
+            logger.LogInformation("The device key of installation {InstallationId} was replaced by user {UserId}", id, CurrentUserId);
+        return answer;
+    }
+
+    /// <summary>
+    /// The installation, tagged with its version; or the failure. An answer carrying a device key is never stored by a
+    /// browser or a proxy.
+    /// </summary>
     private ActionResult<InstallationResponse> Answer(Result<InstallationResponse> result)
     {
         if (!result.IsSuccess)
             return Problem(result.Error);
         Tag(result.Value.Version);
+        if (result.Value.IssuedKey is not null)
+            Response.Headers.CacheControl = "no-store";
         return Ok(result.Value);
     }
 

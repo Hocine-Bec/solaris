@@ -20,6 +20,9 @@ public interface IInstallationService
     Task<Result<InstallationResponse>> RecordDesignAsync(int id, uint version, InstallationDesignRequest request);
     Task<Result<InstallationResponse>> SetTimeZoneAsync(int id, uint version, InstallationTimeZoneRequest request);
     Task<Result<InstallationResponse>> AssignAsync(int id, uint version, AssignTechnicianRequest request, int actingUserId);
+    /// <summary>A new device key for an Active installation; the one it had stops working (BR-T2).</summary>
+    Task<Result<InstallationResponse>> ReplaceDeviceKeyAsync(int id, uint version);
+
     Task<Result<InstallationResponse>> UnassignAsync(int id, uint version, int assignmentId);
 
     /// <summary>An Admin marks a technician's part complete for them (FR-I6).</summary>

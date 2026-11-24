@@ -16,9 +16,6 @@ public class LeadsTests(PostgresFixture database) : ApiTestBase(database)
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private static async Task<JsonElement> JsonAsync(HttpResponseMessage response) =>
-        await response.Content.ReadFromJsonAsync<JsonElement>(Ct);
-
     private static IEnumerable<string> PropertyNames(JsonElement json) => json.EnumerateObject().Select(p => p.Name);
 
     [Fact]

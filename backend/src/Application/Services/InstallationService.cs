@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Application.Common.Models;
+using Application.Common.Security;
 using Application.DTOs.Common;
 using Application.DTOs.Installations;
 using Application.Errors;
@@ -42,17 +43,32 @@ public class InstallationService(
             : Result.Success(InstallationResponse.From(installation));
     }
 
-    public Task<Result<InstallationResponse>> MoveAsync(int id, uint version, MoveInstallationRequest request,
-        int actingUserId) =>
-        ChangeStatusAsync(id, version, (i, now) =>
+    public async Task<Result<InstallationResponse>> MoveAsync(int id, uint version, MoveInstallationRequest request,
+        int actingUserId)
+    {
+        // Switching on makes its device key in the same save (BR-T2); the answer carries it, once
+        NewDeviceKey? key = null;
+        var result = await ChangeStatusAsync(id, version, (i, now) =>
         {
             var to = Enum.Parse<InstallationStatus>(request.Status);
             if (i.TryMoveTo(to, actingUserId, now) is { } refusal)
                 return refusal;
             if (to == InstallationStatus.Active)
+            {
+                key = DeviceKeys.Create();
+                i.SetDeviceKey(key.Prefix, key.Hash, now);
                 outbox.Add(OutboxMessage.ForInstallation(i, OutboxMessageType.InstallationActivated, now));
+            }
             return null;
         });
+        return WithKey(result, key);
+    }
+
+    public async Task<Result<InstallationResponse>> ReplaceDeviceKeyAsync(int id, uint version)
+    {
+        var key = DeviceKeys.Create();
+        return WithKey(await ChangeAsync(id, version, (i, now) => i.SetDeviceKey(key.Prefix, key.Hash, now)), key);
+    }
 
     public Task<Result<InstallationResponse>> CancelAsync(int id, uint version, CancelInstallationRequest request,
         int actingUserId) =>
@@ -220,13 +236,18 @@ public class InstallationService(
         {
             // Read again, so the people a new row names (who moved it, who assigned) are loaded with it
             SaveOutcome.Saved => Result.Success(InstallationResponse.From((await installations.GetDetailsAsync(installation.Id))!)),
-            // Only an assignment is unique: the same technician in the same role, added twice at the same moment
+            // An assignment is unique: the same technician in the same role, added twice at the same moment. (A device
+            // key's prefix is unique too, but two alike out of 60 random bits is out of reach.)
             SaveOutcome.Duplicate => Result.Failure<InstallationResponse>(InstallationErrors.DuplicateAssignment),
             // Someone saved it between this change's read and its save
             SaveOutcome.Conflict => Result.Failure<InstallationResponse>(InstallationErrors.ConcurrentChange),
             var other => throw new UnreachableException($"Saving an installation can't end as {other}.")
         };
     }
+
+    /// <summary>The answer, with the key just made in it: the only answer that ever carries it.</summary>
+    private static Result<InstallationResponse> WithKey(Result<InstallationResponse> result, NewDeviceKey? key) =>
+        result.IsSuccess && key is not null ? Result.Success(result.Value with { IssuedKey = key.Text }) : result;
 
     private DateTime Now() => time.GetUtcNow().UtcDateTime;
 }

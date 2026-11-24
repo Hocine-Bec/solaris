@@ -52,6 +52,21 @@ public class InstallationConfig : IEntityTypeConfiguration<Installation>
         builder.Property(i => i.ActivatedAt)
             .HasColumnName("activated_at");
 
+        // The device key (BR-T2, ADR 14): the prefix finds the installation; only the secret's SHA-256 is stored
+        builder.Property(i => i.DeviceKeyPrefix)
+            .HasColumnName("device_key_prefix")
+            .HasMaxLength(12);
+
+        builder.Property(i => i.DeviceKeyHash)
+            .HasColumnName("device_key_hash");
+
+        builder.Property(i => i.DeviceKeyCreatedAt)
+            .HasColumnName("device_key_created_at");
+
+        builder.HasIndex(i => i.DeviceKeyPrefix)
+            .IsUnique()
+            .HasDatabaseName("ux_installations_device_key_prefix");
+
         builder.Property(i => i.SystemSizeKw)
             .HasColumnName("system_size_kw")
             .HasPrecision(5, 2);

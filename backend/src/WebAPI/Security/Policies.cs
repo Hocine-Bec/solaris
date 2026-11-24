@@ -1,4 +1,5 @@
 using Domain.Enums;
+using Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
 
 namespace WebAPI.Security;
@@ -18,13 +19,22 @@ public static class Policies
     /// <summary>Any staff account: an Admin or a technician.</summary>
     public const string Staff = nameof(Staff);
 
+    /// <summary>
+    /// A device, by its installation's key, and nothing else: a staff session doesn't count here, and a device key
+    /// counts nowhere else, since the other policies use the staff scheme only (BR-T2, ADR 14).
+    /// </summary>
+    public const string Device = nameof(Device);
+
     public static IServiceCollection AddStaffPolicies(this IServiceCollection services)
     {
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
             .AddPolicy(Admin, policy => policy.RequireRole(nameof(UserRole.Admin)))
             .AddPolicy(Technician, policy => policy.RequireRole(nameof(UserRole.Technician)))
-            .AddPolicy(Staff, policy => policy.RequireRole(nameof(UserRole.Admin), nameof(UserRole.Technician)));
+            .AddPolicy(Staff, policy => policy.RequireRole(nameof(UserRole.Admin), nameof(UserRole.Technician)))
+            .AddPolicy(Device, policy => policy
+                .AddAuthenticationSchemes(DeviceKeyAuthentication.Scheme)
+                .RequireClaim(DeviceKeyAuthentication.InstallationIdClaim));
         return services;
     }
 }
