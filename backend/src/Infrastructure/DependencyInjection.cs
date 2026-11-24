@@ -13,6 +13,7 @@ using Infrastructure.Outbox;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Settings;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -110,7 +111,9 @@ public static class DependencyInjection
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        }).AddJwtBearer();
+        }).AddJwtBearer()
+            // Devices: their own scheme, used only by the endpoints whose policy names it (BR-T2, ADR 14)
+            .AddScheme<AuthenticationSchemeOptions, DeviceKeyHandler>(DeviceKeyAuthentication.Scheme, null);
 
         // The bearer options read the validated JwtOptions instead of the configuration directly.
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
@@ -188,6 +191,7 @@ public static class DependencyInjection
         services.AddScoped<ILeadRepo, LeadRepo>();
         services.AddScoped<IUserRepo, UserRepo>();
         services.AddScoped<IOutboxRepo, OutboxRepo>();
+        services.AddScoped<IEnergyReadingRepo, EnergyReadingRepo>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         
         // Email: the provider's sender (Email:Provider), which the measurement harness wraps in Development

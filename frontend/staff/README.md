@@ -83,6 +83,9 @@ The Admin's screens for the projects (FR-I1–I7), from the approved Installatio
     count first."). Moving on happens at once and says Saved; Switch on asks first, naming the time zone the days will
     be counted in (its confirmation), and says the customer gets an email. The design (size, panels, inverter) and the
     time zone are edited in place, until the system is switched on; then each says Fixed at switch-on.
+    Once Active, a **Device key** card shows how the system's key starts and when it was made (never the key), with
+    Replace key… (or Make a key… for a system switched on before keys existed); once deactivated, that the key was
+    deleted.
   - **Assignments:** each technician, their role, when assigned, and whether their part is complete (and, when an
     Admin marked it for them, who). Assign a technician picks an active technician and a role. Mark complete is
     offered at the part's stage; a part not completed can be removed.
@@ -90,6 +93,10 @@ The Admin's screens for the projects (FR-I1–I7), from the approved Installatio
     assignments made and completed.
   - **Production:** says it comes with the production screens.
 - **Cancel** (before Active, with a reason, which the history keeps) and **Deactivate** (once Active) ask first.
+- **The device key, once** (BR-T2): switching on or replacing the key shows the whole key in a panel above the cards,
+  with Copy (where the browser refuses, the key is selected for copying by hand) and Done; focus goes to it. It is
+  kept in that page's state only, never in the query cache or the browser's storage, so it is gone once the page is
+  left. Replace key… asks first, saying the old key stops working at once.
 - **Every change sends the version it was made on** (`If-Match`, from the `ETag` the page last read) and keeps the
   answer's. A change the installation's state refuses (another Admin moved it meanwhile, say) shows why and loads it
   again. A change made on an older version (the API answers 409) keeps the page as it is, says nothing was

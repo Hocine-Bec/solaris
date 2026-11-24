@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Ban, CircleAlert, Globe, Lock, Mail, PowerOff, UserPlus, Zap } from 'lucide-react';
+import { Ban, CircleAlert, Globe, KeyRound, Lock, Mail, PowerOff, RefreshCw, RotateCcw, UserPlus, Zap } from 'lucide-react';
 import type { Tagged } from '../api/client';
 import { ApiError, isStale } from '../api/errors';
-import { ASSIGNMENT_ROLES, type AssignmentRole, type Installation } from '../api/installations';
+import { ASSIGNMENT_ROLES, type AssignmentRole, type Changed, type Installation } from '../api/installations';
 import { fetchTechnicians, TECHNICIANS_KEY } from '../api/users';
 import { Dialog } from '../components/Dialog';
 import { Icon } from '../components/Icon';
@@ -12,7 +12,7 @@ import { isRefusal, kw } from './view';
 
 /*
  * The installation's dialogs, from the approved design: switching on, cancelling and deactivating ask first; assigning
- * picks a technician and a role. A refusal because of the installation's state, or because it changed since the page
+ * picks a technician and a role; replacing the device key asks first. A refusal because of the installation's state, or because it changed since the page
  * read it, closes the dialog and the page says why; any other failure stays in the dialog.
  */
 
@@ -27,7 +27,7 @@ type Props = {
   onRefused: (error: ApiError) => void;
 };
 
-function useSend(send: () => Promise<Tagged<Installation>>, { onDone, onRefused }: Pick<Props, 'onDone' | 'onRefused'>) {
+function useSend<T>(send: () => Promise<T>, { onDone, onRefused }: { onDone: (changed: T) => void; onRefused: Props['onRefused'] }) {
   const [notice, setNotice] = useState<string | null>(null);
   const mutation = useMutation({ mutationFn: send });
   const submit = async () => {
@@ -57,8 +57,11 @@ function Frame({ title, children, notice, onClose, onSubmit }: { title: string; 
 
 const Cancel = ({ onClose }: { onClose: () => void }) => <button className="btn btn-quiet" type="button" onClick={onClose}>Cancel</button>;
 
-/** Switching on (FR-I7): it emails the customer and fixes the design and the time zone, so it asks, naming the zone. */
-export function SwitchOnDialog({ installation: i, send, ...rest }: Props & { send: () => Promise<Tagged<Installation>> }) {
+/**
+ * Switching on (FR-I7): it emails the customer, fixes the design and the time zone, and makes the device key, so it
+ * asks, naming the zone. The answer carries the key, which the page shows once.
+ */
+export function SwitchOnDialog({ installation: i, send, ...rest }: Omit<Props, 'onDone'> & { send: () => Promise<Changed>; onDone: (changed: Changed) => void }) {
   const { notice, busy, submit } = useSend(send, rest);
   const design = i.design.systemSizeKw !== null ? `${kw(i.design.systemSizeKw)}, ${i.design.panelCount} panels` : 'not recorded';
   return (
@@ -67,6 +70,7 @@ export function SwitchOnDialog({ installation: i, send, ...rest }: Props & { sen
         <li><Icon icon={Zap} /><span>The installation becomes <b>Active</b>, and {i.customer.name} an active customer.</span></li>
         <li><Icon icon={Mail} /><span>{i.customer.name} gets the switch-on email.</span></li>
         <li><Icon icon={Lock} /><span>The design ({design}) and the time zone are fixed from now on.</span></li>
+        <li><Icon icon={KeyRound} /><span>A device key is made for the system to send its readings. It's shown once, on the page, after this.</span></li>
       </ul>
       <div className="tz">
         <Icon icon={Globe} />
@@ -110,12 +114,31 @@ export function DeactivateDialog({ installation: i, send, ...rest }: Props & { s
   const { notice, busy, submit } = useSend(() => send(note.trim() || null), rest);
   return (
     <Frame title={`Deactivate the system at ${i.address.street}?`} notice={notice} onClose={rest.onClose} onSubmit={() => void submit()}>
-      <p>For a system removed or decommissioned. It stops being monitored, for good; its history stays. {i.customer.name}'s status follows. This can't be undone.</p>
+      <p>For a system removed or decommissioned. It stops being monitored, for good; its history stays. Its device key is deleted, so the system can't send readings any more. {i.customer.name}'s status follows. This can't be undone.</p>
       <div className="field">
         <label className="field-label" htmlFor="dv-note">Note <span className="field-help">Optional</span></label>
         <div className="control control-area"><textarea id="dv-note" rows={2} maxLength={500} value={note} onChange={e => setNote(e.target.value)} /></div>
       </div>
       <div className="actions"><Cancel onClose={rest.onClose} /><SubmitButton busy={busy} danger><Icon icon={PowerOff} />Deactivate</SubmitButton></div>
+    </Frame>
+  );
+}
+
+/**
+ * Replacing the device key (BR-T2): the old one stops working at once, so it asks first. An installation switched on
+ * before keys existed has none: the same dialog makes its first.
+ */
+export function ReplaceKeyDialog({ installation: i, send, ...rest }: Omit<Props, 'onDone'> & { send: () => Promise<Changed>; onDone: (changed: Changed) => void }) {
+  const { notice, busy, submit } = useSend(send, rest);
+  const old = i.deviceKey;
+  return (
+    <Frame title={old ? `Replace the device key of ${i.address.street}?` : `Make a device key for ${i.address.street}?`} notice={notice} onClose={rest.onClose} onSubmit={() => void submit()}>
+      <ul className="made">
+        <li><Icon icon={KeyRound} /><span>A new key is made, and shown once.</span></li>
+        {old && <li><Icon icon={Ban} /><span>The key starting <code>{old.prefix}.</code> stops working at once: the system's readings are refused until its settings hold the new one.</span></li>}
+        <li><Icon icon={RotateCcw} /><span>Readings refused meanwhile can be sent again with the new key, up to 30 days back.</span></li>
+      </ul>
+      <div className="actions"><Cancel onClose={rest.onClose} /><SubmitButton busy={busy}><Icon icon={RefreshCw} />{old ? 'Replace key' : 'Make a key'}</SubmitButton></div>
     </Frame>
   );
 }

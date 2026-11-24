@@ -96,7 +96,7 @@ the outbox's `OutboxMessage` (§6). The other entities are *(planned)*, each bui
 | **Lead** | A quote request | Its status and when it moved: `ContactedAt`, then `ClosedAt` (Converted, Disqualified or Lost), set by the server (BR-L2); the visitor's note, never replaced. One open lead per email: `NormalizedEmail` with a partial unique index over the open statuses (BR-L1, §7); `xmin` as its version (§7) |
 | **Address** | A property, stored once | `UniqueAddressHash` with a unique index ([ADR 5](adr/0005-address-natural-key.md)) |
 | **Customer** | A converted lead | `NormalizedEmail` unique: a later conversion for the same email reuses the customer (BR-L3); its address is its first lead's property; its status recalculated from its installations' at every status change, in the same save (BR-C1) |
-| **Installation** | One project at one address | Its customer, its address and the lead it came from; its status is its stage (Survey at conversion), with when it last changed; its time zone (an IANA name, proposed from its state, confirmed in the switch-on dialog, BR-P4); its design (size, panel count, inverter type); when it was switched on. Design and time zone fixed once Active. `xmin` as its version (BR-I4, §7). *(Planned:)* the device-key columns `DeviceKeyPrefix` (unique), `DeviceKeyHash`, `DeviceKeyCreatedAt` |
+| **Installation** | One project at one address | Its customer, its address and the lead it came from; its status is its stage (Survey at conversion), with when it last changed; its time zone (an IANA name, proposed from its state, confirmed in the switch-on dialog, BR-P4); its design (size, panel count, inverter type); when it was switched on. Design and time zone fixed once Active. `xmin` as its version (BR-I4, §7). While Active, its device key: `DeviceKeyPrefix` (unique), `DeviceKeyHash` (the secret's SHA-256), `DeviceKeyCreatedAt` ([ADR 14](adr/0014-device-keys.md), §9) |
 | **InstallationStatusChange** | One row per status change (`installation_status_history`) | From (none for the conversion's first row), to, who, when, note (a cancellation's reason); append-only, never updated or deleted |
 | **InstallationAssignment** | A technician's part (`installation_assignments`) | Role Surveyor, Installer or Inspector (an enum); who assigned and when; who completed it (the technician, or an Admin for them) and when; unique per installation, technician and role. One not completed can be removed |
 | **User** | A staff account | Name; email, unique whatever its case (`NormalizedEmail`, a unique index); password hash ([ADR 8](adr/0008-password-hashing.md)); role (Admin or Technician); active flag; last sign-in; the time its sessions are valid from, moved by a new password |
@@ -157,6 +157,8 @@ installation's own time zone (BR-P4).
   | `customer.not_found` | 404 | No customer has this ID |
   | `installation.not_found` | 404 | No installation has this ID; to a technician, also one they aren't assigned to |
   | `installation.concurrent_change` | 409 | The change's `If-Match` names a version the installation is no longer at, or isn't a quoted version (BR-I4) |
+  | `installation.not_active` | 409 | Replacing the device key of an installation that isn't Active |
+  | `device.invalid_key` | 401 | A device key that doesn't work: none sent, not written as a key, unknown, a wrong secret, or the installation no longer Active (ADR 14) |
   | `installation.version_required` | 428 | A change to an installation sent without `If-Match` (BR-I4) |
   | `installation.transition_not_allowed` | 409 | A move the stages or its condition don't allow now (BR-I1, BR-I2); the message says what it waits for |
   | `installation.fixed` | 409 | Changing the design or the time zone of an installation that is Active or closed |
@@ -206,8 +208,8 @@ The event and its notifications are saved in **one save, which is one transactio
 - **Lead created:** the lead (+ its address) and two outbox messages, `LeadWelcome` and `SalesNewLeadAlert`, due at
   once. If the save fails, neither exists.
 - **Installation switched on:** the status change, its history row, the customer's new status, and an
-  `InstallationActivated` message, the customer's switch-on email (FR-I7). *(Planned:)* the device key, in the same
-  save.
+  `InstallationActivated` message, the customer's switch-on email (FR-I7), and the installation's device key (BR-T2,
+  ADR 14).
 
 The HTTP request never talks to the mail server. `Notifications:Mode` picks the path: `Outbox`, the default, or
 `Synchronous`, the P1 "before" kept in the measurement harness, Development only, which writes no outbox messages and
@@ -330,16 +332,27 @@ with 409 `lead.concurrent_change`; one that reads it after the first is saved ge
 
 ---
 
-## 8. Telemetry and production *(planned)*
+## 8. Telemetry and production
 
 ### Ingestion
-`POST /api/telemetry/readings`, authenticated by the device key:
+`POST /api/telemetry/readings`, authenticated by the device key ([ADR 14](adr/0014-device-keys.md)). It is the only
+endpoint a device can reach, and the only one a staff session can't.
 
-- Body: `{ "readings": [ { "slotStart": "2026-10-19T14:15:00Z", "energyWh": 1830 }, … ] }`, at most 500.
+- Body: `{ "readings": [ { "slotStart": "2026-10-19T14:15:00Z", "energyWh": 1830 }, … ] }`, at most 500; fewer or
+  more is `400`. Timestamps follow the API's rule: a zone is required, and they are stored as UTC.
 - The installation comes **from the key**, never from the body, so a device can't write for another
-  installation (BR-T2).
-- Each reading is validated (BR-T1); invalid ones are returned in `rejected` with a reason. Valid ones are
-  written **set-based**, in one transaction:
+  installation (BR-T2). A system deactivated since its key was checked is refused, like any key that doesn't work.
+- Each reading is checked against BR-T1 (`EnergyReading.WhyNotAccepted`: the slot on the quarter hour, in the past,
+  no older than 30 days, not negative, and no more than the system could make). A refused reading doesn't refuse
+  the batch: it comes back in `rejected` with its slot and the reason, and the rest are stored.
+- Answer: `accepted` = slots stored, `duplicates` = valid readings whose slot the installation already had,
+  `rejected` = the list with reasons (FR-T2).
+- **Today, on purpose:** `EnergyReading` is EF Core's defaults — a surrogate `long` key, the index the foreign key
+  brings, a `RecordedAt` timestamp and a `decimal EnergyKwh` — and the service asks `AnyAsync` for each reading,
+  adds it and saves, one at a time. So a batch costs one round trip per reading, and two batches at the same moment
+  can both pass the check and store one slot twice. That is the before P4a measures (`measurements.md` §9).
+- *(Planned, the fix:)* the composite primary key (the installation and the slot) makes a duplicate impossible, and
+  a batch is written **set-based**, in one transaction:
 
   ```sql
   WITH inserted AS (
@@ -353,9 +366,9 @@ with 409 `lead.concurrent_change`; one that reads it after the first is saved ge
   ON CONFLICT DO NOTHING;
   ```
 
-- Response: `accepted` = rows inserted; `duplicates` = valid − accepted; `rejected` = the list with reasons.
+  with `accepted` = rows inserted and `duplicates` = valid − accepted, as today.
 
-### Rollups (BR-P1–BR-P3)
+### Rollups (BR-P1–BR-P3) *(planned)*
 - **`RollupJob`** (Hangfire, every minute), in one transaction:
   1. Claim up to 1,000 rows from `production_dirty_days`
      (`DELETE … WHERE ctid IN (SELECT ctid … FOR UPDATE SKIP LOCKED LIMIT 1000) RETURNING *`).
@@ -369,7 +382,22 @@ with 409 `lead.concurrent_change`; one that reads it after the first is saved ge
   zones without daylight saving always 96: counts use real local-day boundaries, never "96 slots".
 
 ### Dashboards
-They read rollups only:
+Three endpoints, Admin only:
+
+| View | Request | Answers |
+|---|---|---|
+| Fleet (FR-P2) | `GET /api/production/fleet` | The last local day that has finished in **every** zone the fleet stands in, so none is still running out west; how many Active systems are at each health, the day's fleet ratio, and the 20 doing worst, lowest ratio first (Offline before them all). A system switched on since that day isn't counted: it wasn't there to produce anything |
+| Month (FR-P3) | `GET /api/production/installations/{id}/years/{year}/months/{month}` | Each local day of the month with what it made and what it should have, and the month's totals. Days before the switch-on, or after a deactivation, aren't days of production and aren't listed |
+| Year (FR-P4) | `GET /api/production/installations/{id}/years/{year}` | The twelve months, each with its totals, and the year's |
+
+Health (BR-P2) is only in the fleet view: it needs the day's fleet median, and the month and year views are about
+what a system made against what it should have. A month or a year outside 2000–2100, or a month outside 1–12, is
+`400`; an installation that doesn't exist is `404`.
+
+- **Today, on purpose:** every request adds up the raw readings again — the fleet's day over every Active
+  installation, one `GROUP BY` per time zone, since each zone's day covers its own hours. That is the before P4b
+  measures at 11.5 million readings (`measurements.md` §9).
+- *(Planned, the fix:)* they read the daily rollups instead:
 
 | View | Query |
 |---|---|
@@ -427,10 +455,16 @@ Staff sign-in, sessions and the roles' checks are built; the parts marked *(plan
   screen for another role's page, and the API refuses the data anyway.
 - **Technician scoping:** a technician lists and sees only the installations they are assigned to, through My work,
   checked in the service: another installation, or another technician's part, answers `404`, as if it didn't exist.
-- **Devices** *(planned)*: a separate authentication scheme reads `X-Device-Key: <prefix>.<secret>`. The prefix finds
-  the installation; the secret is checked against `DeviceKeyHash` (SHA-256, constant-time comparison), which is
-  adequate because the secret is 32 random bytes, not a human password. The key is shown once at activation and
-  removed on deactivation.
+- **Devices** ([ADR 14](adr/0014-device-keys.md)): a separate authentication scheme, `DeviceKey`, reads
+  `X-Device-Key: <prefix>.<secret>` (12 characters of lowercase base32, then 32 random bytes in base64url). The prefix
+  finds an Active installation (one indexed read, nothing cached); the secret is checked against `DeviceKeyHash`
+  (SHA-256, constant-time comparison), which is adequate because the secret is 32 random bytes, not a human password.
+  Its only claim is the installation's id. The `Device` policy uses this scheme alone and the staff policies the staff
+  scheme alone, so a key opens no staff endpoint and a session no device endpoint. Every refusal answers
+  `401 device.invalid_key`. The key is made at switch-on, in that save, and is in that answer only
+  (`Cache-Control: no-store`, never cached by the staff app); an Admin can replace it while Active
+  (`POST /api/installations/{id}/device-key`, with `If-Match`; the old one stops at once, and the API's log says who);
+  deactivating deletes it. The installation's page shows its prefix and when it was made, never the key.
 - **Rate limiting** (BR-S1): ASP.NET Core's rate limiter, a fixed window of one minute per client address: 5 on the
   quote form (`POST /api/leads`), and 10 password checks, one budget shared by signing in and changing your own
   password (a session left open can't be used to guess the current one faster than sign-in allows). Every request
@@ -474,5 +508,7 @@ Architecture decisions are recorded as ADRs, one file each, in [`adr/`](adr/):
 | [11](adr/0011-outbox-dispatcher.md) | The outbox dispatcher: a background service with `FOR UPDATE SKIP LOCKED` |
 | [12](adr/0012-natural-keys-enforced-by-the-database.md) | Duplicates refused by the database, through natural keys |
 | [13](adr/0013-optimistic-concurrency-with-xmin.md) | Optimistic concurrency: PostgreSQL's `xmin`, sent as `ETag` and back as `If-Match` |
+| [14](adr/0014-device-keys.md) | Device keys: a prefix and a hashed secret, one per Active installation |
+| [15](adr/0015-health-against-the-fleet.md) | A day's health is judged against the fleet, not against the table alone |
 
 Decisions for parts not built yet are added as ADRs when those parts are built.

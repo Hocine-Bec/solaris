@@ -1,10 +1,18 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Application.Common.Security;
 using Domain.Enums;
+using Infrastructure.Auth;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using TestUtilities.Database;
 
 namespace IntegrationTests.Api;
@@ -14,54 +22,6 @@ namespace IntegrationTests.Api;
 public class InstallationsTests(PostgresFixture database) : ApiTestBase(database)
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
-    private static async Task<JsonElement> JsonAsync(HttpResponseMessage response) =>
-        await response.Content.ReadFromJsonAsync<JsonElement>(Ct);
-
-    private static async Task<JsonElement> OkJsonAsync(Task<HttpResponseMessage> call)
-    {
-        var response = await call;
-        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(Ct));
-        return await JsonAsync(response);
-    }
-
-    /// <summary>A lead from the form, contacted and converted by the Admin: the new installation's id.</summary>
-    private async Task<int> ConvertedAsync(HttpClient admin, string email = "jane.doe@example.com", string street = "100 Congress Ave")
-    {
-        var lead = await JsonAsync(await CreateClient().PostAsJsonAsync("/api/leads", ErrorResponseTests.ValidLead(email, street), Ct));
-        var id = lead.GetProperty("id").GetInt32();
-        await OkJsonAsync(admin.PutAsJsonAsync($"/api/leads/{id}/status", new { status = "Contacted" }, Ct));
-        var converted = await OkJsonAsync(admin.PostAsync($"/api/leads/{id}/convert", null, Ct));
-        return converted.GetProperty("installationId").GetInt32();
-    }
-
-    /// <summary>
-    /// A change as the staff app sends it (BR-I4): with the version of the installation it last read, its ETag, as
-    /// If-Match. A technician reads their installation from My work.
-    /// </summary>
-    private static async Task<HttpResponseMessage> Change(HttpClient client, HttpMethod method, string path, object? body = null)
-    {
-        var read = await client.GetAsync(Regex.Match(path, @"^/api/(installations|my-work)/\d+").Value, Ct);
-        return await Send(client, method, path, body, read.Headers.ETag?.Tag);
-    }
-
-    private static Task<HttpResponseMessage> Send(HttpClient client, HttpMethod method, string path, object? body, string? ifMatch)
-    {
-        var request = new HttpRequestMessage(method, path) { Content = body is null ? null : JsonContent.Create(body) };
-        if (ifMatch is not null)
-            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
-        return client.SendAsync(request, Ct);
-    }
-
-    private static Task<JsonElement> Move(HttpClient admin, int id, string to) =>
-        OkJsonAsync(Change(admin, HttpMethod.Post, $"/api/installations/{id}/status", new { status = to }));
-
-    private static Task<JsonElement> Assign(HttpClient admin, int id, int technicianId, string role) =>
-        OkJsonAsync(Change(admin, HttpMethod.Post, $"/api/installations/{id}/assignments", new { technicianId, role }));
-
-    private static int AssignmentId(JsonElement installation, string role) =>
-        installation.GetProperty("assignments").EnumerateArray().First(a => a.GetProperty("role").GetString() == role)
-            .GetProperty("id").GetInt32();
 
     [Fact]
     public async Task AnInstallationsWholePath_FromConversionToSwitchOn()
@@ -336,6 +296,158 @@ public class InstallationsTests(PostgresFixture database) : ApiTestBase(database
         stored.Status.ToString().Should().Be(answered);
         stored.History.Select(h => h.ToStatus.ToString()).Should().BeEquivalentTo(["Survey", answered]);
     }
+
+    #region Device keys (BR-T2)
+
+    /// <summary>The device scheme on its own, as an endpoint whose policy names it runs it.</summary>
+    private async Task<AuthenticateResult> AuthenticateDeviceAsync(string? key)
+    {
+        using var scope = ApiServices.CreateScope();
+        var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        if (key is not null)
+            context.Request.Headers[DeviceKeyAuthentication.Header] = key;
+        return await context.AuthenticateAsync(DeviceKeyAuthentication.Scheme);
+    }
+
+    private static string? IssuedKey(JsonElement page) =>
+        page.TryGetProperty("issuedKey", out var key) ? key.GetString() : null;
+
+    [Fact]
+    public async Task BR_T2_SwitchOn_AnswersTheDeviceKeyOnce_AndKeepsOnlyItsHash()
+    {
+        // Act
+        var (admin, id, switchedOn) = await SwitchedOnAsync();
+
+        // Assert - the answer carries the key, never stored by a browser or a proxy
+        switchedOn.StatusCode.Should().Be(HttpStatusCode.OK);
+        switchedOn.Headers.CacheControl!.NoStore.Should().BeTrue();
+        var answer = await JsonAsync(switchedOn);
+        var key = IssuedKey(answer)!;
+        key.Should().MatchRegex("^[a-z2-7]{12}\\.[A-Za-z0-9_-]{43}$");
+        answer.GetProperty("deviceKey").GetProperty("prefix").GetString().Should().Be(key[..12]);
+
+        // ...the page read later doesn't
+        var page = await OkJsonAsync(admin.GetAsync($"/api/installations/{id}", Ct));
+        IssuedKey(page).Should().BeNull();
+        page.GetProperty("deviceKey").GetProperty("prefix").GetString().Should().Be(key[..12]);
+
+        // ...the database holds the prefix and the secret's hash, not the secret
+        var stored = await Context.Installations.AsNoTracking().SingleAsync(i => i.Id == id, Ct);
+        stored.DeviceKeyPrefix.Should().Be(key[..12]);
+        stored.DeviceKeyHash.Should().Equal(SHA256.HashData(Encoding.ASCII.GetBytes(key[13..])));
+
+        // ...and the key proves the installation
+        var device = await AuthenticateDeviceAsync(key);
+        device.Succeeded.Should().BeTrue();
+        device.Principal!.FindFirst(DeviceKeyAuthentication.InstallationIdClaim)!.Value.Should().Be(id.ToString(CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task BR_T2_ReplacingTheKey_TheOldOneStopsAtOnce()
+    {
+        // Arrange
+        var (admin, id, switchedOn) = await SwitchedOnAsync();
+        var old = IssuedKey(await JsonAsync(switchedOn))!;
+        var survey = await ConvertedAsync(admin, "john.roe@example.com", "2 Other St");
+
+        // Act
+        var replaced = await Change(admin, HttpMethod.Post, $"/api/installations/{id}/device-key");
+        var noVersion = await Send(admin, HttpMethod.Post, $"/api/installations/{id}/device-key", null, null);
+        var notActive = await Change(admin, HttpMethod.Post, $"/api/installations/{survey}/device-key");
+
+        // Assert
+        replaced.StatusCode.Should().Be(HttpStatusCode.OK);
+        replaced.Headers.CacheControl!.NoStore.Should().BeTrue();
+        var key = IssuedKey(await JsonAsync(replaced))!;
+        key[..12].Should().NotBe(old[..12]);
+        (await AuthenticateDeviceAsync(old)).Succeeded.Should().BeFalse();
+        (await AuthenticateDeviceAsync(key)).Succeeded.Should().BeTrue();
+        await ShouldBeProblemAsync(noVersion, (HttpStatusCode)428, "installation.version_required");
+        (await ShouldBeProblemAsync(notActive, HttpStatusCode.Conflict, "installation.not_active"))
+            .GetProperty("detail").GetString().Should().Be("This installation is Survey: only an Active one has a device key.");
+    }
+
+    [Fact]
+    public async Task BR_T2_Deactivating_DeletesTheKey()
+    {
+        // Arrange
+        var (admin, id, switchedOn) = await SwitchedOnAsync();
+        var key = IssuedKey(await JsonAsync(switchedOn))!;
+
+        // Act
+        var page = await OkJsonAsync(Change(admin, HttpMethod.Post, $"/api/installations/{id}/deactivate", new { note = "Removed with the roof." }));
+
+        // Assert
+        page.GetProperty("deviceKey").ValueKind.Should().Be(JsonValueKind.Null);
+        (await AuthenticateDeviceAsync(key)).Succeeded.Should().BeFalse();
+        (await Context.Installations.AsNoTracking().SingleAsync(i => i.Id == id, Ct)).DeviceKeyHash.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task BR_T2_EveryKeyThatDoesntWork_IsRefusedTheSameWay()
+    {
+        // Arrange - a working key, to alter
+        var (_, _, switchedOn) = await SwitchedOnAsync();
+        var key = IssuedKey(await JsonAsync(switchedOn))!;
+        var other = DeviceKeys.Create().Text;
+
+        // Act
+        var none = await AuthenticateDeviceAsync(null);
+        var refused = await Task.WhenAll(new[]
+        {
+            "not a key",
+            key.ToUpperInvariant(),
+            other,                               // well written, an unknown prefix
+            key[..13] + other[13..],             // its prefix, another secret
+        }.Select(AuthenticateDeviceAsync));
+
+        // Assert - nothing sent: no device; anything else: refused. The answer is one 401, whatever the reason.
+        none.None.Should().BeTrue();
+        refused.Should().OnlyContain(r => !r.Succeeded && r.Failure != null);
+        using var scope = ApiServices.CreateScope();
+        var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider, Response = { Body = new MemoryStream() } };
+        await context.ChallengeAsync(DeviceKeyAuthentication.Scheme);
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        context.Response.Body.Position = 0;
+        var problem = await JsonSerializer.DeserializeAsync<JsonElement>(context.Response.Body, cancellationToken: Ct);
+        problem.GetProperty("code").GetString().Should().Be("device.invalid_key");
+    }
+
+    [Fact]
+    public async Task BR_T2_AKeyLeftOnAnInstallationNoLongerActive_IsRefused()
+    {
+        // Arrange - a state the API never leaves (deactivating deletes the key), made directly: the key's read checks
+        // the status itself, as a second guard
+        var (_, id, switchedOn) = await SwitchedOnAsync();
+        var key = IssuedKey(await JsonAsync(switchedOn))!;
+        await Context.Database.ExecuteSqlAsync($"UPDATE installations SET status = 'Deactivated' WHERE id = {id}", Ct);
+
+        // Act
+        var device = await AuthenticateDeviceAsync(key);
+
+        // Assert
+        device.Succeeded.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task BR_T2_ADeviceKey_OpensNoStaffEndpoint()
+    {
+        // Arrange - a working key, sent alone to the office's pages
+        var (_, id, switchedOn) = await SwitchedOnAsync();
+        var key = IssuedKey(await JsonAsync(switchedOn))!;
+        var device = CreateClient();
+        device.DefaultRequestHeaders.Add(DeviceKeyAuthentication.Header, key);
+
+        // Act
+        var page = await device.GetAsync($"/api/installations/{id}", Ct);
+        var mine = await device.GetAsync("/api/my-work", Ct);
+
+        // Assert
+        await ShouldBeProblemAsync(page, HttpStatusCode.Unauthorized, "unauthorized");
+        await ShouldBeProblemAsync(mine, HttpStatusCode.Unauthorized, "unauthorized");
+    }
+
+    #endregion
 
     [Fact]
     public async Task GetInstallations_ByStatus_LastChangeFirst_AndAnUnknownStatusIs400()

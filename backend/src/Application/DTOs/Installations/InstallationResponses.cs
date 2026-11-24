@@ -7,6 +7,9 @@ using Domain.Enums;
 namespace Application.DTOs.Installations;
 
 /// <summary>Someone named on a page: an id and a name.</summary>
+/// <summary>An installation's device key as its page shows it: the prefix that names it, never the secret (BR-T2).</summary>
+public sealed record DeviceKeyResponse(string Prefix, DateTime IssuedAt);
+
 public sealed record PersonResponse(int Id, string Name)
 {
     public static PersonResponse? From(User? user) => user is null ? null : new(user.Id, user.Name);
@@ -30,7 +33,9 @@ public sealed record InstallationSummaryResponse(
 /// One installation, as its page shows it (FR-I1–I6): its customer and their status, its stage and the next move with
 /// the API's reason while it waits (BR-I1), what can be done now, its design and time zone (and whether they are fixed),
 /// its assignments, and its history, newest first: the status changes, and the assignments made and completed. Its
-/// <see cref="Version"/> goes in the <c>ETag</c> header, for the next change to send back (BR-I4).
+/// <see cref="Version"/> goes in the <c>ETag</c> header, for the next change to send back (BR-I4). Its device key shows
+/// as how it starts and when it was made; <see cref="IssuedKey"/>, the whole key, is only in the answer that made it
+/// (switch-on, or a replacement), and absent from every other (BR-T2).
 /// </summary>
 public sealed record InstallationResponse(
     int Id,
@@ -48,7 +53,9 @@ public sealed record InstallationResponse(
     bool CanDeactivate,
     IReadOnlyList<AssignmentResponse> Assignments,
     IReadOnlyList<HistoryEntryResponse> History,
-    [property: JsonIgnore] uint Version)
+    [property: JsonIgnore] uint Version,
+    DeviceKeyResponse? DeviceKey,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? IssuedKey = null)
 {
     public static InstallationResponse From(Installation i)
     {
@@ -65,7 +72,8 @@ public sealed record InstallationResponse(
             new InstallationDesignResponse(i.SystemSizeKw, i.PanelCount, i.InverterType, i.IsFixed),
             next, i.CanCancel, i.CanDeactivate,
             i.Assignments.OrderBy(a => a.AssignedAt).ThenBy(a => a.Id).Select(a => AssignmentResponse.From(i, a)).ToList(),
-            HistoryOf(i), i.Version);
+            HistoryOf(i), i.Version,
+            i.DeviceKeyPrefix is { } prefix ? new DeviceKeyResponse(prefix, i.DeviceKeyCreatedAt!.Value) : null);
     }
 
     // The status changes and the assignments' events, newest first; at one moment, the status change first

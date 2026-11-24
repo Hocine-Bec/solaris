@@ -16,7 +16,7 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    public enum Access { Anyone, Staff, Admin, Technician }
+    public enum Access { Anyone, Staff, Admin, Technician, Device }
 
     public enum Caller { SignedOut, Technician, Admin }
 
@@ -45,6 +45,11 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
         ["POST api/installations/{id:int}/assignments"] = Access.Admin,
         ["DELETE api/installations/{id:int}/assignments/{assignmentId:int}"] = Access.Admin,
         ["POST api/installations/{id:int}/assignments/{assignmentId:int}/complete"] = Access.Admin,
+        ["POST api/installations/{id:int}/device-key"] = Access.Admin,
+        ["POST api/telemetry/readings"] = Access.Device,
+        ["GET api/production/fleet"] = Access.Admin,
+        ["GET api/production/installations/{id:int}/years/{year:int}"] = Access.Admin,
+        ["GET api/production/installations/{id:int}/years/{year:int}/months/{month:int}"] = Access.Admin,
         ["GET api/my-work"] = Access.Technician,   // a technician's own work
         ["GET api/my-work/{installationId:int}"] = Access.Technician,
         ["POST api/my-work/{installationId:int}/assignments/{assignmentId:int}/complete"] = Access.Technician,
@@ -145,11 +150,14 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
         {
             Content = method is "POST" or "PUT" ? JsonContent.Create(new { }) : null
         };
-        var allowed = Table[endpoint] switch
+        var access = Table[endpoint];
+        var allowed = access switch
         {
             Access.Anyone => true,
             Access.Staff => caller != Caller.SignedOut,
             Access.Technician => caller == Caller.Technician,
+            // Only a device key opens these, and no caller here has one (BR-T2, ADR 14)
+            Access.Device => false,
             _ => caller == Caller.Admin
         };
 
@@ -160,6 +168,9 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
         if (allowed)
             new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden }.Should()
                 .NotContain(response.StatusCode, $"{caller} may call {endpoint}");
+        else if (access == Access.Device)
+            // A staff session isn't a device: the device scheme answers, whoever asked
+            await ShouldBeProblemAsync(response, HttpStatusCode.Unauthorized, "device.invalid_key");
         else if (caller == Caller.SignedOut)
             await ShouldBeProblemAsync(response, HttpStatusCode.Unauthorized, "unauthorized");
         else

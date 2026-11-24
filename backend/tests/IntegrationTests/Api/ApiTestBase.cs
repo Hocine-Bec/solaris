@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Application.Interfaces.Repositories;
 using Application.Interfaces.Services;
 using Domain.Entities;
@@ -166,6 +167,84 @@ public abstract class ApiTestBase(PostgresFixture database) : IntegrationTestBas
     }
 
     /// <summary>Checks the response is a ProblemDetails with this status and code, and returns its body.</summary>
+    // ---- Walking the screens' own flows, for the tests that need an installation to exist ----
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    protected static async Task<JsonElement> JsonAsync(HttpResponseMessage response) =>
+        await response.Content.ReadFromJsonAsync<JsonElement>(Ct);
+
+    protected static async Task<JsonElement> OkJsonAsync(Task<HttpResponseMessage> call)
+    {
+        var response = await call;
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(Ct));
+        return await JsonAsync(response);
+    }
+
+    /// <summary>A lead from the form, contacted and converted by the Admin: the new installation's id.</summary>
+    protected async Task<int> ConvertedAsync(HttpClient admin, string email = "jane.doe@example.com", string street = "100 Congress Ave")
+    {
+        var lead = await JsonAsync(await CreateClient().PostAsJsonAsync("/api/leads", ErrorResponseTests.ValidLead(email, street), Ct));
+        var id = lead.GetProperty("id").GetInt32();
+        await OkJsonAsync(admin.PutAsJsonAsync($"/api/leads/{id}/status", new { status = "Contacted" }, Ct));
+        var converted = await OkJsonAsync(admin.PostAsync($"/api/leads/{id}/convert", null, Ct));
+        return converted.GetProperty("installationId").GetInt32();
+    }
+
+    /// <summary>
+    /// A change as the staff app sends it (BR-I4): with the version of the installation it last read, its ETag, as
+    /// If-Match. A technician reads their installation from My work.
+    /// </summary>
+    protected static async Task<HttpResponseMessage> Change(HttpClient client, HttpMethod method, string path, object? body = null)
+    {
+        var read = await client.GetAsync(Regex.Match(path, @"^/api/(installations|my-work)/\d+").Value, Ct);
+        return await Send(client, method, path, body, read.Headers.ETag?.Tag);
+    }
+
+    protected static Task<HttpResponseMessage> Send(HttpClient client, HttpMethod method, string path, object? body, string? ifMatch)
+    {
+        var request = new HttpRequestMessage(method, path) { Content = body is null ? null : JsonContent.Create(body) };
+        if (ifMatch is not null)
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        return client.SendAsync(request, Ct);
+    }
+
+    protected static Task<JsonElement> Move(HttpClient admin, int id, string to) =>
+        OkJsonAsync(Change(admin, HttpMethod.Post, $"/api/installations/{id}/status", new { status = to }));
+
+    protected static Task<JsonElement> Assign(HttpClient admin, int id, int technicianId, string role) =>
+        OkJsonAsync(Change(admin, HttpMethod.Post, $"/api/installations/{id}/assignments", new { technicianId, role }));
+
+    protected static int AssignmentId(JsonElement installation, string role) =>
+        installation.GetProperty("assignments").EnumerateArray().First(a => a.GetProperty("role").GetString() == role)
+            .GetProperty("id").GetInt32();
+
+    /// <summary>An installation walked from conversion to Inspection, every part completed, then switched on.</summary>
+    protected async Task<(HttpClient Admin, int Id, HttpResponseMessage SwitchedOn)> SwitchedOnAsync(string street = "100 Congress Ave")
+    {
+        var admin = await CreateClientAsAsync(UserRole.Admin);
+        await CreateClientAsAsync(UserRole.Technician);
+        var techId = await IdOfAsync(TestTechnician.Email);
+        var id = await ConvertedAsync(admin, street: street);
+        foreach (var (role, then) in new[] { ("Surveyor", "Design"), ("Installer", "Installation"), ("Inspector", "") })
+        {
+            if (role == "Installer")
+            {
+                await OkJsonAsync(Change(admin, HttpMethod.Put, $"/api/installations/{id}/design", new { systemSizeKw = 8.4m, panelCount = 21, inverterType = "Enphase IQ8M" }));
+                await Move(admin, id, "Permits");
+            }
+            if (role == "Inspector")
+                await Move(admin, id, "Inspection");
+            var page = await Assign(admin, id, techId, role);
+            if (role == "Installer")
+                await Move(admin, id, "Installation");
+            await OkJsonAsync(Change(admin, HttpMethod.Post, $"/api/installations/{id}/assignments/{AssignmentId(page, role)}/complete"));
+            if (role == "Surveyor")
+                await Move(admin, id, then);
+        }
+        return (admin, id, await Change(admin, HttpMethod.Post, $"/api/installations/{id}/status", new { status = "Active" }));
+    }
+
     protected static async Task<JsonElement> ShouldBeProblemAsync(HttpResponseMessage response, HttpStatusCode status,
         string code)
     {

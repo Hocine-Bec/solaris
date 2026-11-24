@@ -442,3 +442,6 @@ $RECYCLE.BIN/
 .env.local
 .env.development
 .env.production
+
+# The measurement fleet's device keys: credentials, even for a throwaway database (ADR 14)
+perf/keys.csv

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   assignTechnician, cancelInstallation, completeAssignment, deactivateInstallation, fetchInstallation, fetchInstallations,
-  moveInstallation, recordDesign, removeAssignment, setTimeZone,
+  moveInstallation, recordDesign, removeAssignment, replaceDeviceKey, setTimeZone,
 } from './installations';
 import { completeMine, fetchMyInstallation, fetchMyWork, fetchUserAssignments } from './myWork';
 
@@ -18,7 +18,7 @@ const PECAN = {
   createdAt: '2026-10-02T09:15:00Z', activatedAt: null,
   timeZone: { id: 'America/Chicago', name: 'Central', fixed: false }, timeZones: [{ id: 'America/Chicago', name: 'Central' }],
   design: { systemSizeKw: 8.4, panelCount: 21, inverterType: 'Enphase IQ8M', fixed: false },
-  next: { status: 'Active', allowed: true, reason: null }, canCancel: true, canDeactivate: false,
+  next: { status: 'Active', allowed: true, reason: null }, canCancel: true, canDeactivate: false, deviceKey: null,
   assignments: [{
     id: 8, technician: person(8, 'Lena Park'), role: 'Inspector', assignedAt: '2026-11-19T08:05:00Z', assignedBy: person(1, 'Rosa Castillo'),
     completedAt: '2026-11-21T10:40:00Z', completedBy: person(8, 'Lena Park'), canComplete: false, canRemove: false,
@@ -49,7 +49,7 @@ describe('the installations', () => {
     const fetchMock = vi.fn<typeof fetch>(async () => json(200, PECAN, { ETag: '"4712"' }));
     vi.stubGlobal('fetch', fetchMock);
     const c = { id: 35, etag: '"4711"' };
-    await expect(moveInstallation(c, 'Active')).resolves.toEqual({ data: PECAN, etag: '"4712"' });
+    await expect(moveInstallation(c, 'Active')).resolves.toEqual({ data: PECAN, etag: '"4712"', issuedKey: null });
     await cancelInstallation(c, 'Moving away.');
     await deactivateInstallation(c, null);
     await recordDesign(c, { systemSizeKw: 8.4, panelCount: 21, inverterType: null });
@@ -57,6 +57,7 @@ describe('the installations', () => {
     await assignTechnician(c, 7, 'Installer');
     await removeAssignment(c, 5);
     await completeAssignment(c, 5);
+    await replaceDeviceKey(c);
     expect(sent(fetchMock)).toEqual([
       'POST /api/installations/35/status {"status":"Active"} If-Match "4711"',
       'POST /api/installations/35/cancel {"reason":"Moving away."} If-Match "4711"',
@@ -66,7 +67,17 @@ describe('the installations', () => {
       'POST /api/installations/35/assignments {"technicianId":7,"role":"Installer"} If-Match "4711"',
       'DELETE /api/installations/35/assignments/5 If-Match "4711"',
       'POST /api/installations/35/assignments/5/complete If-Match "4711"',
+      'POST /api/installations/35/device-key If-Match "4711"',
     ]);
+  });
+
+  it('gives the device key from switching on apart from the installation, so it is never cached with it', async () => {
+    const key = 'ost46n6gr6ny.mexkZJqRqA8vDdRO3rZsIDFDl0BhmvStDmX66DDALG4';
+    const active = { ...PECAN, status: 'Active', deviceKey: { prefix: 'ost46n6gr6ny', issuedAt: '2026-11-22T10:12:00Z' } };
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async () => json(200, { ...active, issuedKey: key }, { ETag: '"4712"' })));
+    const changed = await moveInstallation({ id: 35, etag: '"4711"' }, 'Active');
+    expect(changed).toEqual({ data: active, etag: '"4712"', issuedKey: key });
+    expect(JSON.stringify(changed.data)).not.toContain(key);
   });
 
   it('sends no If-Match without a version', async () => {

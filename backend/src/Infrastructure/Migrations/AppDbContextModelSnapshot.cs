@@ -156,6 +156,37 @@ namespace Infrastructure.Migrations
                     b.ToTable("customers", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.EnergyReading", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("EnergyKwh")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("numeric(10,4)")
+                        .HasColumnName("energy_kwh");
+
+                    b.Property<int>("InstallationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("installation_id");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_energy_readings");
+
+                    b.HasIndex("InstallationId")
+                        .HasDatabaseName("ix_energy_readings_installation_id");
+
+                    b.ToTable("energy_readings", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.Installation", b =>
                 {
                     b.Property<int>("Id")
@@ -180,6 +211,19 @@ namespace Infrastructure.Migrations
                     b.Property<int>("CustomerId")
                         .HasColumnType("integer")
                         .HasColumnName("customer_id");
+
+                    b.Property<DateTime?>("DeviceKeyCreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("device_key_created_at");
+
+                    b.Property<byte[]>("DeviceKeyHash")
+                        .HasColumnType("bytea")
+                        .HasColumnName("device_key_hash");
+
+                    b.Property<string>("DeviceKeyPrefix")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("device_key_prefix");
 
                     b.Property<string>("InverterType")
                         .HasMaxLength(100)
@@ -229,6 +273,10 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("CustomerId")
                         .HasDatabaseName("ix_installations_customer_id");
+
+                    b.HasIndex("DeviceKeyPrefix")
+                        .IsUnique()
+                        .HasDatabaseName("ux_installations_device_key_prefix");
 
                     b.HasIndex("LeadId")
                         .HasDatabaseName("ix_installations_lead_id");
@@ -679,6 +727,18 @@ namespace Infrastructure.Migrations
                         .HasConstraintName("fk_customers_addresses_contact_address_id");
 
                     b.Navigation("ContactAddress");
+                });
+
+            modelBuilder.Entity("Domain.Entities.EnergyReading", b =>
+                {
+                    b.HasOne("Domain.Entities.Installation", "Installation")
+                        .WithMany()
+                        .HasForeignKey("InstallationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_energy_readings_installations_installation_id");
+
+                    b.Navigation("Installation");
                 });
 
             modelBuilder.Entity("Domain.Entities.Installation", b =>

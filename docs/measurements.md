@@ -122,18 +122,32 @@ only, and measurement runs use the Development environment with a Release build.
 
 ---
 
-## 5. Dataset generator *(planned)*
+## 5. Dataset generator
 
 `backend/tools/Solaris.DataGen` is a console app that creates Active installations (4–12 kW), spread across states
 and time zones, and writes their readings with `COPY` (`NpgsqlBinaryImporter`):
 
 ```
-dotnet run --project backend/tools/Solaris.DataGen -- --installations 1000 --days 120 --seed 42 --schema final
+dotnet run --project backend/tools/Solaris.DataGen -c Release -- \
+  --installations 1000 --days 120 --seed 42 --schema naive --connection "$CONNECTION"
 ```
 
-- `--schema naive | final` writes the readings in the P4 "before" or "after" table layout.
-- A fixed seed makes every dataset reproducible.
-- It writes the installations' device keys to `perf/keys.csv`, for the ingestion runs (Development only).
+- `--schema naive | final` writes the readings in the P4 "before" or "after" table layout. It checks the table's
+  columns first and says which migration is missing rather than failing inside `COPY`, so asking for a layout the
+  database hasn't got leaves nothing behind.
+- `--connection` names the database, or `ConnectionStrings__Default` from the environment. It refuses one that
+  already holds installations or readings, so a dataset is never doubled by a second run.
+- The readings end with **yesterday**, the last day that has certainly finished in every zone, and go back
+  `--days` from there. Each installation's days are its own local days (BR-P4), so a day is 92, 96 or 100 slots
+  where the clocks change.
+- **A fixed seed makes the same readings every time**, checked by generating twice and comparing the count, the
+  sum and the first and last slots. The device keys are *not* from the seed: they are credentials, made by the
+  cryptographic generator (ADR 14), so each run writes different ones to `--keys` (default `perf/keys.csv`), which
+  the ingestion run then uploads with. The file is for a throwaway measurement database, never a real one.
+- Measured on the test laptop: **about 96,000 readings a second** (200 installations × 30 days = 231,580 readings
+  in 2.4 s, the fleet itself in 1.1 s), so dataset M is a couple of minutes.
+- The fleet covers 51 states and **7** zones: no state is proposed the Aleutian zone, which only the far west of
+  Alaska uses.
 
 The data is shaped to look real:
 - a daylight bell curve around each installation's local noon, wider in summer
@@ -484,6 +498,11 @@ values, so any is the median: run 2 is reported. Raw results in `perf/results/p3
 
 ## 9. P4 — Telemetry at volume
 
+**Scripts:** `perf/p4/run.sh <a|b> <run number> [before|after]`, on a fresh database and the API's Release build, as
+P1's, P2's and P3's (§3). Each run generates its own dataset with §5's generator, in the layout the design needs
+(`naive` before, `final` after). Results: `perf/results/p4/<date>-<before|after>/<a|b>-run<N>/` (`results.json`,
+`env.md`, `dataset.txt`, the plans, k6's summary and output, the API's log).
+
 ### P4a — Backfill-storm ingestion
 
 **Question.** After an internet outage, 1,000 devices upload two days of readings at once. How fast does
@@ -498,7 +517,10 @@ ingestion go, and do retried batches create duplicates?
 installation → **192,000 readings in 2,000 batches of 96**.
 
 **Steps:** 50 concurrent devices upload all the batches as fast as allowed. **20% of the batches are sent
-twice**, some at the same time as the original (simulated retries).
+twice**, some at the same time as the original (simulated retries). The fleet is generated with `--days 0`, so every
+reading in the database came from an upload; the batches are shuffled in a fixed order, so a retry usually overlaps
+its original rather than following it. Each reading is 400 Wh, under what the smallest system in the fleet may
+produce in a slot (BR-T1), so nothing is rejected for its size.
 
 **Counted:**
 - accepted readings ÷ wall time = **readings/s**
@@ -531,8 +553,11 @@ twice**, some at the same time as the original (simulated retries).
    took**.
 
 **Steps:** for each endpoint, warm up for 30 s, then a constant 10 req/s for 1 minute, with random installations
-and months or years. One representative call per endpoint is saved with `EXPLAIN (ANALYZE, BUFFERS)`, before and
-after.
+and months or years. The three run one after another, so each one's numbers are its own, and only the measured
+minute is recorded. One representative call per endpoint is saved with `EXPLAIN (ANALYZE, BUFFERS)`, before and
+after: the statements are the ones the endpoints send, read from the API's own EF Core log and written out with
+their values. The fleet's view sends one of them per time zone its installations are in (7 for a nationwide fleet),
+since each zone's day covers its own hours (BR-P4).
 
 | Endpoint | Design | p50 | p95 | p99 | Errors | Plan file |
 |---|---|---|---|---|---|---|

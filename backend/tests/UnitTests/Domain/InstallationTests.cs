@@ -150,6 +150,41 @@ public class InstallationTests
     }
 
     [Theory]
+    [InlineData(InstallationStatus.Active, true)]
+    [InlineData(InstallationStatus.Inspection, false)]
+    [InlineData(InstallationStatus.Cancelled, false)]
+    [InlineData(InstallationStatus.Deactivated, false)]
+    public void BR_T2_DeviceKey_OnlyWhileActive(InstallationStatus at, bool allowed)
+    {
+        var installation = Ready(at);
+
+        var refusal = installation.SetDeviceKey("ost46n6gr6ny", [1, 2, 3], Now);
+
+        if (allowed)
+        {
+            refusal.Should().BeNull();
+            (installation.DeviceKeyPrefix, installation.DeviceKeyHash, installation.DeviceKeyCreatedAt)
+                .Should().BeEquivalentTo(("ost46n6gr6ny", new byte[] { 1, 2, 3 }, (DateTime?)Now));
+        }
+        else
+        {
+            refusal!.Code.Should().Be("installation.not_active");
+            installation.DeviceKeyPrefix.Should().BeNull();
+        }
+    }
+
+    [Fact]
+    public void BR_T2_Deactivating_DeletesTheDeviceKey()
+    {
+        var installation = Ready(InstallationStatus.Active);
+        installation.SetDeviceKey("ost46n6gr6ny", [1, 2, 3], Now);
+
+        installation.Deactivate("Removed with the roof.", Admin, Now);
+
+        (installation.DeviceKeyPrefix, installation.DeviceKeyHash, installation.DeviceKeyCreatedAt).Should().Be((null, null, null));
+    }
+
+    [Theory]
     [InlineData(InstallationStatus.Permits, false)]
     [InlineData(InstallationStatus.Active, true)]
     [InlineData(InstallationStatus.Cancelled, true)]

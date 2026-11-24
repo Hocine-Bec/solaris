@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using Domain.Enums;
 using FluentAssertions;
+using Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -125,6 +126,36 @@ public class AuthorizationTests(PostgresFixture database) : ApiTestBase(database
         var result = await AuthorizationService().AuthorizeAsync(new ClaimsPrincipal(new ClaimsIdentity()), policy);
 
         result.Succeeded.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(Policies.Device, true)]
+    [InlineData(Policies.Admin, false)]
+    [InlineData(Policies.Technician, false)]
+    [InlineData(Policies.Staff, false)]
+    public async Task Policy_ForADevice_OnlyTheDevicePolicy(string policy, bool allowed)
+    {
+        var device = new ClaimsPrincipal(new ClaimsIdentity([new Claim(DeviceKeyAuthentication.InstallationIdClaim, "12")],
+            DeviceKeyAuthentication.Scheme));
+
+        var result = await AuthorizationService().AuthorizeAsync(device, policy);
+
+        result.Succeeded.Should().Be(allowed);
+    }
+
+    [Theory]
+    [InlineData("Admin")]
+    [InlineData("Technician")]
+    public async Task Policy_Device_RefusesStaff_AndReadsTheDeviceSchemeOnly(string role)
+    {
+        var staff = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "1"), new Claim("role", role)], "Bearer", "sub", "role"));
+        var services = new ServiceCollection().AddLogging().AddStaffPolicies().BuildServiceProvider();
+
+        var result = await services.GetRequiredService<IAuthorizationService>().AuthorizeAsync(staff, Policies.Device);
+        var policy = await services.GetRequiredService<IAuthorizationPolicyProvider>().GetPolicyAsync(Policies.Device);
+
+        result.Succeeded.Should().BeFalse();
+        policy!.AuthenticationSchemes.Should().Equal(DeviceKeyAuthentication.Scheme);
     }
 
     private static IAuthorizationService AuthorizationService() =>
