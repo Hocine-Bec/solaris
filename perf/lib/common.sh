@@ -138,7 +138,7 @@ write_env() {
     echo "Power profile:  $(powerprofilesctl get 2>/dev/null || echo unknown) ; $(power_source) ; CPU MHz during the run: $mhz"
     echo ".NET:           $(dotnet --version) (Release build)"
     echo "PostgreSQL:     postgres:18 in Docker · $(sql 'select version()') · configuration changes: none"
-    echo "Dataset:        an empty database; the run creates its own leads"
+    echo "Dataset:        ${DATASET_NOTE:-an empty database; the run creates its own leads}"
     echo "Load tool:      $(k6 version | head -1) · $script"
     echo "Other load:     containers: $(docker ps --format '{{.Names}}' | grep -vx "$DB_CONTAINER" | paste -sd, - || true); browser: $(pgrep -x 'firefox|chrome|chromium|brave' >/dev/null && echo running || echo 'not running')"
     echo "Notes:          $notes"
