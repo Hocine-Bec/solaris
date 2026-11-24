@@ -14,6 +14,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<InstallationAssignment> InstallationAssignments { get; set; }
     public DbSet<User> Users { get; set; }
 
+    /// <summary>What the installations' systems produce, 15 minutes at a time (BR-T1).</summary>
+    public DbSet<EnergyReading> EnergyReadings { get; set; }
+
     /// <summary>Notifications waiting to be sent, saved with the event that causes them (BR-N1).</summary>
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
 
