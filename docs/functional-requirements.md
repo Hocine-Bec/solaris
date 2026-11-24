@@ -118,18 +118,33 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
 - **BR-P1 Expected production.** Expected daily kWh = system size (kW) × peak sun hours for the month in the
   installation's state × 0.80.
 
-  The peak sun hours come from a table of monthly averages per state, taken from NREL's published solar data
-  for one representative city per state; the table and its exact source are added with the code that uses it.
-  Weather isn't modelled.
-- **BR-P2 Health.** Ratio = actual ÷ expected for the day.
+  The peak sun hours come from a table of monthly averages per state (`Domain/Common/PeakSunHours.cs`), read from
+  the lab's published solar data for one representative city per state: the most populous, and Washington for the
+  District of Columbia. Every city, its coordinates, the numbers and the source of each row are in
+  `docs/data/peak-sun-hours.json`, which the table is generated from. Weather isn't modelled: these are long-term
+  averages, so a cloudy week makes a system look worse than it is, which is why BR-P2 judges a system against the
+  fleet rather than against this table alone.
+- **BR-P2 Health.** A day's ratio = actual ÷ expected (BR-P1). Health compares that ratio with **the fleet's**
+  for the same day, not with the expected production alone: the weather moves every system together, so a cloudy
+  week would otherwise read as a fleet of broken systems ([ADR 15](adr/0015-health-against-the-fleet.md)).
+
+  The day's **fleet ratio** is the median of the ratios of every Active installation that reported at least one
+  reading that day, nationwide. Systems that reported nothing are left out of it: they are Offline, and would
+  otherwise drag the middle down. With fewer than **10** reporting systems there is no meaningful middle, and the
+  ratio is judged on its own.
 
   | Health | Rule |
   |---|---|
-  | Excellent | ratio ≥ 0.90 |
-  | Good | 0.80 ≤ ratio < 0.90 |
-  | Warning | 0.60 ≤ ratio < 0.80 |
-  | Critical | ratio < 0.60 and some readings exist |
+  | Excellent | ratio ≥ 0.90 × the fleet's |
+  | Good | 0.80 × the fleet's ≤ ratio < 0.90 × the fleet's |
+  | Warning | 0.60 × the fleet's ≤ ratio < 0.80 × the fleet's |
+  | Critical | below 0.60 × the fleet's, and some readings exist |
   | Offline | no readings at all for that day |
+
+  So health answers "is this system keeping pace with its neighbours", not "is it producing a lot": on a dark day a
+  system that made little alongside everyone else is healthy, and a system that fell behind the others on a bright
+  day is not, even if it met the table. A system that is switched on during a day isn't judged on that day's
+  predecessors: it wasn't there to produce anything.
 - **BR-P3 Late data.** When readings arrive for a past day, that day's rollup is recalculated. Recalculating the
   same day twice gives the same result.
 - **BR-P4 Local days.** Every installation has a time zone, proposed from its state when it is created and
