@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Application\Application.csproj" />
     <ProjectReference Include="..\..\src\Domain\Domain.csproj" />
+    <ProjectReference Include="..\..\tools\Solaris.DataGen\Solaris.DataGen.csproj" />
   </ItemGroup>
 
   <ItemGroup>
