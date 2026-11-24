@@ -46,6 +46,8 @@ export const installationSchema = z.object({
   next: z.object({ status: z.enum(INSTALLATION_STATUSES), allowed: z.boolean(), reason: z.string().nullable() }).nullable(),
   canCancel: z.boolean(),
   canDeactivate: z.boolean(),
+  /** How its device key starts and when it was made, while it is Active and has one: never the key (BR-T2) */
+  deviceKey: z.object({ prefix: z.string(), issuedAt: z.iso.datetime() }).nullable(),
   assignments: z.array(z.object({
     id: z.number().int(),
     technician: person,
@@ -88,9 +90,20 @@ export function fetchInstallations(statuses: readonly InstallationStatus[], page
 export const fetchInstallation = (id: number, signal?: AbortSignal): Promise<Tagged<Installation>> =>
   requestTagged(`/installations/${id}`, { schema: installationSchema, signal });
 
+/**
+ * A change's answer: the installation with its version and, only from switching on or replacing the key, the device
+ * key itself (BR-T2). The key is apart from the installation so that it is shown once and never kept: the page puts
+ * `data` and `etag` in the query cache, never `issuedKey`.
+ */
+export type Changed = Tagged<Installation> & { issuedKey: string | null };
+const changedSchema = installationSchema.extend({ issuedKey: z.string().optional() });
+
 type Change = { id: number; etag: string | null };
-const change = (path: string, method: 'POST' | 'PUT' | 'DELETE', { id, etag }: Change, body?: unknown) =>
-  requestTagged(`/installations/${id}${path}`, { method, body, ifMatch: etag, schema: installationSchema });
+const change = async (path: string, method: 'POST' | 'PUT' | 'DELETE', { id, etag }: Change, body?: unknown): Promise<Changed> => {
+  const { data: { issuedKey, ...data }, etag: version } =
+    await requestTagged(`/installations/${id}${path}`, { method, body, ifMatch: etag, schema: changedSchema });
+  return { data, etag: version, issuedKey: issuedKey ?? null };
+};
 
 /** The next stage, when its condition is met (BR-I1) */
 export const moveInstallation = (c: Change, status: InstallationStatus) => change('/status', 'POST', c, { status });
@@ -104,3 +117,5 @@ export const assignTechnician = (c: Change, technicianId: number, role: Assignme
 export const removeAssignment = (c: Change, assignmentId: number) => change(`/assignments/${assignmentId}`, 'DELETE', c);
 /** An Admin marks a technician's part complete for them (FR-I6) */
 export const completeAssignment = (c: Change, assignmentId: number) => change(`/assignments/${assignmentId}/complete`, 'POST', c);
+/** A new device key, shown once; the one it had stops working (BR-T2) */
+export const replaceDeviceKey = (c: Change) => change('/device-key', 'POST', c);

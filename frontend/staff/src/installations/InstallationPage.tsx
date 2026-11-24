@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Ban, Check, CircleCheck, ClipboardCheck, DraftingCompass, HardHat, Lock, Pencil, PowerOff, ScanSearch, Stamp, TriangleAlert, UserPlus, X, Zap, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Ban, Check, CircleCheck, ClipboardCheck, Copy, DraftingCompass, HardHat, KeyRound, Lock, Pencil, PowerOff, RefreshCw, ScanSearch, ShieldCheck, Stamp, TriangleAlert, UserPlus, X, Zap, type LucideIcon } from 'lucide-react';
 import type { Tagged } from '../api/client';
 import { CUSTOMERS_KEY } from '../api/customers';
 import { ApiError, isStale } from '../api/errors';
 import {
   assignTechnician, cancelInstallation, completeAssignment, deactivateInstallation, fetchInstallation, INSTALLATIONS_KEY,
-  installationKey, moveInstallation, recordDesign, removeAssignment, setTimeZone, type Installation,
+  installationKey, moveInstallation, recordDesign, removeAssignment, replaceDeviceKey, setTimeZone, type Changed, type Installation,
 } from '../api/installations';
 import { MY_WORK_KEY } from '../api/myWork';
 import { Icon } from '../components/Icon';
@@ -24,11 +24,11 @@ import { opensFor } from '../shell/sections';
 import { ConflictNotice, NotAllowed, NotFound } from '../states/States';
 import { QueryView } from '../states/QueryView';
 import { designSchema } from './forms';
-import { AssignDialog, CancelDialog, DeactivateDialog, SwitchOnDialog } from './InstallationDialogs';
+import { AssignDialog, CancelDialog, DeactivateDialog, ReplaceKeyDialog, SwitchOnDialog } from './InstallationDialogs';
 import { historyBy, historyLine, isRefusal, kw, STAGES } from './view';
 
 type Tab = 'overview' | 'assignments' | 'history' | 'production';
-type Open = 'switchOn' | 'cancel' | 'deactivate' | 'assign' | null;
+type Open = 'switchOn' | 'cancel' | 'deactivate' | 'assign' | 'replaceKey' | null;
 
 const UNEXPECTED = 'Something went wrong in the app. Try again; if it happens again, report it.';
 const TABS: [Tab, string][] = [['overview', 'Overview'], ['assignments', 'Assignments'], ['history', 'History'], ['production', 'Production']];
@@ -69,11 +69,16 @@ function InstallationView({ tagged }: { tagged: Tagged<Installation> }) {
   const [refused, setRefused] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
+  // The device key just made: in this component's state only, so it is gone once the page is left (BR-T2)
+  const [shownKey, setShownKey] = useState<{ key: string; replaced: boolean } | null>(null);
   const current = { id: i.id, etag: tagged.etag };
 
-  /** The installation as the API answered it: shown at once; the lists, the customer and My work load again when shown. */
+  /**
+   * The installation as the API answered it: shown at once; the lists, the customer and My work load again when shown.
+   * Only the installation and its version are cached, never a device key in the answer.
+   */
   const keep = (changed: Tagged<Installation>) => {
-    queryClient.setQueryData(installationKey(i.id), changed);
+    queryClient.setQueryData<Tagged<Installation>>(installationKey(i.id), { data: changed.data, etag: changed.etag });
     void queryClient.invalidateQueries({ queryKey: [...INSTALLATIONS_KEY, 'page'] });
     void queryClient.invalidateQueries({ queryKey: CUSTOMERS_KEY });
     void queryClient.invalidateQueries({ queryKey: MY_WORK_KEY });
@@ -123,6 +128,18 @@ function InstallationView({ tagged }: { tagged: Tagged<Installation> }) {
     if (focusTitle) document.getElementById('page-title')?.focus();
   };
   const show = (dialog: Open) => { clear(); setOpen(dialog); };
+  /** Switched on, or its key replaced: the key, once, above the cards; focus goes to it. */
+  const keyMade = (said: string, replaced: boolean) => (changed: Changed) => {
+    flushSync(() => {
+      keep(changed); setOpen(null); setSaved(said); setTab('overview');
+      setShownKey(changed.issuedKey ? { key: changed.issuedKey, replaced } : null);
+    });
+    document.getElementById(changed.issuedKey ? 'key-shown' : 'page-title')?.focus();
+  };
+  const keyDone = () => {
+    flushSync(() => setShownKey(null));
+    document.getElementById('page-title')?.focus();
+  };
 
   const onTabKey = (e: React.KeyboardEvent) => {
     const index = TABS.findIndex(([k]) => k === tab);
@@ -178,10 +195,12 @@ function InstallationView({ tagged }: { tagged: Tagged<Installation> }) {
             <div className="ov-main">
               <NextMove installation={i} saved={saved} busy={change.isPending}
                 onMove={to => void run(() => moveInstallation(current, to), 'Saved', 'page-title')} onSwitchOn={() => show('switchOn')} />
+              {shownKey && <KeyShown shown={shownKey} street={i.address.street} onDone={keyDone} />}
               <DesignCard installation={i} editing={editing === 'design'} onEdit={on => { clear(); setEditing(on ? 'design' : null); }}
                 save={design => recordDesign(current, design)} onSaved={changed => { keep(changed); setEditing(null); setSaved('Saved'); }} onFailed={onFailed} />
               <ZoneCard installation={i} editing={editing === 'zone'} onEdit={on => { clear(); setEditing(on ? 'zone' : null); }}
                 save={zone => setTimeZone(current, zone)} onSaved={changed => { keep(changed); setEditing(null); setSaved('Saved'); }} onFailed={onFailed} />
+              <DeviceKeyCard installation={i} onReplace={() => show('replaceKey')} />
             </div>
           </>
         )}
@@ -201,10 +220,11 @@ function InstallationView({ tagged }: { tagged: Tagged<Installation> }) {
         )}
       </div>
 
-      {open === 'switchOn' && <SwitchOnDialog installation={i} send={() => moveInstallation(current, 'Active')} onClose={() => setOpen(null)} onDone={done('Saved')} onRefused={onDialogRefused} />}
+      {open === 'switchOn' && <SwitchOnDialog installation={i} send={() => moveInstallation(current, 'Active')} onClose={() => setOpen(null)} onDone={keyMade('Saved', false)} onRefused={onDialogRefused} />}
       {open === 'cancel' && <CancelDialog installation={i} send={reason => cancelInstallation(current, reason)} onClose={() => setOpen(null)} onDone={done('Cancelled')} onRefused={onDialogRefused} />}
-      {open === 'deactivate' && <DeactivateDialog installation={i} send={note => deactivateInstallation(current, note)} onClose={() => setOpen(null)} onDone={done('Deactivated')} onRefused={onDialogRefused} />}
+      {open === 'deactivate' && <DeactivateDialog installation={i} send={note => deactivateInstallation(current, note)} onClose={() => setOpen(null)} onDone={changed => { setShownKey(null); done('Deactivated')(changed); }} onRefused={onDialogRefused} />}
       {open === 'assign' && <AssignDialog installation={i} send={(t, r) => assignTechnician(current, t, r)} onClose={() => setOpen(null)} onDone={done('Assigned', false)} onRefused={onDialogRefused} />}
+      {open === 'replaceKey' && <ReplaceKeyDialog installation={i} send={() => replaceDeviceKey(current)} onClose={() => setOpen(null)} onDone={keyMade('Saved', i.deviceKey !== null)} onRefused={onDialogRefused} />}
     </>
   );
 }
@@ -382,6 +402,81 @@ function ZoneCard({ installation: i, editing, onEdit, save, onSaved, onFailed }:
       <p className="dim-note">
         {i.timeZone.fixed ? 'Its readings are counted per local day in this zone.' : `Proposed from ${i.address.state}. You confirm it when you switch the system on.`}
       </p>
+    </div>
+  );
+}
+
+/**
+ * The device key, once (BR-T2): just made, at switch-on or by a replacement. Nothing else ever shows it: Solaris keeps
+ * only its hash. Copy puts it on the clipboard; where the browser refuses, the key is selected for copying by hand.
+ */
+function KeyShown({ shown, street, onDone }: { shown: { key: string; replaced: boolean }; street: string; onDone: () => void }) {
+  const [copied, setCopied] = useState<'yes' | 'no' | null>(null);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(shown.key);
+      setCopied('yes');
+      setTimeout(() => setCopied(c => (c === 'yes' ? null : c)), 2000);
+    } catch {
+      setCopied('no');
+      const range = document.createRange();
+      const code = document.getElementById('key-value');
+      if (code) { range.selectNodeContents(code); getSelection()?.removeAllRanges(); getSelection()?.addRange(range); }
+    }
+  };
+  return (
+    <section className="key-shown" id="key-shown" tabIndex={-1} aria-labelledby="key-shown-title">
+      <div className="kp-top">
+        <Icon icon={KeyRound} />
+        <p>
+          <b id="key-shown-title">{shown.replaced ? 'The new device key' : 'Its device key'}, shown only now</b>
+          The system at {street} sends its readings with it{shown.replaced && '; the old key no longer works'}. Copy it into the system's monitoring settings.
+        </p>
+        <button className="btn btn-quiet btn-sm" type="button" onClick={onDone}>Done</button>
+      </div>
+      <div className="key-row">
+        <code className="key-value" id="key-value">{shown.key}</code>
+        <button className={`btn btn-secondary${copied === 'yes' ? ' copied' : ''}`} type="button" onClick={() => void copy()}>
+          <Icon icon={copied === 'yes' ? Check : Copy} />{copied === 'yes' ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <p className="sr-status" role="status">{copied === 'yes' ? 'Copied' : ''}</p>
+      {copied === 'no' && <p className="field-error"><Icon icon={TriangleAlert} /><span>This browser didn't allow copying: the key is selected, copy it with the keyboard.</span></p>}
+      <p className="after">Once this panel is closed, nobody can show it again, the office included. If it's lost, use Replace key… on the Device key card.</p>
+    </section>
+  );
+}
+
+/** The device key on the overview (BR-T2): how it starts and when it was made; deleted once deactivated. */
+function DeviceKeyCard({ installation: i, onReplace }: { installation: Installation; onReplace: () => void }) {
+  if (i.status === 'Deactivated') {
+    const at = i.history.find(h => h.kind === 'Status' && h.to === 'Deactivated')?.at;
+    return (
+      <div className="rec-card key-card">
+        <div className="card-head"><p className="a-label">Device key</p><span className="fixed-note"><Icon icon={Ban} />Deleted</span></div>
+        <p className="revoked">Deleted when the system was deactivated{at && `, ${formatDay(at)}`}. A device still sending it is refused.</p>
+      </div>
+    );
+  }
+  if (i.status !== 'Active') return null;
+  const key = i.deviceKey;
+  return (
+    <div className="rec-card key-card">
+      <div className="card-head">
+        <p className="a-label">Device key</p>
+        {key && <span className="fixed-note"><Icon icon={ShieldCheck} />Valid</span>}
+      </div>
+      {key ? (
+        <>
+          <dl className="kv"><dt>Starts with</dt><dd><code>{key.prefix}.</code></dd><dt>Made</dt><dd>{formatMoment(key.issuedAt)}</dd></dl>
+          <p className="dim-note">The system sends its readings with it. Solaris keeps only a fingerprint: the key itself was shown once.</p>
+        </>
+      ) : (
+        <p className="dim-note">This system has no key yet: it was switched on before device keys existed. Make one for it to send its readings.</p>
+      )}
+      <div className="key-actions">
+        <button className="btn btn-secondary btn-sm" type="button" onClick={onReplace}><Icon icon={RefreshCw} />{key ? 'Replace key…' : 'Make a key…'}</button>
+      </div>
     </div>
   );
 }
