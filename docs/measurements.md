@@ -540,7 +540,7 @@ produce in a slot (BR-T1), so nothing is rejected for its size.
 | Design | Readings | Wall time | **Readings/s** | Batch p95 | Duplicates in DB | Errors |
 |---|---|---|---|---|---|---|
 | Before | 192,000 | 19.97 s | 9,640 | 663 ms | 502 | 0 |
-| After | 192,000 | | | | | |
+| After | 192,000 | 5.04 s | 38,127 | 43 ms | 0 | 0 |
 
 **Before, as measured** (2026-11-24, tag `p4-before`, no uncommitted change; mains power, balanced profile, no
 browser, the dev database's container running idle; 2,499–3,200 MHz during the load). 3 runs; the median by
@@ -551,6 +551,21 @@ readings a second is reported (run 2). Raw results in `perf/results/p4/2026-11-2
   reading at a time, so a retry that arrives while its original is still being stored passes the check too. Of the
   37,883–37,898 readings the API answered as duplicates, these are the ones that slipped through.
 - The rows stored come to 192,517, 192,502 and 192,511: the 192,000 real slots plus one row for each duplicate.
+
+**After, as measured** (2026-11-27, `main` with the fixes merged and the run script's duplicate count corrected,
+`p4-before-4-g04f2b21`, no uncommitted change; the same conditions as the before). 3 runs; the median by readings a
+second is reported (run 2). Raw results in `perf/results/p4/2026-11-27-after/a-run1` … `a-run3`.
+- **Duplicates in the database: 0, in every run.** Each run stored exactly the 192,000 real slots and answered all
+  38,400 retried readings (400 batches sent twice × 96) as duplicates: the table's key passes over a slot it already
+  holds, however many devices send it at once.
+- Readings a second: 38,113, 38,127 and 38,190 (before: 9,238–10,018), each batch one statement instead of 96 checks
+  and saves; batch p95 42.7, 43.1 and 41.1 ms (before: 652–663 ms), p99 218–222 ms. No errors and nothing rejected.
+- Each run took about 5.0 s from k6's start to its end, including its loading of the keys and building the batches,
+  so the rate is a little under what the API alone did.
+- The CPU clock sampled 5 s into a 5-second load read 399–495, 399–500 and 400–3,084 MHz: the load was mostly over
+  when it was read. The three runs' rates agree to within 0.2%, so none was redone.
+- A first set of after runs, the same day, stopped at the duplicate count: the run script still named the before's
+  column, renamed in the fixes. Their databases went with them, so they had no count; these are the reruns.
 
 ### P4b — Dashboards at 11.4 million readings
 
