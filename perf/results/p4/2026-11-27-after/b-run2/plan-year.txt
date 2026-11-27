@@ -1,0 +1,16 @@
+Sort  (cost=329.77..330.07 rows=119 width=12) (actual time=0.329..0.333 rows=119.00 loops=1)
+  Sort Key: day
+  Sort Method: quicksort  Memory: 28kB
+  Buffers: shared hit=116
+  ->  Bitmap Heap Scan on energy_production e  (cost=5.93..325.67 rows=119 width=12) (actual time=0.032..0.303 rows=119.00 loops=1)
+        Recheck Cond: ((installation_id = 1) AND (day >= '2026-01-01'::date) AND (day < '2027-01-01'::date))
+        Heap Blocks: exact=110
+        Buffers: shared hit=113
+        ->  Bitmap Index Scan on pk_energy_production  (cost=0.00..5.91 rows=119 width=0) (actual time=0.016..0.016 rows=119.00 loops=1)
+              Index Cond: ((installation_id = 1) AND (day >= '2026-01-01'::date) AND (day < '2027-01-01'::date))
+              Index Searches: 1
+              Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=120
+Planning Time: 0.251 ms
+Execution Time: 0.363 ms

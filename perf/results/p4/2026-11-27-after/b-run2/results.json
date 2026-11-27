@@ -1,0 +1,34 @@
+{
+  "part": "P4b",
+  "run": 2,
+  "design": "after",
+  "readings_in_database": 11414664,
+  "full_rollup": {
+    "batches": 119,
+    "days": 118863,
+    "seconds": 21.9356775
+  },
+  "views": {
+    "fleet": {
+      "requests": 601,
+      "p50_ms": 37.261835,
+      "p95_ms": 49.544502,
+      "p99_ms": 57.197214,
+      "errors": 0
+    },
+    "month": {
+      "requests": 601,
+      "p50_ms": 13.457672,
+      "p95_ms": 17.015412,
+      "p99_ms": 18.79413,
+      "errors": 0
+    },
+    "year": {
+      "requests": 601,
+      "p50_ms": 14.392632,
+      "p95_ms": 19.392752,
+      "p99_ms": 25.533389,
+      "errors": 0
+    }
+  }
+}

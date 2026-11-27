@@ -1,0 +1,15 @@
+1,000 installations, 120 days to 2026-11-26, seed 42, final layout
+  1,000 installations, their keys in /home/hous/projects/freelance/solar-crm/solaris/perf/keys.csv (1.6 s)
+  1,000,000 readings (2.4 s)
+  2,000,000 readings (3.3 s)
+  3,000,000 readings (4.2 s)
+  4,000,000 readings (5.2 s)
+  5,000,000 readings (6.2 s)
+  6,000,000 readings (7.1 s)
+  7,000,000 readings (8.0 s)
+  8,000,000 readings (9.0 s)
+  9,000,000 readings (9.9 s)
+  10,000,000 readings (10.9 s)
+  11,000,000 readings (12.0 s)
+  11,414,664 readings written in 47.8 s (238,847 rows/s)
+  systems: 898 healthy, 67 degraded, 35 failing; 7 time zones, 51 states, 4–12 kW

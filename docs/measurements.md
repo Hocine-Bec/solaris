@@ -580,11 +580,11 @@ since each zone's day covers its own hours (BR-P4).
 | Endpoint | Design | p50 | p95 | p99 | Errors | Plan file |
 |---|---|---|---|---|---|---|
 | Fleet (FR-P2) | before | 41,014 ms | 53,203 ms | 55,295 ms | 0 | `b-run3/plan-fleet.txt` |
-| Fleet (FR-P2) | after | | | | | |
+| Fleet (FR-P2) | after | 37.5 ms | 53.7 ms | 60.2 ms | 0 | `b-run1/plan-fleet.txt` |
 | Month (FR-P3) | before | 27.5 ms | 39.5 ms | 44.1 ms | 0 | `b-run3/plan-month.txt` |
-| Month (FR-P3) | after | | | | | |
+| Month (FR-P3) | after | 13.2 ms | 16.9 ms | 18.1 ms | 0 | `b-run1/plan-month.txt` |
 | Year (FR-P4) | before | 39.8 ms | 58.2 ms | 66.8 ms | 0 | `b-run3/plan-year.txt` |
-| Year (FR-P4) | after | | | | | |
+| Year (FR-P4) | after | 14.5 ms | 20.0 ms | 26.1 ms | 0 | `b-run1/plan-year.txt` |
 
 **Before, as measured** (2026-11-27; the API exactly as tagged `p4-before` — `git diff p4-before -- backend/src` is
 empty — with the generator's copy timeout fixed since, which the API under test doesn't use; the same conditions as
@@ -602,5 +602,24 @@ wrote the night slots, which it doesn't use.
 - The month and the year read one installation's rows through the index on `installation_id` and are quick in the
   database — 1.8 ms and 3.8 ms — so their 27.5 ms and 39.8 ms are mostly the day-by-day work in the app. Both took
   their full 600 requests.
+- No errors in any view, in any run.
+
+**After, as measured** (2026-11-27, `main` with the fixes merged, `p4-before-2-g1162662`, no uncommitted change; mains
+power, balanced profile, no browser, the dev database's container running idle). 3 runs; the median by the fleet
+view's p50 is reported (run 1). Raw results in `perf/results/p4/2026-11-27-after/b-run1` … `b-run3`.
+- **The full rollup:** 118,863 days in 21.8, 21.9 and 22.4 s (119 batches of up to 1,000). That is 1,000 × 120 days
+  less the 1,137 the generator left silent (one in a hundred), which have no readings and so no mark.
+- The fleet view: p50 37.5, 37.3 and 37.8 ms; p95 53.7, 49.5 and 51.9 ms. **It took the full 10 requests a second**:
+  600–601 in each measured minute, no iteration dropped. Its day is one read of that day's rollups through the index
+  on `day`: 989 rows, 1.06 ms in the database (`plan-fleet.txt`), against seven `GROUP BY`s over the raw readings,
+  about 430 ms each, before.
+- The month and the year: 13.2 and 14.5 ms p50 (before: 27.5 and 39.8), reading 0.13 ms and 0.77 ms in the
+  database, by the key.
+- The before's fleet p50 of 41 s was mostly queueing, the server saturated at about 4.5 requests a second; so the
+  like-for-like comparison is the database work for one day, about 3 s before and 1 ms after, and the rate it could
+  serve, about 4.5 a second before and the full 10 after.
+- The CPU clock sampled during the warm-up read 399–737, 399–1,648 and 399–516 MHz: the load is now light enough
+  that most cores are idle at any moment. The three runs' latencies agree to within 0.5 ms at p50, so no run was
+  redone.
 - No errors in any view, in any run.
 

@@ -1,0 +1,27 @@
+
+
+  █ TOTAL RESULTS 
+
+    CUSTOM
+    p4b_fleet_ms...................: p(50)=37.45ms p(95)=53.71ms p(99)=60.23ms max=71.85ms  count=601 
+    p4b_month_ms...................: p(50)=13.22ms p(95)=16.93ms p(99)=18.06ms max=24.32ms  count=600 
+    p4b_year_ms....................: p(50)=14.49ms p(95)=19.99ms p(99)=26.12ms max=32.27ms  count=601 
+
+    HTTP
+    http_req_duration..............: p(50)=14.82ms p(95)=45.23ms p(99)=57.14ms max=120.38ms count=2705
+      { expected_response:true }...: p(50)=14.82ms p(95)=45.23ms p(99)=57.14ms max=120.38ms count=2705
+    http_req_failed................: 0.00%  0 out of 2705
+    http_reqs......................: 2705   10.013274/s
+
+    EXECUTION
+    iteration_duration.............: p(50)=15.6ms  p(95)=45.71ms p(99)=57.92ms max=100.15ms count=2704
+    iterations.....................: 2704   10.009572/s
+    vus............................: 0      min=0         max=1 
+    vus_max........................: 80     min=80        max=80
+
+    NETWORK
+    data_received..................: 7.5 MB 28 kB/s
+    data_sent......................: 1.1 MB 4.2 kB/s
+
+
+

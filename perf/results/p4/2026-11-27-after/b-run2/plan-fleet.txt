@@ -1,0 +1,12 @@
+Bitmap Heap Scan on energy_production e  (cost=15.94..840.44 rows=987 width=12) (actual time=0.216..1.652 rows=989.00 loops=1)
+  Recheck Cond: (day = '2026-11-26'::date)
+  Heap Blocks: exact=533
+  Buffers: shared hit=535
+  ->  Bitmap Index Scan on ix_energy_production_day  (cost=0.00..15.70 rows=987 width=0) (actual time=0.133..0.133 rows=989.00 loops=1)
+        Index Cond: (day = '2026-11-26'::date)
+        Index Searches: 1
+        Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=94
+Planning Time: 0.402 ms
+Execution Time: 1.767 ms
