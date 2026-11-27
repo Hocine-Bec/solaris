@@ -1,4 +1,4 @@
 1,000 installations, no readings (the fleet only), seed 42, naive layout
-  1,000 installations, their keys in /home/hous/projects/freelance/solar-crm/solaris/perf/keys.csv (1.6 s)
+  1,000 installations, their keys in perf/keys.csv (1.6 s)
   0 readings written in 1.6 s (0 rows/s)
   systems: 898 healthy, 67 degraded, 35 failing; 7 time zones, 51 states, 4–12 kW

@@ -45,7 +45,7 @@ generate() {
   log "generating: $INSTALLATIONS installations, $days days, seed $SEED, $SCHEMA layout"
   dotnet run --project "$REPO/backend/tools/Solaris.DataGen" -c Release --no-build -- \
     --installations "$INSTALLATIONS" --days "$days" --seed "$SEED" --schema "$SCHEMA" \
-    --connection "$CONNECTION" --keys "$KEYS" | tee "$OUT/dataset.txt"
+    --connection "$CONNECTION" --keys "$KEYS" | sed "s|$REPO/||g" | tee "$OUT/dataset.txt"
 }
 
 # The rows the three views read, with their plans (docs/measurements.md §9). The statements are the ones the
