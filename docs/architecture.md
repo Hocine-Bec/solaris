@@ -353,9 +353,11 @@ endpoint a device can reach, and the only one a staff session can't.
 - Answer: `accepted` = slots stored, `duplicates` = valid readings whose slot the installation already had,
   `rejected` = the list with reasons (FR-T2).
 - The installation and the slot are the table's **primary key**, so a duplicate is impossible rather than unlikely:
-  two devices sending one slot at the same moment leave one row, and the second is simply not new. The whole batch
-  is written **set-based**, with the local days it touched marked in the same statement (BR-P3), so a day is never
-  marked for a reading that wasn't stored, nor a reading stored without its day being marked:
+  two devices sending one slot at the same moment leave one row, and the second is simply not new
+  ([ADR 12](adr/0012-natural-keys-enforced-by-the-database.md)). The whole batch is written **set-based**
+  ([ADR 16](adr/0016-set-based-ingestion.md)), with the local days it touched marked in the same statement
+  (BR-P3), so a day is never marked for a reading that wasn't stored, nor a reading stored without its day being
+  marked:
 
   ```sql
   WITH inserted AS (
@@ -386,8 +388,8 @@ that came from, and when it was added up. It holds only what the readings say. W
 late reading for any other system can move (ADR 15): both are worked out when the day is read, so one late reading
 never means rewriting a thousand other rows.
 
-- **`RollupJob`** (Hangfire, every minute) adds up the days the ingestion marked, until none is left. Each batch is
-  one statement: claim up to 1,000 marked days
+- **`RollupJob`** (Hangfire, every minute; [ADR 17](adr/0017-incremental-daily-rollups.md)) adds up the days the
+  ingestion marked, until none is left. Each batch is one statement: claim up to 1,000 marked days
   (`DELETE … WHERE ctid IN (SELECT ctid … FOR UPDATE SKIP LOCKED LIMIT 1000) RETURNING *`), sum each one's readings
   over its own local hours (a primary-key range scan from `day::timestamp AT TIME ZONE time_zone`), and upsert the
   rows. A day is always added up from all its readings, so doing it twice gives the same row; a crash before the
@@ -397,8 +399,8 @@ never means rewriting a thousand other rows.
 - **A day without a row is a day the system said nothing:** Offline on the fleet's view (BR-P2), nothing produced on
   the month's and the year's. A row added up from no readings means the same. The fleet's view goes through every
   Active installation switched on for the day, so a dead system can't drop out of it; no job writes "nothing" rows.
-- **Local days** follow each installation's time zone (BR-P4), so daylight-saving days have 92 or 100 slots and
-  zones without daylight saving always 96: the sums use real local-day boundaries, never "96 slots".
+- **Local days** follow each installation's time zone (BR-P4, [ADR 18](adr/0018-local-time-per-installation.md)),
+  so daylight-saving days have 92 or 100 slots and zones without daylight saving always 96: the sums use real local-day boundaries, never "96 slots".
 - In Development, `POST /api/dev/rollups` runs the job to completion and answers how long it took, for P4b.
 
 ### Dashboards
@@ -528,5 +530,8 @@ Architecture decisions are recorded as ADRs, one file each, in [`adr/`](adr/):
 | [13](adr/0013-optimistic-concurrency-with-xmin.md) | Optimistic concurrency: PostgreSQL's `xmin`, sent as `ETag` and back as `If-Match` |
 | [14](adr/0014-device-keys.md) | Device keys: a prefix and a hashed secret, one per Active installation |
 | [15](adr/0015-health-against-the-fleet.md) | A day's health is judged against the fleet, not against the table alone |
+| [16](adr/0016-set-based-ingestion.md) | Readings written set-based: one statement per batch |
+| [17](adr/0017-incremental-daily-rollups.md) | Production added up per day, incrementally, from the days that changed |
+| [18](adr/0018-local-time-per-installation.md) | Days counted in each installation's own time zone |
 
 Decisions for parts not built yet are added as ADRs when those parts are built.
