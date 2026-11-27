@@ -7,12 +7,15 @@ namespace Solaris.DataGen;
 /// <summary>
 /// The readings themselves, written with <c>COPY</c>: 11 million rows one at a time would take hours, and the
 /// dataset isn't what P4 measures. Each installation's days are its own local days (BR-P4), so a day is 92, 96 or
-/// 100 slots where the clocks change.
+/// 100 slots where the clocks change, and every slot gets a row: the energy the sun gave it, or zero at night.
 /// </summary>
 public static class Readings
 {
     /// <summary>Rows written between progress lines.</summary>
     private const int ReportEvery = 1_000_000;
+
+    /// <summary>Long enough for PostgreSQL to finish a copy of tens of millions of rows.</summary>
+    private static readonly TimeSpan CopyTimeout = TimeSpan.FromMinutes(30);
 
     /// <summary>The columns each layout writes.</summary>
     private static string[] ColumnsOf(Schema schema) => schema == Schema.Naive
@@ -48,6 +51,9 @@ public static class Readings
     {
         await using var writer = await connection.BeginBinaryImportAsync(
             $"COPY energy_readings ({string.Join(", ", ColumnsOf(options.Schema))}) FROM STDIN (FORMAT BINARY)");
+        // Finishing a COPY of millions of rows takes PostgreSQL longer than a command's usual 30 seconds: at 11
+        // million it timed out after every row had already been sent.
+        writer.Timeout = CopyTimeout;
 
         long written = 0, sinceReport = 0;
         foreach (var installation in fleet)
@@ -68,13 +74,13 @@ public static class Readings
                 var weights = ProductionShape.SlotWeights(slots, ProductionShape.DaylightHours(day));
                 var mostPerSlot = Domain.Entities.EnergyReading.MaximumKwh(installation.SystemSizeKw);
 
+                // Every slot of the day, the dark ones as zero: a system reports all night as well, and BR-T1 counts
+                // nothing produced as a reading. That is what makes a day 96 rows rather than its daylight alone.
                 for (var slot = 0; slot < slots; slot++)
                 {
-                    if (weights[slot] <= 0)
-                        continue;
-                    var kwh = Math.Min(Math.Round(dayKwh * (decimal)weights[slot], 4), mostPerSlot);
-                    if (kwh <= 0)
-                        continue;
+                    var kwh = weights[slot] <= 0
+                        ? 0m
+                        : Math.Min(Math.Round(dayKwh * (decimal)weights[slot], 4), mostPerSlot);
 
                     await writer.StartRowAsync();
                     await writer.WriteAsync(installation.Id, NpgsqlDbType.Integer);

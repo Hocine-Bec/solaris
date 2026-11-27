@@ -1,0 +1,13 @@
+Sort  (cost=1125.24..1153.10 rows=11143 width=12) (actual time=3.185..3.468 rows=11428.00 loops=1)
+  Sort Key: recorded_at
+  Sort Method: quicksort  Memory: 742kB
+  Buffers: shared hit=99
+  ->  Index Scan using ix_energy_readings_installation_id on energy_readings e  (cost=0.43..376.22 rows=11143 width=12) (actual time=0.033..1.827 rows=11428.00 loops=1)
+        Index Cond: (installation_id = 1)
+        Filter: ((recorded_at >= '2026-01-01 00:00:00+00'::timestamp with time zone) AND (recorded_at < '2027-01-01 00:00:00+00'::timestamp with time zone))
+        Index Searches: 1
+        Buffers: shared hit=96
+Planning:
+  Buffers: shared hit=117
+Planning Time: 0.441 ms
+Execution Time: 3.780 ms

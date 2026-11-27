@@ -1,6 +1,6 @@
 # 15. A day's health is judged against the fleet, not against the table alone
 
-**Status:** Accepted · **Last changed:** 2026-11-23
+**Status:** Accepted · **Last changed:** 2026-11-27
 
 **Context:** BR-P1 expects a day's production from the system's size and the month's average peak sun hours for its
 state (`PeakSunHours`). Those are long-term averages with no weather in them. Judged against them alone, a cloudy
@@ -30,10 +30,10 @@ it wasn't there to produce anything.
 ## Trade-offs
 Health now answers "is this system keeping pace with its neighbours", not "is it producing well". On a genuinely
 dark day a system making almost nothing can read Excellent, because the fleet made almost nothing too; a dead
-system still reads Offline, and one that falls behind its neighbours still reads Critical. A system's day can no
-longer be worked out from its own readings: it needs the day's fleet median, so a recalculation for one
-installation (BR-P3) depends on every other installation's readings for that day, and a day's health can change as
-late data arrives. While the fleet is under ten reporting systems, every day falls back to B, so the early weeks of
+system still reads Offline, and one that falls behind its neighbours still reads Critical. A day's health can
+change as late data arrives for other systems. That is why health isn't stored: the daily rollups hold only what
+each system's readings say, and health is worked out from that day's rows when the day is read (decided with the
+rollups, 2026-11-27), so adding up one installation's day never needs anyone else's readings. While the fleet is under ten reporting systems, every day falls back to B, so the early weeks of
 a deployment behave as B did.
 
 ## Alternative that could also work

@@ -68,8 +68,7 @@ they do.
  HTTP ───────▶ Controllers ─▶ Services ─▶ Repositories / EF Core ─────────────┐             │
               │                                                               ▼             │
               │ OutboxDispatcher (every 2 s) ─▶ IEmailSender ─▶ SMTP      PostgreSQL        │
-              │ Hangfire: RollupJob (every minute), CloseDayJob (01:00 local),             │
-              │           OutboxCleanupJob (daily)                                          │
+              │ Hangfire: RollupJob (every minute), OutboxCleanupJob (daily)                │
               └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -101,9 +100,10 @@ the outbox's `OutboxMessage` (§6). The other entities are *(planned)*, each bui
 | **InstallationAssignment** | A technician's part (`installation_assignments`) | Role Surveyor, Installer or Inspector (an enum); who assigned and when; who completed it (the technician, or an Admin for them) and when; unique per installation, technician and role. One not completed can be removed |
 | **User** | A staff account | Name; email, unique whatever its case (`NormalizedEmail`, a unique index); password hash ([ADR 8](adr/0008-password-hashing.md)); role (Admin or Technician); active flag; last sign-in; the time its sessions are valid from, moved by a new password |
 | **EnergyReading** | What a system produced in one 15-minute slot | Keyed by the installation and the slot (`slot_start`, UTC), so one slot can be stored only once (BR-T1); `energy_wh` whole watt-hours |
-| **EnergyProduction** | The daily production rollup | One row per installation and local day, enforced by a unique index; `ReadingCount` and `ComputedAt` *(planned)* |
+| **ProductionDirtyDay** | A local day whose rollup is out of date (`production_dirty_days`) | Written with the readings that changed it, in the same statement (BR-P3); keyed by the installation and the day, so a day already marked stays marked once |
+| **EnergyProduction** | The daily production rollup (`energy_production`) | One row per installation and local day, the pair its key; `ActualWh`, `ReadingCount`, `ComputedAt`: only what the readings say, with expected production and health worked out when read (§8) |
 
-Tables for the mechanisms below (the outbox is built; the others are *(planned)*):
+Tables for the mechanisms below:
 
 ```
 outbox_messages        id uuid PK (version 7, made by the app; the email's Message-ID), type text
@@ -121,6 +121,10 @@ energy_readings        installation_id int, slot_start timestamptz, energy_wh in
 
 production_dirty_days  installation_id int, day date, PK (installation_id, day)
                        (local days whose rollup must be recalculated)
+
+energy_production      installation_id int, day date (the local day), actual_wh int, reading_count int,
+                       computed_at timestamptz
+                       PK (installation_id, day); index (day), for the fleet's day
 ```
 
 `energy_wh` is an integer number of watt-hours: 4 bytes instead of a `numeric`, and exact. At 11.4 million
@@ -375,18 +379,27 @@ endpoint a device can reach, and the only one a staff session can't.
   the duplicates keeping each slot's earliest row (BR-T1's "the first one wins"), converts the kilowatt-hours to
   whole watt-hours, and then adds the key.
 
-### Rollups (BR-P1–BR-P3) *(planned)*
-- **`RollupJob`** (Hangfire, every minute), in one transaction:
-  1. Claim up to 1,000 rows from `production_dirty_days`
-     (`DELETE … WHERE ctid IN (SELECT ctid … FOR UPDATE SKIP LOCKED LIMIT 1000) RETURNING *`).
-  2. For each installation and day: sum `energy_wh` over that local day (a primary-key range scan), compute
-     expected production (BR-P1) and health (BR-P2), and upsert the `EnergyProduction` row.
-  3. Commit. If the job crashes, the claimed rows come back; recalculating is idempotent.
-- **`CloseDayJob`** (Hangfire, every hour): every Active installation whose local day ended at least an hour ago,
-  with no rollup for that day, gets an **Offline** row (BR-P2), so a dead system doesn't simply disappear from the
-  dashboards.
+### Rollups (BR-P3)
+`energy_production` holds one row per installation and local day: what it produced (`actual_wh`), how many readings
+that came from, and when it was added up. It holds only what the readings say. What the day should have produced
+(BR-P1) comes from the system's design, fixed at switch-on, and how it went (BR-P2) from the fleet's day, which a
+late reading for any other system can move (ADR 15): both are worked out when the day is read, so one late reading
+never means rewriting a thousand other rows.
+
+- **`RollupJob`** (Hangfire, every minute) adds up the days the ingestion marked, until none is left. Each batch is
+  one statement: claim up to 1,000 marked days
+  (`DELETE … WHERE ctid IN (SELECT ctid … FOR UPDATE SKIP LOCKED LIMIT 1000) RETURNING *`), sum each one's readings
+  over its own local hours (a primary-key range scan from `day::timestamp AT TIME ZONE time_zone`), and upsert the
+  rows. A day is always added up from all its readings, so doing it twice gives the same row; a crash before the
+  commit hands the claimed days back; two runs never take the same day.
+- A reading that lands while its day is being added up waits for that statement's lock on the mark, then marks the
+  day again once it commits, so the next batch adds it up with that reading in it.
+- **A day without a row is a day the system said nothing:** Offline on the fleet's view (BR-P2), nothing produced on
+  the month's and the year's. A row added up from no readings means the same. The fleet's view goes through every
+  Active installation switched on for the day, so a dead system can't drop out of it; no job writes "nothing" rows.
 - **Local days** follow each installation's time zone (BR-P4), so daylight-saving days have 92 or 100 slots and
-  zones without daylight saving always 96: counts use real local-day boundaries, never "96 slots".
+  zones without daylight saving always 96: the sums use real local-day boundaries, never "96 slots".
+- In Development, `POST /api/dev/rollups` runs the job to completion and answers how long it took, for P4b.
 
 ### Dashboards
 Three endpoints, Admin only:
@@ -401,16 +414,14 @@ Health (BR-P2) is only in the fleet view: it needs the day's fleet median, and t
 what a system made against what it should have. A month or a year outside 2000–2100, or a month outside 1–12, is
 `400`; an installation that doesn't exist is `404`.
 
-- **Today, on purpose:** every request adds up the raw readings again — the fleet's day over every Active
-  installation, one `GROUP BY` per time zone, since each zone's day covers its own hours. That is the before P4b
-  measures at 11.5 million readings (`measurements.md` §9).
-- *(Planned, the fix:)* they read the daily rollups instead:
+They read the daily rollups. The first version added up the raw readings on every request — the fleet's day over
+every Active installation, one `GROUP BY` per time zone — which is the before P4b measured (`measurements.md` §9):
 
 | View | Query |
 |---|---|
-| Fleet (FR-P2) | Count by health for the last day ended in every zone, plus the 20 lowest actual ÷ expected ratios; indexed on the date |
-| Month (FR-P3) | One installation's rollups for one month (covered by the unique index) |
-| Year (FR-P4) | One installation's rollups for one year, summed by month |
+| Fleet (FR-P2) | That day's rows for every installation, through the index on the day; the median, the health and the 20 worst worked out from them |
+| Month (FR-P3) | One installation's rows for one month, by the key |
+| Year (FR-P4) | One installation's rows for one year, by the key, summed by month |
 
 ---
 

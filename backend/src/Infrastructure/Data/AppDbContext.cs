@@ -20,6 +20,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     /// <summary>Local days whose rollup must be worked out again (BR-P3).</summary>
     public DbSet<ProductionDirtyDay> ProductionDirtyDays { get; set; }
 
+    /// <summary>Each installation's local days, added up from its readings (FR-P1).</summary>
+    public DbSet<EnergyProduction> EnergyProduction { get; set; }
+
     /// <summary>Notifications waiting to be sent, saved with the event that causes them (BR-N1).</summary>
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
 

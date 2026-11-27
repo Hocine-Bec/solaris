@@ -144,12 +144,16 @@ dotnet run --project backend/tools/Solaris.DataGen -c Release -- \
   sum and the first and last slots. The device keys are *not* from the seed: they are credentials, made by the
   cryptographic generator (ADR 14), so each run writes different ones to `--keys` (default `perf/keys.csv`), which
   the ingestion run then uploads with. The file is for a throwaway measurement database, never a real one.
-- Measured on the test laptop: **about 96,000 readings a second** (200 installations × 30 days = 231,580 readings
-  in 2.4 s, the fleet itself in 1.1 s), so dataset M is a couple of minutes.
+- Measured on the test laptop: dataset M (1,000 installations × 120 days) is **11,414,664 readings in 57 s**,
+  about 200,000 a second, the fleet itself in under 2 s. The rows stream in about 21 s; the rest is PostgreSQL
+  finishing the copy, which is why the importer is given a timeout of its own rather than a command's usual 30
+  seconds.
 - The fleet covers 51 states and **7** zones: no state is proposed the Aleutian zone, which only the far west of
   Alaska uses.
 
 The data is shaped to look real:
+- **every slot of the local day gets a row**, the dark ones as zero: a system reports all night too, and BR-T1
+  counts nothing produced as a reading. So a day is 92, 96 or 100 rows, not only its daylight
 - a daylight bell curve around each installation's local noon, wider in summer
 - a random daily cloud factor (0.3–1.0)
 - per installation: 90% healthy (0.95–1.0 of expected), 7% degraded (0.6–0.8), 3% failing, with some
@@ -548,9 +552,9 @@ readings a second is reported (run 2). Raw results in `perf/results/p4/2026-11-2
   37,883–37,898 readings the API answered as duplicates, these are the ones that slipped through.
 - The rows stored come to 192,517, 192,502 and 192,511: the 192,000 real slots plus one row for each duplicate.
 
-### P4b — Dashboards at 11.5 million readings
+### P4b — Dashboards at 11.4 million readings
 
-**Question.** How fast are the three production views when the readings table holds about 11.5 million rows?
+**Question.** How fast are the three production views when the readings table holds about 11.4 million rows?
 
 | | Build |
 |---|---|
@@ -558,10 +562,13 @@ readings a second is reported (run 2). Raw results in `perf/results/p4/2026-11-2
 | **After** | the endpoints read the daily rollups (`EnergyProduction`) |
 
 **Setup:**
-1. Dataset **M**: 1,000 installations × 120 days ≈ 11.5 million readings, generated with `--schema naive` for
-   before and `--schema final` for after, with the same seed.
+1. Dataset **M**: 1,000 installations × 120 days ≈ 11.4 million readings (96 a day, less the one day in a
+   hundred a system says nothing at all), generated with `--schema naive` for before and `--schema final` for
+   after, with the same seed.
 2. After only: run `RollupJob` until `production_dirty_days` is empty, and record **how long the full rollup
-   took**.
+   took**. The generator writes with `COPY`, which bypasses the ingestion statement that marks the days, so the
+   script marks every generated day first, then calls `POST /api/dev/rollups` (Development only), which runs the job
+   to completion and answers its batches, days and seconds; they go in `results.json` as `full_rollup`.
 
 **Steps:** for each endpoint, warm up for 30 s, then a constant 10 req/s for 1 minute, with random installations
 and months or years. The three run one after another, so each one's numbers are its own, and only the measured
@@ -572,9 +579,28 @@ since each zone's day covers its own hours (BR-P4).
 
 | Endpoint | Design | p50 | p95 | p99 | Errors | Plan file |
 |---|---|---|---|---|---|---|
-| Fleet (FR-P2) | before | | | | | |
+| Fleet (FR-P2) | before | 41,014 ms | 53,203 ms | 55,295 ms | 0 | `b-run3/plan-fleet.txt` |
 | Fleet (FR-P2) | after | | | | | |
-| Month (FR-P3) | before | | | | | |
+| Month (FR-P3) | before | 27.5 ms | 39.5 ms | 44.1 ms | 0 | `b-run3/plan-month.txt` |
 | Month (FR-P3) | after | | | | | |
-| Year (FR-P4) | before | | | | | |
+| Year (FR-P4) | before | 39.8 ms | 58.2 ms | 66.8 ms | 0 | `b-run3/plan-year.txt` |
 | Year (FR-P4) | after | | | | | |
+
+**Before, as measured** (2026-11-27; the API exactly as tagged `p4-before` — `git diff p4-before -- backend/src` is
+empty — with the generator's copy timeout fixed since, which the API under test doesn't use; the same conditions as
+P4a: mains power, balanced profile, no browser, the dev database's container running idle; 2,599–3,251 MHz during
+the load). 3 runs; the median by the fleet view's p50 is reported (run 3). Raw results in
+`perf/results/p4/2026-11-27-before/b-run1` … `b-run3`; P4a's are in `2026-11-24-before`, run before the generator
+wrote the night slots, which it doesn't use.
+- The fleet view: p50 43,869, 40,964 and 41,014 ms; p95 54,344, 53,961 and 53,203 ms. **It can't serve the load at
+  all.** Offered 10 requests a second for a minute, it completed 257, 275 and 273 of the 600 — about 4.5 a second —
+  and k6 dropped 433–457 iterations for want of a free virtual user. Most of each 41 seconds is therefore waiting
+  in the queue behind other requests, not the work itself.
+- Where the work goes: the view sums the raw readings with one `GROUP BY` per time zone, seven of them a request.
+  One alone scans 40,800 rows, reads 39,739 blocks and takes 430 ms (`plan-fleet.txt`), so about 3 s of database
+  work a request before any queueing.
+- The month and the year read one installation's rows through the index on `installation_id` and are quick in the
+  database — 1.8 ms and 3.8 ms — so their 27.5 ms and 39.8 ms are mostly the day-by-day work in the app. Both took
+  their full 600 requests.
+- No errors in any view, in any run.
+

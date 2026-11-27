@@ -79,6 +79,7 @@ public class EndpointAccessTests(PostgresFixture database) : ApiTestBase(databas
         "GET scalar/scalar.aspnetcore.js",
         "GET api/dev/email-fault/",
         "PUT api/dev/email-fault/",
+        "POST api/dev/rollups",
     ];
 
     private static IEnumerable<string> Public => Table.Where(e => e.Value == Access.Anyone).Select(e => e.Key);

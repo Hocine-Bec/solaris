@@ -1,0 +1,29 @@
+time="2026-11-27T08:14:27+01:00" level=warning msg="Insufficient VUs, reached 200 active VUs and cannot initialize more" executor=constant-arrival-rate scenario=fleet_measure
+
+
+  █ TOTAL RESULTS 
+
+    CUSTOM
+    p4b_fleet_ms...................: p(50)=41.01s  p(95)=53.2s   p(99)=55.29s  max=56.11s  count=273 
+    p4b_month_ms...................: p(50)=27.52ms p(95)=39.45ms p(99)=44.14ms max=50.54ms count=601 
+    p4b_year_ms....................: p(50)=39.79ms p(95)=58.24ms p(99)=66.81ms max=76.25ms count=600 
+
+    HTTP
+    http_req_duration..............: p(50)=38.65ms p(95)=44.18s  p(99)=52.47s  max=56.11s  count=2203
+      { expected_response:true }...: p(50)=38.65ms p(95)=44.18s  p(99)=52.47s  max=56.11s  count=2203
+    http_req_failed................: 0.00%  0 out of 2203
+    http_reqs......................: 2203   8.155756/s
+
+    EXECUTION
+    dropped_iterations.............: 433    1.603015/s
+    iteration_duration.............: p(50)=39.21ms p(95)=44.18s  p(99)=52.47s  max=56.11s  count=2202
+    iterations.....................: 2202   8.152054/s
+    vus............................: 0      min=0         max=238
+    vus_max........................: 345    min=80        max=345
+
+    NETWORK
+    data_received..................: 4.9 MB 18 kB/s
+    data_sent......................: 957 kB 3.5 kB/s
+
+
+

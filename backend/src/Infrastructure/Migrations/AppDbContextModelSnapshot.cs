@@ -156,6 +156,37 @@ namespace Infrastructure.Migrations
                     b.ToTable("customers", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.EnergyProduction", b =>
+                {
+                    b.Property<int>("InstallationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("installation_id");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date")
+                        .HasColumnName("day");
+
+                    b.Property<int>("ActualWh")
+                        .HasColumnType("integer")
+                        .HasColumnName("actual_wh");
+
+                    b.Property<DateTime>("ComputedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("computed_at");
+
+                    b.Property<int>("ReadingCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("reading_count");
+
+                    b.HasKey("InstallationId", "Day")
+                        .HasName("pk_energy_production");
+
+                    b.HasIndex("Day")
+                        .HasDatabaseName("ix_energy_production_day");
+
+                    b.ToTable("energy_production", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.EnergyReading", b =>
                 {
                     b.Property<int>("InstallationId")
@@ -174,22 +205,6 @@ namespace Infrastructure.Migrations
                         .HasName("pk_energy_readings");
 
                     b.ToTable("energy_readings", (string)null);
-                });
-
-            modelBuilder.Entity("Domain.Entities.ProductionDirtyDay", b =>
-                {
-                    b.Property<int>("InstallationId")
-                        .HasColumnType("integer")
-                        .HasColumnName("installation_id");
-
-                    b.Property<DateOnly>("Day")
-                        .HasColumnType("date")
-                        .HasColumnName("day");
-
-                    b.HasKey("InstallationId", "Day")
-                        .HasName("pk_production_dirty_days");
-
-                    b.ToTable("production_dirty_days", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Installation", b =>
@@ -620,6 +635,22 @@ namespace Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Domain.Entities.ProductionDirtyDay", b =>
+                {
+                    b.Property<int>("InstallationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("installation_id");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date")
+                        .HasColumnName("day");
+
+                    b.HasKey("InstallationId", "Day")
+                        .HasName("pk_production_dirty_days");
+
+                    b.ToTable("production_dirty_days", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -734,6 +765,18 @@ namespace Infrastructure.Migrations
                     b.Navigation("ContactAddress");
                 });
 
+            modelBuilder.Entity("Domain.Entities.EnergyProduction", b =>
+                {
+                    b.HasOne("Domain.Entities.Installation", "Installation")
+                        .WithMany()
+                        .HasForeignKey("InstallationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_energy_production_installations_installation_id");
+
+                    b.Navigation("Installation");
+                });
+
             modelBuilder.Entity("Domain.Entities.EnergyReading", b =>
                 {
                     b.HasOne("Domain.Entities.Installation", "Installation")
@@ -742,18 +785,6 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_energy_readings_installations_installation_id");
-
-                    b.Navigation("Installation");
-                });
-
-            modelBuilder.Entity("Domain.Entities.ProductionDirtyDay", b =>
-                {
-                    b.HasOne("Domain.Entities.Installation", "Installation")
-                        .WithMany()
-                        .HasForeignKey("InstallationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_production_dirty_days_installations_installation_id");
 
                     b.Navigation("Installation");
                 });
@@ -889,6 +920,18 @@ namespace Infrastructure.Migrations
                     b.Navigation("Lead");
 
                     b.Navigation("RetriedBy");
+                });
+
+            modelBuilder.Entity("Domain.Entities.ProductionDirtyDay", b =>
+                {
+                    b.HasOne("Domain.Entities.Installation", "Installation")
+                        .WithMany()
+                        .HasForeignKey("InstallationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_production_dirty_days_installations_installation_id");
+
+                    b.Navigation("Installation");
                 });
 
             modelBuilder.Entity("Domain.Entities.Customer", b =>

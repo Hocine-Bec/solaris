@@ -5,7 +5,9 @@ using Domain.Common;
 using Domain.Entities;
 using Domain.Enums;
 using FluentAssertions;
+using Infrastructure.Production;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using TestUtilities.Database;
 
 namespace IntegrationTests.Api;
@@ -39,17 +41,23 @@ public class ProductionTests(PostgresFixture database) : ApiTestBase(database)
     private async Task GiveReadingsAsync(int installationId, DateOnly day, string zone, decimal totalKwh, int slots = 40)
     {
         var (fromUtc, _) = LocalDays.WindowUtc(day, zone);
-        var each = totalKwh / slots;
+        var each = (int)Math.Round(totalKwh * EnergyReading.WhPerKwh / slots);
         for (var n = 0; n < slots; n++)
             Context.EnergyReadings.Add(new EnergyReading
             {
                 InstallationId = installationId,
                 // From 06:00 local, so every reading is inside the day whatever its length
-                RecordedAt = fromUtc.AddHours(6).AddMinutes(15 * n),
-                EnergyKwh = each
+                SlotStart = fromUtc.AddHours(6).AddMinutes(15 * n),
+                EnergyWh = each
             });
         await Context.SaveChangesAsync(Ct);
         Context.ChangeTracker.Clear();
+
+        // The views read the daily rollups: the day is marked as the ingestion marks it, and added up by the job
+        await Context.Database.ExecuteSqlAsync(
+            $"INSERT INTO production_dirty_days (installation_id, day) VALUES ({installationId}, {day}) ON CONFLICT DO NOTHING", Ct);
+        using var scope = ApiServices.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<RollupJob>().RunAsync(Ct);
     }
 
     private async Task<JsonElement> FleetAsync(HttpClient admin) =>
@@ -110,6 +118,39 @@ public class ProductionTests(PostgresFixture database) : ApiTestBase(database)
         worst[0].GetProperty("health").GetString().Should().Be("Offline");
         worst[0].GetProperty("actualKwh").GetDecimal().Should().Be(0m);
         worst[0].GetProperty("ratio").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task BR_P4_OnceSwitchedOn_TheTimeZoneCantChange()
+    {
+        // Arrange - its readings are already counted in its days: moving the zone would move every day's hours
+        var (admin, id, _) = await SwitchedOnAsync();
+
+        // Act
+        var moved = await Change(admin, HttpMethod.Put, $"/api/installations/{id}/time-zone", new { timeZone = "America/Denver" });
+
+        // Assert
+        await ShouldBeProblemAsync(moved, HttpStatusCode.Conflict, "installation.fixed");
+        (await Context.Installations.AsNoTracking().SingleAsync(i => i.Id == id, Ct)).TimeZone.Should().Be(UsTimeZones.Central);
+    }
+
+    [Fact]
+    public async Task BR_P2_ARowAddedUpFromNoReadings_IsOfflineToo()
+    {
+        // Arrange - a day's row that holds nothing (its readings went after it was added up): the same as no row
+        var (admin, id, _) = await SwitchedOnAsync();
+        var day = FleetDay();
+        await ActiveSinceAsync(id, 10);
+        await Context.Database.ExecuteSqlAsync($"""
+            INSERT INTO energy_production (installation_id, day, actual_wh, reading_count, computed_at)
+            VALUES ({id}, {day}, 0, 0, now())
+            """, Ct);
+
+        // Act
+        var fleet = await FleetAsync(admin);
+
+        // Assert
+        (fleet.GetProperty("reporting").GetInt32(), CountOf(fleet, "Offline")).Should().Be((0, 1));
     }
 
     [Fact]

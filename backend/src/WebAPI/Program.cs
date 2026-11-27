@@ -145,6 +145,9 @@ await FirstAdmin.EnsureAsync(app.Services);
 // The scheduled jobs, run by Hangfire's server (once per job, whatever the number of API instances)
 app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<OutboxCleanupJob>(OutboxCleanupJob.RecurringJobId,
     job => job.RunAsync(CancellationToken.None), Cron.Daily());
+// The days the readings changed, added up every minute (BR-P3)
+app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<Infrastructure.Production.RollupJob>(
+    Infrastructure.Production.RollupJob.RecurringJobId, job => job.RunAsync(CancellationToken.None), Cron.Minutely());
 
 app.UseHttpsRedirection();
 

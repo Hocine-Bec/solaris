@@ -77,13 +77,24 @@ explain_views() {
          WHERE e.installation_id = 1 AND e.recorded_at >= '$year-01-01' AND e.recorded_at < '$((year + 1))-01-01'
          ORDER BY e.recorded_at" >"$OUT/plan-year.txt"
   else
-    sql "EXPLAIN (ANALYZE, BUFFERS) SELECT health, count(*) FROM energy_production
-         WHERE local_day = (now() AT TIME ZONE '$zone')::date - 1 GROUP BY health" >"$OUT/plan-fleet.txt"
-    sql "EXPLAIN (ANALYZE, BUFFERS) SELECT local_day, actual_kwh, expected_kwh FROM energy_production
-         WHERE installation_id = 1 AND local_day >= '$year-$(printf '%02d' "$month")-01'
-           AND local_day < '$year-$(printf '%02d' "$month")-01'::date + interval '1 month'" >"$OUT/plan-month.txt"
-    sql "EXPLAIN (ANALYZE, BUFFERS) SELECT local_day, actual_kwh, expected_kwh FROM energy_production
-         WHERE installation_id = 1 AND local_day >= '$year-01-01' AND local_day < '$((year + 1))-01-01'" >"$OUT/plan-year.txt"
+    # The fleet's day is one read of that day's rollups; the month and the year, one installation's by the key
+    local day
+    day=$(sql "select (now() AT TIME ZONE '$zone')::date - 1")
+    sql "EXPLAIN (ANALYZE, BUFFERS)
+         SELECT e.installation_id AS \"InstallationId\", e.actual_wh AS \"ActualWh\", e.reading_count AS \"ReadingCount\"
+         FROM energy_production AS e
+         WHERE e.day = '$day'" >"$OUT/plan-fleet.txt"
+    sql "EXPLAIN (ANALYZE, BUFFERS)
+         SELECT e.day AS \"Day\", e.actual_wh AS \"ActualWh\", e.reading_count AS \"ReadingCount\"
+         FROM energy_production AS e
+         WHERE e.installation_id = 1 AND e.day >= '$year-$(printf '%02d' "$month")-01'
+           AND e.day < ('$year-$(printf '%02d' "$month")-01'::date + interval '1 month')::date
+         ORDER BY e.day" >"$OUT/plan-month.txt"
+    sql "EXPLAIN (ANALYZE, BUFFERS)
+         SELECT e.day AS \"Day\", e.actual_wh AS \"ActualWh\", e.reading_count AS \"ReadingCount\"
+         FROM energy_production AS e
+         WHERE e.installation_id = 1 AND e.day >= '$year-01-01' AND e.day < '$((year + 1))-01-01'
+         ORDER BY e.day" >"$OUT/plan-year.txt"
   fi
   log "plans saved: $(ls "$OUT" | grep -c '^plan-') files"
 }
@@ -134,6 +145,19 @@ case "$PART" in
     ;;
   b)
     generate "$DATASET_DAYS"
+    rollup='null'
+    if [ "$DESIGN" = after ]; then
+      # COPY bypasses the ingestion statement that marks the days, so every generated day is marked here, then all
+      # of them added up at once: "how long the full rollup took" (docs/measurements.md §9)
+      log "marking every generated day for the rollup"
+      sql "insert into production_dirty_days (installation_id, day)
+           select distinct r.installation_id, (r.slot_start at time zone i.time_zone)::date
+           from energy_readings r join installations i on i.id = r.installation_id" >/dev/null
+      log "rolling up: $(sql 'select count(*) from production_dirty_days') days"
+      rollup=$(curl -sf -X POST "$BASE_URL/api/dev/rollups")
+      echo "$rollup" >"$OUT/rollup.json"
+      log "rolled up: $rollup"
+    fi
     # A month the dataset covers: yesterday's
     year=$(date -u -d yesterday +%Y)
     month=$(date -u -d yesterday +%-m)
@@ -148,8 +172,10 @@ case "$PART" in
     wait "$k6_pid" || true
 
     rows=$(sql "select count(*) from energy_readings")
-    jq -n --slurpfile k6 "$OUT/k6-summary.json" --arg rows "$rows" --arg run "$RUN" --arg design "$DESIGN" '{
+    jq -n --slurpfile k6 "$OUT/k6-summary.json" --arg rows "$rows" --arg run "$RUN" --arg design "$DESIGN" \
+      --argjson rollup "$rollup" '{
         part: "P4b", run: ($run | tonumber), design: $design, readings_in_database: ($rows | tonumber),
+        full_rollup: $rollup,
         views: ([ "fleet", "month", "year" ] | map({
           (.): {
             requests: ($k6[0].metrics["p4b_" + . + "_ms"].count // 0),

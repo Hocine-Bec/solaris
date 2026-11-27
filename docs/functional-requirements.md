@@ -41,7 +41,7 @@ endpoints: routes and field names are defined by the API itself. Terms are defin
 - **FR-T2** — Uploading a reading twice, or retrying a whole batch, never creates duplicates (BR-T1). The
   response says how many readings were accepted, how many were duplicates, and which were rejected and why.
 - **FR-T3** — Late readings, up to 30 days old, are accepted and correct the affected days (BR-P3).
-- **FR-P1** — Each installation has one production row per day: actual kWh, expected kWh, health (BR-P1, BR-P2).
+- **FR-P1** — Each installation has one production row per local day, added up from its readings: actual kWh. Its expected kWh (BR-P1) and its health (BR-P2) are worked out when the day is read: the first from the system's design, the second from the fleet's day, which a late reading for any system can move.
 - **FR-P2** — **Fleet dashboard:** for the last day that has ended in every time zone the fleet covers, the number of installations per health status,
   plus the 20 worst performers.
 - **FR-P3** — **Month view:** daily actual vs expected production for one installation and one month.

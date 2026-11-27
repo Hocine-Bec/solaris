@@ -11,13 +11,15 @@ using Domain.Enums;
 namespace Application.Services;
 
 // What the systems produced (FR-P2, FR-P3, FR-P4). The rules are the Domain's: Production for what a day should make
-// and how it went (BR-P1, BR-P2, ADR 15), LocalDays for which readings belong to which day (BR-P4).
+// and how it went (BR-P1, BR-P2, ADR 15), LocalDays for which day is which (BR-P4).
 //
-// Built naive on purpose: every request adds up the raw readings again, the fleet's day across every Active
-// installation. P4b measures that at 11.5 million readings; the fixes branch reads one row per installation per day
-// from the rollups instead.
+// The views read the daily rollups (EnergyProduction), one row per installation and local day, which RollupJob adds
+// up from the readings. A rollup holds only what the readings say: what a day should have made comes from the
+// system's design, and how it went from the fleet's day, both worked out here. A day without a row is a day the
+// system said nothing: Offline on the fleet's view, nothing produced on the month's and the year's. The first version
+// added the raw readings up again on every request; P4b measures the difference.
 public class ProductionService(
-    IEnergyReadingRepo readings,
+    IEnergyProductionRepo production,
     IInstallationRepo installations,
     TimeProvider time) : IProductionService
 {
@@ -39,15 +41,13 @@ public class ProductionService(
         if (fleet.Count == 0)
             return new FleetDayResponse(day, 0, 0, null, EveryHealthCounted([]), []);
 
-        // One sum per installation, a zone at a time: each zone's day covers its own hours (BR-P4)
-        var actualByInstallation = new Dictionary<int, decimal>();
-        foreach (var zone in fleet.GroupBy(i => i.TimeZone))
-        {
-            var (fromUtc, toUtc) = LocalDays.WindowUtc(day, zone.Key);
-            var sums = await readings.SumByInstallationAsync(zone.Select(i => i.Id).ToList(), fromUtc, toUtc);
-            foreach (var (installationId, kwh) in sums)
-                actualByInstallation[installationId] = kwh;
-        }
+        // The day's rows, one read: each installation's row is already its own local day (BR-P4). A row added up
+        // from no readings at all means the same as no row.
+        var actualByInstallation = (await production.GetDayAsync(day))
+            .Where(r => r.ReadingCount > 0)
+            .ToDictionary(r => r.InstallationId, r => Kwh(r.ActualWh));
+        actualByInstallation = fleet.Where(i => actualByInstallation.ContainsKey(i.Id))
+            .ToDictionary(i => i.Id, i => actualByInstallation[i.Id]);
 
         var days = fleet.Select(i =>
         {
@@ -112,14 +112,9 @@ public class ProductionService(
     private async Task<IReadOnlyList<DayProductionResponse>> DailyAsync(Installation installation, DateOnly from, DateOnly to)
     {
         var zone = installation.TimeZone;
-        var (fromUtc, _) = LocalDays.WindowUtc(from, zone);
-        var (toUtc, _) = LocalDays.WindowUtc(to, zone);
-        var rows = await readings.GetForAsync(installation.Id, fromUtc, toUtc);
-
-        // The readings put into the days they belong to, in the installation's own zone (BR-P4)
-        var actualByDay = rows
-            .GroupBy(r => LocalDays.LocalDateOf(r.RecordedAt, zone))
-            .ToDictionary(g => g.Key, g => g.Sum(r => r.Kwh));
+        // The rollups are already its local days (BR-P4): one row a day, read by the key
+        var actualByDay = (await production.GetDaysAsync(installation.Id, from, to))
+            .ToDictionary(r => r.Day, r => Kwh(r.ActualWh));
 
         var produced = new List<DayProductionResponse>();
         for (var day = from; day < to; day = day.AddDays(1))
@@ -143,6 +138,9 @@ public class ProductionService(
 
     private static decimal ExpectedFor(Installation installation, int month) =>
         installation.SystemSizeKw is { } size ? Production.ExpectedKwh(size, installation.Address.State, month) : 0m;
+
+    /// <summary>Watt-hours as the kilowatt-hours the views report.</summary>
+    private static decimal Kwh(long wh) => wh / (decimal)EnergyReading.WhPerKwh;
 
     private static decimal? RatioOf(decimal? actual, decimal expected) =>
         actual is { } kwh && expected > 0 ? kwh / expected : null;
