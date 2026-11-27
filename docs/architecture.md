@@ -100,6 +100,7 @@ the outbox's `OutboxMessage` (§6). The other entities are *(planned)*, each bui
 | **InstallationStatusChange** | One row per status change (`installation_status_history`) | From (none for the conversion's first row), to, who, when, note (a cancellation's reason); append-only, never updated or deleted |
 | **InstallationAssignment** | A technician's part (`installation_assignments`) | Role Surveyor, Installer or Inspector (an enum); who assigned and when; who completed it (the technician, or an Admin for them) and when; unique per installation, technician and role. One not completed can be removed |
 | **User** | A staff account | Name; email, unique whatever its case (`NormalizedEmail`, a unique index); password hash ([ADR 8](adr/0008-password-hashing.md)); role (Admin or Technician); active flag; last sign-in; the time its sessions are valid from, moved by a new password |
+| **EnergyReading** | What a system produced in one 15-minute slot | Keyed by the installation and the slot (`slot_start`, UTC), so one slot can be stored only once (BR-T1); `energy_wh` whole watt-hours |
 | **EnergyProduction** | The daily production rollup | One row per installation and local day, enforced by a unique index; `ReadingCount` and `ComputedAt` *(planned)* |
 
 Tables for the mechanisms below (the outbox is built; the others are *(planned)*):
@@ -122,8 +123,8 @@ production_dirty_days  installation_id int, day date, PK (installation_id, day)
                        (local days whose rollup must be recalculated)
 ```
 
-`energy_wh` is an integer number of watt-hours: 4 bytes instead of a `numeric`, and exact. At about 11.5 million
-readings, the table and its index stay under 1 GB.
+`energy_wh` is an integer number of watt-hours: 4 bytes instead of a `numeric`, and exact. At 11.4 million
+readings (dataset M), the table and its key come to about 1 GB.
 
 Conventions: snake_case names for tables, columns, keys and indexes (a test checks the migrated database), enums
 stored as strings, every timestamp a UTC `timestamptz`. Only the daily rollups use a local day: the
@@ -347,12 +348,10 @@ endpoint a device can reach, and the only one a staff session can't.
   the batch: it comes back in `rejected` with its slot and the reason, and the rest are stored.
 - Answer: `accepted` = slots stored, `duplicates` = valid readings whose slot the installation already had,
   `rejected` = the list with reasons (FR-T2).
-- **Today, on purpose:** `EnergyReading` is EF Core's defaults — a surrogate `long` key, the index the foreign key
-  brings, a `RecordedAt` timestamp and a `decimal EnergyKwh` — and the service asks `AnyAsync` for each reading,
-  adds it and saves, one at a time. So a batch costs one round trip per reading, and two batches at the same moment
-  can both pass the check and store one slot twice. That is the before P4a measures (`measurements.md` §9).
-- *(Planned, the fix:)* the composite primary key (the installation and the slot) makes a duplicate impossible, and
-  a batch is written **set-based**, in one transaction:
+- The installation and the slot are the table's **primary key**, so a duplicate is impossible rather than unlikely:
+  two devices sending one slot at the same moment leave one row, and the second is simply not new. The whole batch
+  is written **set-based**, with the local days it touched marked in the same statement (BR-P3), so a day is never
+  marked for a reading that wasn't stored, nor a reading stored without its day being marked:
 
   ```sql
   WITH inserted AS (
@@ -366,7 +365,15 @@ endpoint a device can reach, and the only one a staff session can't.
   ON CONFLICT DO NOTHING;
   ```
 
-  with `accepted` = rows inserted and `duplicates` = valid − accepted, as today.
+  `accepted` is the rows inserted and `duplicates` is valid − accepted, so a batch that repeats a slot within
+  itself counts the repeat as a duplicate too.
+
+  The first version was EF Core's defaults — a surrogate `long` key, a `RecordedAt` timestamp and a
+  `decimal EnergyKwh` — with an `AnyAsync` check, an add and a save per reading. A batch cost one round trip per
+  reading, and two batches at the same moment could both pass the check: P4a counted about 500 duplicate rows in
+  192,000 readings (`measurements.md` §9). The migration to this shape keeps the readings already stored: it drops
+  the duplicates keeping each slot's earliest row (BR-T1's "the first one wins"), converts the kilowatt-hours to
+  whole watt-hours, and then adds the key.
 
 ### Rollups (BR-P1–BR-P3) *(planned)*
 - **`RollupJob`** (Hangfire, every minute), in one transaction:

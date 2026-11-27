@@ -1,0 +1,18 @@
+{
+  "part": "P4a",
+  "run": 2,
+  "design": "before",
+  "installations": 1000,
+  "days": 2,
+  "batches": 2400,
+  "accepted": 192502,
+  "duplicates_answered": 37898,
+  "rejected": 0,
+  "errors": 0,
+  "wall_seconds": 19.968396429,
+  "readings_per_second": 9640.333448129582,
+  "batch_p95_ms": 662.85039135,
+  "batch_p99_ms": 1049.8813149899997,
+  "rows_in_database": 192502,
+  "duplicates_in_database": 502
+}

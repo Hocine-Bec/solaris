@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Application.Common.Models;
 using Application.DTOs.Telemetry;
 using Application.Errors;
@@ -12,13 +11,13 @@ namespace Application.Services;
 // The readings a device uploads (FR-T1, FR-T2). The rules are the Domain's (EnergyReading.WhyNotAccepted, BR-T1):
 // this service asks them, then stores what is left.
 //
-// Built naive on purpose: each reading is asked for and saved on its own, so two batches arriving at the same moment
-// can both pass the check and store the same slot twice, and 500 readings cost 500 round trips. P4a measures both;
-// the fixes branch gives the table the key that makes a duplicate impossible and writes a batch in one statement.
+// The whole batch goes in one statement, and the slots the installation already has are passed over by the table's
+// own key rather than by a check this code makes: two devices sending one slot at the same moment can no longer
+// both store it (BR-T1). The local days the batch touched are marked in the same statement, for the rollups
+// (BR-P3). P4a measures the difference from the naive version, which asked and saved one reading at a time.
 public class TelemetryService(
     IEnergyReadingRepo readings,
     IInstallationRepo installations,
-    IUnitOfWork unitOfWork,
     TimeProvider time) : ITelemetryService
 {
     private const decimal WhPerKwh = 1000m;
@@ -33,8 +32,7 @@ public class TelemetryService(
 
         var now = time.GetUtcNow().UtcDateTime;
         var rejected = new List<RejectedReadingResponse>();
-        var accepted = 0;
-        var duplicates = 0;
+        var wanted = new List<(DateTime SlotStart, int EnergyWh)>(request.Readings.Count);
 
         foreach (var reading in request.Readings)
         {
@@ -44,25 +42,11 @@ public class TelemetryService(
                 rejected.Add(new RejectedReadingResponse(reading.SlotStart, refusal.Message));
                 continue;
             }
-
-            if (await readings.ExistsAsync(installationId, reading.SlotStart))
-            {
-                duplicates++;
-                continue;
-            }
-
-            readings.Add(new EnergyReading
-            {
-                InstallationId = installationId,
-                RecordedAt = reading.SlotStart,
-                EnergyKwh = kwh
-            });
-            var outcome = await unitOfWork.SaveAsync();
-            if (outcome != SaveOutcome.Saved)
-                throw new UnreachableException($"Storing a reading can't end as {outcome}: nothing about it is unique yet.");
-            accepted++;
+            wanted.Add((reading.SlotStart, (int)Math.Round(reading.EnergyWh)));
         }
 
-        return Result.Success(new UploadReadingsResponse(accepted, duplicates, rejected));
+        // A slot the installation already has, and a slot this batch repeats, are both simply not new
+        var accepted = await readings.AddBatchAsync(installationId, installation.TimeZone, wanted);
+        return Result.Success(new UploadReadingsResponse(accepted, wanted.Count - accepted, rejected));
     }
 }

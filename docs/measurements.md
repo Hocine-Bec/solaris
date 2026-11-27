@@ -511,6 +511,7 @@ ingestion go, and do retried batches create duplicates?
 | | Build |
 |---|---|
 | **Before** | tag `p4-before`: EF Core defaults: an `EnergyReading` entity with a `long Id` key, only the default index on `InstallationId`, a `RecordedAt` timestamp and a `decimal EnergyKwh`; for each reading, an `AnyAsync` duplicate check, then `Add`, then `SaveChanges`. Device-key authentication is already in place, and isn't what is measured |
+| | *After this change the before can no longer be generated: `--schema naive` names the migration that took those columns away, and the layout lives on at the tag.* |
 | **After** | the composite primary key, the set-based `unnest` + `ON CONFLICT DO NOTHING` insert, and the dirty-day marks in the same transaction |
 
 **Setup:** the generator creates 1,000 Active installations and their keys (§5). Readings: 2 days per
@@ -534,8 +535,18 @@ produce in a slot (BR-T1), so nothing is rejected for its size.
 
 | Design | Readings | Wall time | **Readings/s** | Batch p95 | Duplicates in DB | Errors |
 |---|---|---|---|---|---|---|
-| Before | 192,000 | | | | | |
+| Before | 192,000 | 19.97 s | 9,640 | 663 ms | 502 | 0 |
 | After | 192,000 | | | | | |
+
+**Before, as measured** (2026-11-24, tag `p4-before`, no uncommitted change; mains power, balanced profile, no
+browser, the dev database's container running idle; 2,499–3,200 MHz during the load). 3 runs; the median by
+readings a second is reported (run 2). Raw results in `perf/results/p4/2026-11-24-before/a-run1` … `a-run3`.
+- Readings a second: 10,018, 9,640 and 9,238 (runs 1–3); batch p95 652, 663 and 656 ms; no errors and nothing
+  rejected in any run.
+- **Duplicates in the database: 517, 502 and 511.** The service asks whether a slot is there and then saves it, one
+  reading at a time, so a retry that arrives while its original is still being stored passes the check too. Of the
+  37,883–37,898 readings the API answered as duplicates, these are the ones that slipped through.
+- The rows stored come to 192,517, 192,502 and 192,511: the 192,000 real slots plus one row for each duplicate.
 
 ### P4b — Dashboards at 11.5 million readings
 

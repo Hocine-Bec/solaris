@@ -1,0 +1,29 @@
+
+
+  █ TOTAL RESULTS 
+
+    CUSTOM
+    p4a_accepted...................: 192502  9967.649174/s
+    p4a_batch_ms...................: p(50)=362.57ms p(95)=662.85ms p(99)=1.04s max=1.09s count=2400
+    p4a_duplicates.................: 37898   1962.337889/s
+    p4a_ok.........................: 100.00% 2400 out of 2400
+    p4a_rejected...................: 0       0/s
+
+    HTTP
+    http_req_duration..............: p(50)=362.57ms p(95)=662.85ms p(99)=1.04s max=1.09s count=2400
+      { expected_response:true }...: p(50)=362.57ms p(95)=662.85ms p(99)=1.04s max=1.09s count=2400
+    http_req_failed................: 0.00%   0 out of 2400
+    http_reqs......................: 2400    124.270699/s
+
+    EXECUTION
+    iteration_duration.............: p(50)=363.21ms p(95)=663.57ms p(99)=1.05s max=1.1s  count=2400
+    iterations.....................: 2400    124.270699/s
+    vus............................: 50      min=50           max=50
+    vus_max........................: 50      min=50           max=50
+
+    NETWORK
+    data_received..................: 487 kB  25 kB/s
+    data_sent......................: 14 MB   697 kB/s
+
+
+

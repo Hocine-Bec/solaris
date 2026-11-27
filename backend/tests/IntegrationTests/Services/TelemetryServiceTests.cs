@@ -23,7 +23,7 @@ public class TelemetryServiceTests(PostgresFixture database) : IntegrationTestBa
     private int _seeded;
 
     private TelemetryService CreateService() =>
-        new(new EnergyReadingRepo(Context), new InstallationRepo(Context), new UnitOfWork(Context), Clock);
+        new(new EnergyReadingRepo(Context), new InstallationRepo(Context), Clock);
 
     private static UploadReadingsRequest Batch(params (DateTime Slot, decimal Wh)[] readings) =>
         new() { Readings = readings.Select(r => new ReadingRequest { SlotStart = r.Slot, EnergyWh = r.Wh }).ToList() };
@@ -91,8 +91,8 @@ public class TelemetryServiceTests(PostgresFixture database) : IntegrationTestBa
         again.Value.Should().BeEquivalentTo(new { Accepted = 1, Duplicates = 1 });
         again.Value.Rejected.Should().BeEmpty();
         ClearTracking();
-        var stored = await Context.EnergyReadings.OrderBy(r => r.RecordedAt).ToListAsync(Ct);
-        stored.Select(r => r.EnergyKwh).Should().Equal(1.83m, 1.5m);
+        var stored = await Context.EnergyReadings.OrderBy(r => r.SlotStart).ToListAsync(Ct);
+        stored.Select(r => r.EnergyWh).Should().Equal(1830, 1500);
     }
 
     [Fact]

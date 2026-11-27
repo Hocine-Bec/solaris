@@ -77,4 +77,32 @@ public class MigrationSqlTests(PostgresFixture database) : IntegrationTestBase(d
         (await act.Should().ThrowAsync<PostgresException>()).Which.MessageText.Should()
             .Be($"Open leads share an email (BR-L1): leads {leads[0].Id}, {leads[1].Id}. Close all but one of each, then migrate again.");
     }
+
+    [Fact]
+    public async Task DropDuplicateSlots_KeepsEachSlotsEarliestRow()
+    {
+        // Arrange - the state the naive table allowed: one slot stored three times, and another stored once. The
+        // table has its final shape here, so the old columns are made back for the statement to work on.
+        await Context.Database.ExecuteSqlRawAsync("""
+            CREATE TEMP TABLE kept AS SELECT 1;
+            DROP TABLE energy_readings;
+            CREATE TABLE energy_readings (
+              id bigserial PRIMARY KEY, installation_id int NOT NULL,
+              recorded_at timestamptz NOT NULL, energy_kwh numeric(10,4) NOT NULL);
+            INSERT INTO energy_readings (installation_id, recorded_at, energy_kwh) VALUES
+              (1, '2026-11-20 18:00:00+00', 1.8300),
+              (1, '2026-11-20 18:00:00+00', 9.9999),
+              (1, '2026-11-20 18:00:00+00', 5.5555),
+              (1, '2026-11-20 18:15:00+00', 0.4567),
+              (2, '2026-11-20 18:00:00+00', 2.0000);
+            """, Ct);
+
+        // Act
+        await Context.Database.ExecuteSqlRawAsync(FinalReadingSchema.DropDuplicateSlotsSql, Ct);
+
+        // Assert - one row per installation and slot, and the one kept is the earliest of each
+        var left = await Context.Database.SqlQueryRaw<decimal>(
+            "SELECT energy_kwh AS \"Value\" FROM energy_readings ORDER BY installation_id, recorded_at").ToListAsync(Ct);
+        left.Should().Equal(1.8300m, 0.4567m, 2.0000m);
+    }
 }

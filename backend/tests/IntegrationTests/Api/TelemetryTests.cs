@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Domain.Common;
 using Domain.Enums;
 using FluentAssertions;
 using Infrastructure.Auth;
@@ -57,10 +58,10 @@ public class TelemetryTests(PostgresFixture database) : ApiTestBase(database)
 
         // Assert - stored, as kWh, against the key's own installation and nobody else's
         Counts(answer).Should().Be((2, 0, 0));
-        var stored = await Context.EnergyReadings.AsNoTracking().OrderBy(r => r.RecordedAt).ToListAsync(Ct);
+        var stored = await Context.EnergyReadings.AsNoTracking().OrderBy(r => r.SlotStart).ToListAsync(Ct);
         stored.Should().HaveCount(2);
         stored.Should().OnlyContain(r => r.InstallationId == id);
-        stored.Select(r => r.EnergyKwh).Should().Equal(1.25m, 1.83m);
+        stored.Select(r => r.EnergyWh).Should().Equal(1250, 1830);
         otherId.Should().NotBe(id);
         other.Dispose();
     }
@@ -107,7 +108,7 @@ public class TelemetryTests(PostgresFixture database) : ApiTestBase(database)
                 "Readings are accepted for the last 30 days.",
                 "A system can't produce less than nothing.",
                 "More than a 8.4 kW system can produce in 15 minutes (2.31 kWh).");
-        (await Context.EnergyReadings.SingleAsync(Ct)).RecordedAt.Should().Be(good);
+        (await Context.EnergyReadings.SingleAsync(Ct)).SlotStart.Should().Be(good);
     }
 
     [Fact]
@@ -177,9 +178,10 @@ public class TelemetryTests(PostgresFixture database) : ApiTestBase(database)
     }
 
     [Fact]
-    public async Task P4a_TwoBatchesAtOnce_BothStoreTheSameSlot_UntilTheFixesBranch()
+    public async Task BR_T1_TwoBatchesAtOnce_StoreEachSlotOnce()
     {
-        // Arrange - the retry that arrives while the first batch is still being stored
+        // Arrange - the retry that arrives while the first batch is still being stored, which the naive build let
+        // through: both passed its check and both were saved (P4a counted ~500 of them in 192,000 readings)
         var (device, id) = await ADeviceAsync();
         var batch = Enumerable.Range(0, 20).Select(n => Reading(Slot(2).AddMinutes(-15 * n), 1000)).ToArray();
         using var start = new SemaphoreSlim(0);
@@ -193,11 +195,67 @@ public class TelemetryTests(PostgresFixture database) : ApiTestBase(database)
         start.Release(2);
         var responses = await Task.WhenAll(uploads);
 
-        // Assert - both answered; nothing in the database stops one slot being stored twice, which is what P4a counts
+        // Assert - both answered; between them they stored each slot once, and the other upload counted its 20 as
+        // duplicates. The key makes that so, not a check this code makes.
         responses.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.OK);
-        var rows = await Context.EnergyReadings.CountAsync(r => r.InstallationId == id, Ct);
-        var slots = await Context.EnergyReadings.Where(r => r.InstallationId == id).Select(r => r.RecordedAt).Distinct().CountAsync(Ct);
-        slots.Should().Be(20);
-        rows.Should().BeGreaterThanOrEqualTo(slots, "the naive build can store a slot more than once");
+        var answers = await Task.WhenAll(responses.Select(JsonAsync));
+        answers.Sum(a => a.GetProperty("accepted").GetInt32()).Should().Be(20);
+        answers.Sum(a => a.GetProperty("duplicates").GetInt32()).Should().Be(20);
+        (await Context.EnergyReadings.CountAsync(r => r.InstallationId == id, Ct)).Should().Be(20);
+    }
+
+    [Fact]
+    public async Task BR_P3_AnAcceptedBatch_MarksTheLocalDaysItTouched()
+    {
+        // Arrange - two slots on one local day in the installation's zone, and one on the day before
+        var (device, id) = await ADeviceAsync();
+        var zone = (await Context.Installations.AsNoTracking().SingleAsync(i => i.Id == id, Ct)).TimeZone;
+        var yesterday = LocalDays.LastDayEnded(zone, DateTime.UtcNow);
+        var (fromUtc, _) = LocalDays.WindowUtc(yesterday, zone);
+
+        // Act
+        var answer = await UploadAsync(device,
+            Reading(fromUtc.AddHours(9), 1000),
+            Reading(fromUtc.AddHours(9).AddMinutes(15), 1000),
+            Reading(fromUtc.AddHours(-3), 500));
+
+        // Assert - one row per day touched, whatever the slots, and nothing for a day the batch didn't reach
+        Counts(answer).Should().Be((3, 0, 0));
+        var days = await Context.ProductionDirtyDays.AsNoTracking()
+            .Where(d => d.InstallationId == id).Select(d => d.Day).OrderBy(d => d).ToListAsync(Ct);
+        days.Should().Equal(yesterday.AddDays(-1), yesterday);
+    }
+
+    [Fact]
+    public async Task BR_P3_ADayAlreadyMarked_IsMarkedOnce()
+    {
+        // Arrange
+        var (device, id) = await ADeviceAsync();
+        var zone = (await Context.Installations.AsNoTracking().SingleAsync(i => i.Id == id, Ct)).TimeZone;
+        var (fromUtc, _) = LocalDays.WindowUtc(LocalDays.LastDayEnded(zone, DateTime.UtcNow), zone);
+
+        // Act - two batches for the same day, the second with a slot the first didn't send
+        await UploadAsync(device, Reading(fromUtc.AddHours(9), 1000));
+        await UploadAsync(device, Reading(fromUtc.AddHours(10), 1000));
+
+        // Assert
+        (await Context.ProductionDirtyDays.CountAsync(d => d.InstallationId == id, Ct)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task BR_P3_ABatchThatStoredNothingNew_MarksNothing()
+    {
+        // Arrange - everything in it is a slot the installation already has
+        var (device, id) = await ADeviceAsync();
+        var batch = new[] { Reading(Slot(2), 1830) };
+        await UploadAsync(device, batch);
+        await Context.Database.ExecuteSqlAsync($"DELETE FROM production_dirty_days WHERE installation_id = {id}", Ct);
+
+        // Act
+        var again = await UploadAsync(device, batch);
+
+        // Assert - a day is never marked for a reading that wasn't stored
+        Counts(again).Should().Be((0, 1, 0));
+        (await Context.ProductionDirtyDays.CountAsync(d => d.InstallationId == id, Ct)).Should().Be(0);
     }
 }

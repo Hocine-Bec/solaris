@@ -3,21 +3,25 @@ using Domain.Common;
 namespace Domain.Entities;
 
 /// <summary>
-/// The energy one installation produced in one 15-minute slot (BR-T1). Built naive on purpose: a surrogate key and
-/// EF Core's defaults, so there is nothing in the database to stop the same slot being stored twice. P4a measures
-/// that; the fixes branch gives the table its real key (the installation and the slot) and a set-based insert.
+/// The energy one installation produced in one 15-minute slot (BR-T1). The installation and the slot are its key, so
+/// the same slot can't be stored twice however many devices send it at once; watt-hours are whole numbers, four
+/// bytes and exact, where a decimal kWh would be neither.
 /// </summary>
 public class EnergyReading
 {
-    public long Id { get; set; }
-
     public int InstallationId { get; set; }
     public Installation Installation { get; set; } = null!;
 
     /// <summary>The start of the slot, in UTC: always :00, :15, :30 or :45.</summary>
-    public DateTime RecordedAt { get; set; }
+    public DateTime SlotStart { get; set; }
 
-    public decimal EnergyKwh { get; set; }
+    /// <summary>What it produced over that quarter hour, in watt-hours.</summary>
+    public int EnergyWh { get; set; }
+
+    /// <summary>The same energy in kilowatt-hours, which is what the production views report.</summary>
+    public decimal Kwh => EnergyWh / (decimal)WhPerKwh;
+
+    public const int WhPerKwh = 1000;
 
     /// <summary>How long one slot is: a reading is the energy produced over it.</summary>
     public static readonly TimeSpan Slot = TimeSpan.FromMinutes(15);

@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace Infrastructure.Data.Configurations;
 
 /// <summary>
-/// EF Core's defaults on purpose (P4a's before): a surrogate key and the index the foreign key brings, so nothing
-/// stops one slot being stored twice. Only the names are explicit, as every table's are.
+/// The installation and the slot are the key (BR-T1): two devices sending one slot at the same moment can't both
+/// store it, and the index the key brings is the one every read of a system's readings wants.
 /// </summary>
 public class EnergyReadingConfig : IEntityTypeConfiguration<EnergyReading>
 {
@@ -14,31 +14,24 @@ public class EnergyReadingConfig : IEntityTypeConfiguration<EnergyReading>
     {
         builder.ToTable("energy_readings");
 
-        builder.HasKey(r => r.Id).HasName("pk_energy_readings");
-
-        builder.Property(r => r.Id)
-            .HasColumnName("id");
+        builder.HasKey(r => new { r.InstallationId, r.SlotStart }).HasName("pk_energy_readings");
 
         builder.Property(r => r.InstallationId)
-            .HasColumnName("installation_id")
+            .HasColumnName("installation_id");
+
+        builder.Property(r => r.SlotStart)
+            .HasColumnName("slot_start");
+
+        builder.Property(r => r.EnergyWh)
+            .HasColumnName("energy_wh")
             .IsRequired();
 
-        builder.Property(r => r.RecordedAt)
-            .HasColumnName("recorded_at")
-            .IsRequired();
-
-        builder.Property(r => r.EnergyKwh)
-            .HasColumnName("energy_kwh")
-            .HasPrecision(10, 4)
-            .IsRequired();
+        builder.Ignore(r => r.Kwh);
 
         builder.HasOne(r => r.Installation)
             .WithMany()
             .HasForeignKey(r => r.InstallationId)
             .HasConstraintName("fk_energy_readings_installations_installation_id")
             .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasIndex(r => r.InstallationId)
-            .HasDatabaseName("ix_energy_readings_installation_id");
     }
 }
