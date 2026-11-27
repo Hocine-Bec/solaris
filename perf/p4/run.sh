@@ -121,7 +121,9 @@ case "$PART" in
     seconds=$(echo "$(date +%s.%N) - $started" | bc)
 
     rows=$(sql "select count(*) from energy_readings")
-    dupes=$(sql "select count(*) from (select 1 from energy_readings group by installation_id, recorded_at having count(*) > 1) d")
+    # The slot's column is recorded_at in the before's layout and slot_start in the after's
+    slot_column=$([ "$SCHEMA" = naive ] && echo recorded_at || echo slot_start)
+    dupes=$(sql "select count(*) from (select 1 from energy_readings group by installation_id, $slot_column having count(*) > 1) d")
     jq -n --slurpfile k6 "$OUT/k6-summary.json" --arg seconds "$seconds" --arg rows "$rows" --arg dupes "$dupes" \
       --arg run "$RUN" --arg design "$DESIGN" --arg installations "$INSTALLATIONS" --arg days "$STORM_DAYS" '{
         part: "P4a", run: ($run | tonumber), design: $design,
